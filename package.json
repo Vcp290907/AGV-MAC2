@@ -1,0 +1,13 @@
+{
+  "name": "agv-system",
+  "version": "1.0.0",
+  "description": "AGV System - Frontend e Backend",
+  "scripts": {
+    "dev": "concurrently \"npm run backend\" \"npm run frontend\"",
+    "backend": "cd agv-backend && python app.py",
+    "frontend": "cd agv-frontend && npm start"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
