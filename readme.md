@@ -9,8 +9,6 @@ Sistema completo para controle e monitoramento de um carrinho AGV com Raspberry 
 - Coral USB Accelerator
 - ESP32 Mini
 - Câmera
-- Motores para esteira
-- Braço mecânico
 
 **Software:**
 - **Backend:** Python Flask (API REST)
