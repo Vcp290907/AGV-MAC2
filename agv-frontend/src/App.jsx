@@ -7,7 +7,6 @@ function App() {
   const [darkMode, setDarkMode] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Carregar dados salvos no localStorage
   useEffect(() => {
     const savedUsuario = localStorage.getItem('usuario');
     const savedDarkMode = localStorage.getItem('darkMode') === 'true';
@@ -28,13 +27,11 @@ function App() {
     setLoading(false);
   }, []);
 
-  // Função para fazer login e salvar no localStorage
   const handleLogin = (dadosUsuario) => {
     setUsuario(dadosUsuario);
     localStorage.setItem('usuario', JSON.stringify(dadosUsuario));
   };
 
-  // Função para alternar dark mode
   const toggleDarkMode = () => {
     const newDarkMode = !darkMode;
     setDarkMode(newDarkMode);
@@ -52,7 +49,6 @@ function App() {
     localStorage.removeItem('usuario');
   };
 
-  // Mostrar loading enquanto verifica localStorage
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex items-center justify-center">

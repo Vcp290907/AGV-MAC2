@@ -1,7 +1,6 @@
 import React from 'react';
 
 export default function Sidebar({ usuario, paginaAtiva, setPaginaAtiva, onLogout, darkMode, toggleDarkMode }) {
-  // Menus baseados no perfil do usuário
   const menusGerente = [
     { id: 'controle', nome: 'Controle', icone: '📱' },
     { id: 'analise', nome: 'Análise', icone: '📊' },

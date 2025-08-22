@@ -65,7 +65,6 @@ export default function Armazem({ usuario }) {
       return data.tag;
     } catch (error) {
       console.error('Erro ao gerar próxima tag:', error);
-      // Fallback: gerar baseado no timestamp
       return `TAG${Date.now()}`;
     }
   };
@@ -124,13 +123,11 @@ export default function Armazem({ usuario }) {
   const handleImagemChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Validar tipo de arquivo
       if (!file.type.startsWith('image/')) {
         alert('Por favor, selecione um arquivo de imagem válido');
         return;
       }
 
-      // Validar tamanho (máximo 5MB)
       if (file.size > 5 * 1024 * 1024) {
         alert('A imagem deve ter no máximo 5MB');
         return;
@@ -138,7 +135,6 @@ export default function Armazem({ usuario }) {
 
       setImagemSelecionada(file);
       
-      // Criar preview
       const reader = new FileReader();
       reader.onload = (e) => {
         setPreviewImagem(e.target.result);
@@ -167,7 +163,6 @@ export default function Armazem({ usuario }) {
   const salvarEdicao = async () => {
     if (!itemEditando) return;
 
-    // Validações
     if (!itemEditando.nome.trim()) {
       alert('Nome é obrigatório');
       return;
@@ -177,7 +172,6 @@ export default function Armazem({ usuario }) {
     try {
       let nomeImagem = itemEditando.imagem;
 
-      // Upload da imagem se uma nova foi selecionada
       if (imagemSelecionada) {
         nomeImagem = await uploadImagem(imagemSelecionada);
       }
@@ -259,7 +253,6 @@ export default function Armazem({ usuario }) {
 
   const renderizarConteudo = () => {
     if (!subCorredorSelecionado) {
-      // Mostrar todos os sub-corredores do corredor
       const corredor = corredores.find(c => c.id === corredorSelecionado);
       return (
         <div className="space-y-8">
@@ -351,7 +344,6 @@ export default function Armazem({ usuario }) {
         </div>
       );
     } else {
-      // Mostrar apenas o sub-corredor selecionado
       const subCorredorInfo = getSubCorredorSelecionadoInfo();
       const posicoes = gerarPosicoesSubCorredor(subCorredorSelecionado);
       const itensCount = posicoes.filter(p => !p.vazia).length;

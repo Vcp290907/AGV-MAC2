@@ -11,8 +11,7 @@ if [ ! -d "agv-backend" ] || [ ! -d "agv-frontend" ]; then
     exit 1
 fi
 
-# Ativar ambiente virtual e iniciar backend
-echo "Iniciando backend..."
+echo "Iniciando backend"
 cd agv-backend
 
 if [ -d "venv" ]; then
@@ -28,7 +27,6 @@ echo "Backend rodando no PID: $BACKEND_PID (http://localhost:5000)"
 
 cd ..
 
-# Verificar se o frontend foi buildado
 if [ -d "agv-frontend/build" ]; then
     echo "Servindo frontend buildado..."
     cd agv-frontend
@@ -50,7 +48,6 @@ echo "  Frontend: http://localhost:3000"
 echo "========================================="
 echo "Pressione Ctrl+C para parar todos os serviços"
 
-# Função para cleanup quando o script for interrompido
 cleanup() {
     echo ""
     echo "Parando serviços..."
@@ -60,8 +57,6 @@ cleanup() {
     exit 0
 }
 
-# Capturar sinais de interrupção
 trap cleanup SIGINT SIGTERM
 
-# Aguardar interrupção
 wait

@@ -13,7 +13,7 @@ Sistema completo para controle e monitoramento de um carrinho AGV com Raspberry 
 **Software:**
 - **Backend:** Python Flask (API REST)
 - **Frontend:** React + Tailwind CSS
-- **Banco de Dados:** SQLite (futuro)
+- **Banco de Dados:** SQLite
 - **IA:** TensorFlow Lite (Coral USB)
 
 ## 📋 Funcionalidades
@@ -38,11 +38,11 @@ Sistema completo para controle e monitoramento de um carrinho AGV com Raspberry 
 ### Pré-requisitos
 - Python 3.8+
 - Node.js 16+
-- npm ou yarn
+- npm
 
 ### 1. Clone o repositório
 ```bash
-git clone <seu-repositorio>
+git clone <>
 cd AGV-MAC
 ```
 
@@ -88,11 +88,6 @@ npm run frontend
 - **Frontend:** http://localhost:3000
 - **Backend API:** http://localhost:5000
 
-### Credenciais de teste
-- **Usuário:** admin
-- **Senha:** 123
-- **Perfil:** gerente
-
 ## 📁 Estrutura do Projeto
 
 ```
@@ -120,18 +115,4 @@ AGV-MAC/
 - `POST /login` - Login do usuário
 
 ### Status
-- `GET /status` - Status do AGV (bateria, conexão)
-
-## 🚧 Roadmap
-
-- [ ] Implementar JWT para autenticação
-- [ ] Criar páginas do dashboard
-- [ ] Integrar controle do ESP32
-- [ ] Implementar análise de dados
-- [ ] Configuração de rotas do AGV
-- [ ] Sistema de logs
-- [ ] Deploy no Raspberry Pi
-
-## 👨‍💻 Autor
-
-Desenvolvido para controle de sistema AGV industrial.
+- `GET /status` - Status do AGV

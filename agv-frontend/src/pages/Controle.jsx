@@ -95,7 +95,7 @@ export default function Controle({ usuario }) {
         alert('Pedido enviado com sucesso!');
         setItensSelecionados([]);
         setDispositivoSelecionado('');
-        carregarDispositivos(); // Recarregar lista de dispositivos
+        carregarDispositivos();
       } else {
         alert('Erro ao enviar pedido: ' + data.error);
       }
