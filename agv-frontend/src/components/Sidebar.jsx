@@ -5,6 +5,7 @@ export default function Sidebar({ usuario, paginaAtiva, setPaginaAtiva, onLogout
     { id: 'controle', nome: 'Controle', icone: '📱' },
     { id: 'analise', nome: 'Análise', icone: '📊' },
     { id: 'armazem', nome: 'Armazém', icone: '📦' },
+    { id: 'admin-usuarios', nome: 'Usuários', icone: '👥' },
     { id: 'configuracao', nome: 'Configuração', icone: '⚙️' },
     { id: 'status', nome: 'Status', icone: 'ℹ️' },
     { id: 'rotina', nome: 'Rotina', icone: '🔄' }

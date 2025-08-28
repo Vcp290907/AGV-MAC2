@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import Controle from './Controle';
 import Armazem from './Armazem';
+import AdminUsuarios from './AdminUsuarios';
 
 export default function Dashboard({ usuario, onLogout, darkMode, toggleDarkMode }) {
   const [paginaAtiva, setPaginaAtiva] = useState('controle');
@@ -17,7 +18,7 @@ export default function Dashboard({ usuario, onLogout, darkMode, toggleDarkMode 
         toggleDarkMode={toggleDarkMode}
       />
       
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1">
         <div className="bg-white dark:bg-gray-800 m-6 rounded-lg shadow-md h-[calc(100vh-3rem)] transition-colors">
           <div className="p-6 border-b dark:border-gray-700">
             <h1 className="text-2xl font-bold text-gray-800 dark:text-white">
@@ -28,7 +29,7 @@ export default function Dashboard({ usuario, onLogout, darkMode, toggleDarkMode 
             </p>
           </div>
           
-          <div className="h-[calc(100%-5rem)] overflow-auto">
+          <div className="h-[calc(100%-5rem)]">
             {renderizarConteudo(paginaAtiva, usuario)}
           </div>
         </div>
@@ -42,6 +43,7 @@ function getPaginaTitulo(pagina) {
     controle: 'Controle',
     analise: 'Análise',
     armazem: 'Armazém',
+    'admin-usuarios': 'Administração de Usuários',
     configuracao: 'Configuração',
     status: 'Status',
     rotina: 'Rotina'
@@ -55,6 +57,8 @@ function renderizarConteudo(pagina, usuario) {
       return <Controle usuario={usuario} />;
     case 'armazem':
       return <Armazem usuario={usuario} />;
+    case 'admin-usuarios':
+      return <AdminUsuarios usuario={usuario} />;
     case 'analise':
       return <div className="p-6">Conteúdo da Análise</div>;
     case 'configuracao':
