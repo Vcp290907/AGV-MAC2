@@ -3,6 +3,7 @@ import Sidebar from '../components/Sidebar';
 import Controle from './Controle';
 import Armazem from './Armazem';
 import AdminUsuarios from './AdminUsuarios';
+import Status from './Status';
 
 export default function Dashboard({ usuario, onLogout, darkMode, toggleDarkMode }) {
   const [paginaAtiva, setPaginaAtiva] = useState('controle');
@@ -18,7 +19,7 @@ export default function Dashboard({ usuario, onLogout, darkMode, toggleDarkMode 
         toggleDarkMode={toggleDarkMode}
       />
       
-      <div className="flex-1">
+      <div className="flex-1 overflow-y-auto">
         <div className="bg-white dark:bg-gray-800 m-6 rounded-lg shadow-md h-[calc(100vh-3rem)] transition-colors">
           <div className="p-6 border-b dark:border-gray-700">
             <h1 className="text-2xl font-bold text-gray-800 dark:text-white">
@@ -59,12 +60,12 @@ function renderizarConteudo(pagina, usuario) {
       return <Armazem usuario={usuario} />;
     case 'admin-usuarios':
       return <AdminUsuarios usuario={usuario} />;
+    case 'status':
+      return <Status usuario={usuario} />;
     case 'analise':
       return <div className="p-6">Conteúdo da Análise</div>;
     case 'configuracao':
       return <div className="p-6">Conteúdo da Configuração</div>;
-    case 'status':
-      return <div className="p-6">Conteúdo do Status</div>;
     case 'rotina':
       return <div className="p-6">Conteúdo da Rotina</div>;
     default:

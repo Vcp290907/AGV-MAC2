@@ -49,3 +49,19 @@ def atualizar_status_dispositivo(dispositivo_id):
     conn.close()
     
     return jsonify({"success": True, "message": "Status atualizado"})
+
+@dispositivos_bp.route("/dispositivos/<int:dispositivo_id>", methods=["GET"])
+def obter_dispositivo(dispositivo_id):
+    """Obtém informações de um dispositivo específico"""
+    conn = get_db_connection()
+    dispositivo = conn.execute('''
+        SELECT id, nome, codigo, status, bateria, localizacao
+        FROM dispositivos 
+        WHERE id = ?
+    ''', (dispositivo_id,)).fetchone()
+    conn.close()
+    
+    if dispositivo:
+        return jsonify(dict(dispositivo))
+    else:
+        return jsonify({"error": "Dispositivo não encontrado"}), 404

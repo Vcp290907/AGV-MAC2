@@ -10,6 +10,13 @@ export default function Armazem({ usuario }) {
   const [loading, setLoading] = useState(false);
   const [imagemSelecionada, setImagemSelecionada] = useState(null);
   const [previewImagem, setPreviewImagem] = useState(null);
+  const [abaAtiva, setAbaAtiva] = useState('disposicao'); // 'disposicao' ou 'lista'
+  const [termoPesquisa, setTermoPesquisa] = useState('');
+  const [itensFiltrados, setItensFiltrados] = useState([]);
+  const [tipoAdicao, setTipoAdicao] = useState('novo'); // 'novo' ou 'baseado'
+  const [itemModelo, setItemModelo] = useState(null);
+  const [mostrarModalSeletor, setMostrarModalSeletor] = useState(false);
+  const [posicaoDestino, setPosicaoDestino] = useState({ subCorredor: '', posicao: 1 });
 
   // Estrutura do armazém
   const corredores = [
@@ -30,6 +37,19 @@ export default function Armazem({ usuario }) {
     carregarItens();
     carregarCategorias();
   }, []);
+
+  useEffect(() => {
+    if (termoPesquisa.trim() === '') {
+      setItensFiltrados(itens);
+    } else {
+      const filtrados = itens.filter(item => 
+        item.nome.toLowerCase().includes(termoPesquisa.toLowerCase()) ||
+        item.tag.toLowerCase().includes(termoPesquisa.toLowerCase()) ||
+        item.categoria.toLowerCase().includes(termoPesquisa.toLowerCase())
+      );
+      setItensFiltrados(filtrados);
+    }
+  }, [itens, termoPesquisa]);
 
   const carregarItens = async () => {
     try {
@@ -101,23 +121,54 @@ export default function Armazem({ usuario }) {
     setModoEdicao(true);
   };
 
-  const adicionarNovoItem = async (subCorredorId, posicao) => {
+  const adicionarNovoItem = async (subCorredorId, posicao, itemBaseado = null) => {
     const proximaTag = await gerarProximaTag();
     
-    setItemEditando({
-      id: null,
-      nome: '',
-      tag: proximaTag,
-      categoria: categorias[0]?.nome || 'Diversos',
-      imagem: null,
-      novo_corredor: corredorSelecionado,
-      novo_sub_corredor: subCorredorId,
-      nova_posicao_x: posicao,
-      nova_posicao_y: 1
-    });
+    if (itemBaseado) {
+      // Criar item baseado em um existente
+      setItemEditando({
+        id: null,
+        nome: itemBaseado.nome,
+        tag: proximaTag,
+        categoria: itemBaseado.categoria,
+        imagem: itemBaseado.imagem,
+        novo_corredor: corredorSelecionado,
+        novo_sub_corredor: subCorredorId,
+        nova_posicao_x: posicao,
+        nova_posicao_y: 1
+      });
+      setTipoAdicao('baseado');
+      setItemModelo(itemBaseado);
+    } else {
+      // Criar item completamente novo
+      setItemEditando({
+        id: null,
+        nome: '',
+        tag: proximaTag,
+        categoria: categorias[0]?.nome || 'Diversos',
+        imagem: null,
+        novo_corredor: corredorSelecionado,
+        novo_sub_corredor: subCorredorId,
+        nova_posicao_x: posicao,
+        nova_posicao_y: 1
+      });
+      setTipoAdicao('novo');
+      setItemModelo(null);
+    }
+    
     setImagemSelecionada(null);
     setPreviewImagem(null);
     setModoEdicao(true);
+  };
+
+  const mostrarSeletorItemModelo = (subCorredorId, posicao) => {
+    setPosicaoDestino({ subCorredor: subCorredorId, posicao: posicao });
+    setMostrarModalSeletor(true);
+  };
+
+  const selecionarItemModelo = async (itemSelecionado) => {
+    setMostrarModalSeletor(false);
+    await adicionarNovoItem(posicaoDestino.subCorredor, posicaoDestino.posicao, itemSelecionado);
   };
 
   const handleImagemChange = (e) => {
@@ -172,8 +223,13 @@ export default function Armazem({ usuario }) {
     try {
       let nomeImagem = itemEditando.imagem;
 
+      // Se uma nova imagem foi selecionada, fazer upload
       if (imagemSelecionada) {
         nomeImagem = await uploadImagem(imagemSelecionada);
+      }
+      // Se é baseado em item e não selecionou nova imagem, manter a imagem do modelo
+      else if (tipoAdicao === 'baseado' && itemModelo && !itemEditando.id) {
+        nomeImagem = itemModelo.imagem;
       }
 
       const url = itemEditando.id 
@@ -200,11 +256,15 @@ export default function Armazem({ usuario }) {
 
       const data = await response.json();
       if (data.success) {
-        alert(itemEditando.id ? 'Item atualizado com sucesso!' : 'Item criado com sucesso!');
+        alert(itemEditando.id ? 'Item atualizado com sucesso!' : 
+              tipoAdicao === 'baseado' ? 'Nova instância criada com sucesso!' : 
+              'Item criado com sucesso!');
         setModoEdicao(false);
         setItemEditando(null);
         setImagemSelecionada(null);
         setPreviewImagem(null);
+        setTipoAdicao('novo');
+        setItemModelo(null);
         carregarItens();
       } else {
         alert('Erro ao salvar item: ' + data.error);
@@ -241,6 +301,8 @@ export default function Armazem({ usuario }) {
     setItemEditando(null);
     setImagemSelecionada(null);
     setPreviewImagem(null);
+    setTipoAdicao('novo');
+    setItemModelo(null);
   };
 
   const getSubCorredorSelecionadoInfo = () => {
@@ -251,11 +313,130 @@ export default function Armazem({ usuario }) {
     return subCorredor;
   };
 
+  const renderizarListaItens = () => {
+    return (
+      <div className="space-y-6">
+        {/* Barra de pesquisa */}
+        <div className="max-w-md mx-auto">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Pesquisar por nome, tag ou categoria..."
+              value={termoPesquisa}
+              onChange={(e) => setTermoPesquisa(e.target.value)}
+              className="w-full px-4 py-2 pl-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        {/* Estatísticas */}
+        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+          <div className="text-center">
+            <p className="text-blue-700 dark:text-blue-300">
+              <span className="font-semibold">{itensFiltrados.length}</span> 
+              {termoPesquisa ? ' itens encontrados' : ' itens cadastrados no total'}
+            </p>
+          </div>
+        </div>
+
+        {/* Lista de itens */}
+        {itensFiltrados.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="text-gray-400 text-6xl mb-4">📦</div>
+            <p className="text-gray-500 dark:text-gray-400 text-lg">
+              {termoPesquisa ? 'Nenhum item encontrado para sua pesquisa' : 'Nenhum item cadastrado'}
+            </p>
+          </div>
+        ) : (
+          <div className="max-h-[60vh] overflow-y-auto pr-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {itensFiltrados.map(item => (
+                <div
+                  key={item.id}
+                  className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600 p-6 hover:shadow-lg transition-shadow"
+                >
+                  {/* Imagem do item */}
+                  <div className="w-24 h-24 bg-gray-200 dark:bg-gray-600 rounded-lg mx-auto mb-4 flex items-center justify-center overflow-hidden">
+                    {item.imagem ? (
+                      <img 
+                        src={`http://localhost:5000/static/images/${item.imagem}`} 
+                        alt={item.nome}
+                        className="w-full h-full object-cover rounded-lg"
+                      />
+                    ) : (
+                      <span className="text-3xl">📦</span>
+                    )}
+                  </div>
+
+                  {/* Informações do item */}
+                  <div className="text-center space-y-2">
+                    <h3 className="font-semibold text-lg text-gray-900 dark:text-white">
+                      {item.nome}
+                    </h3>
+                    
+                    <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
+                      <p><span className="font-medium">Tag:</span> {item.tag}</p>
+                      <p><span className="font-medium">Categoria:</span> {item.categoria}</p>
+                      <p>
+                        <span className="font-medium">Localização:</span> 
+                        {item.corredor ? ` Corredor ${item.corredor}, Sub ${item.sub_corredor}, Pos ${item.posicao_x}` : ' Não definida'}
+                      </p>
+                    </div>
+
+                    {/* Status */}
+                    <div className="flex justify-center mt-3">
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        item.disponivel 
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
+                          : 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
+                      }`}>
+                        {item.disponivel ? 'Disponível' : 'Indisponível'}
+                      </span>
+                    </div>
+
+                    {/* Botões de ação (apenas para gerentes) */}
+                    {usuario.perfil === 'gerente' && (
+                      <div className="flex gap-2 mt-4 justify-center">
+                        <button
+                          onClick={() => handleEditarItem(item)}
+                          className="px-4 py-2 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => excluirItem(item.id)}
+                          className="px-4 py-2 bg-red-500 text-white text-sm rounded-lg hover:bg-red-600 transition-colors flex items-center gap-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                          Excluir
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderizarConteudo = () => {
     if (!subCorredorSelecionado) {
       const corredor = corredores.find(c => c.id === corredorSelecionado);
       return (
-        <div className="space-y-8">
+        <div className="max-h-[70vh] overflow-y-auto pr-2 space-y-8">
           {corredor?.subCorredores.map(subCorredor => {
             const posicoes = gerarPosicoesSubCorredor(subCorredor.id);
             const itensCount = posicoes.filter(p => !p.vazia).length;
@@ -286,12 +467,20 @@ export default function Armazem({ usuario }) {
                             Vazia
                           </p>
                           {usuario.perfil === 'gerente' && (
-                            <button
-                              onClick={() => adicionarNovoItem(subCorredor.id, posicao)}
-                              className="mt-2 px-2 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600 transition-colors"
-                            >
-                              Adicionar
-                            </button>
+                            <div className="space-y-1">
+                              <button
+                                onClick={() => adicionarNovoItem(subCorredor.id, posicao)}
+                                className="w-full px-2 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600 transition-colors"
+                              >
+                                Novo Item
+                              </button>
+                              <button
+                                onClick={() => mostrarSeletorItemModelo(subCorredor.id, posicao)}
+                                className="w-full px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition-colors"
+                              >
+                                Baseado em Item
+                              </button>
+                            </div>
                           )}
                         </>
                       ) : (
@@ -374,12 +563,20 @@ export default function Armazem({ usuario }) {
                       Vazia
                     </p>
                     {usuario.perfil === 'gerente' && (
-                      <button
-                        onClick={() => adicionarNovoItem(subCorredorSelecionado, posicao)}
-                        className="px-3 py-2 bg-green-500 text-white text-sm rounded hover:bg-green-600 transition-colors"
-                      >
-                        Adicionar Item
-                      </button>
+                      <div className="space-y-2">
+                        <button
+                          onClick={() => adicionarNovoItem(subCorredorSelecionado, posicao)}
+                          className="w-full px-3 py-2 bg-green-500 text-white text-sm rounded hover:bg-green-600 transition-colors"
+                        >
+                          Novo Item
+                        </button>
+                        <button
+                          onClick={() => mostrarSeletorItemModelo(subCorredorSelecionado, posicao)}
+                          className="w-full px-3 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition-colors"
+                        >
+                          Baseado em Item
+                        </button>
+                      </div>
                     )}
                   </>
                 ) : (
@@ -436,67 +633,195 @@ export default function Armazem({ usuario }) {
       {/* Cabeçalho */}
       <div className="text-center">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-          Disposição dos itens
+          Gerenciamento do Armazém
         </h2>
+        <p className="text-gray-600 dark:text-gray-400">
+          Gerencie a disposição e listagem dos itens do armazém
+        </p>
       </div>
 
-      {/* Seletores de Corredor */}
-      <div className="flex gap-4 items-center">
-        <div className="flex items-center gap-2">
-          <label className="text-gray-700 dark:text-gray-300 font-medium">
-            Corredor:
-          </label>
-          <select
-            value={corredorSelecionado}
-            onChange={(e) => {
-              setCorredorSelecionado(e.target.value);
-              setSubCorredorSelecionado('');
-            }}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+      {/* Abas de Navegação */}
+      <div className="flex justify-center">
+        <div className="inline-flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+          <button
+            onClick={() => setAbaAtiva('disposicao')}
+            className={`px-6 py-2 rounded-md font-medium transition-colors ${
+              abaAtiva === 'disposicao'
+                ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+            }`}
           >
-            {corredores.map(corredor => (
-              <option key={corredor.id} value={corredor.id}>
-                {corredor.nome}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <label className="text-gray-700 dark:text-gray-300 font-medium">
-            Sub corredor:
-          </label>
-          <select
-            value={subCorredorSelecionado}
-            onChange={(e) => setSubCorredorSelecionado(e.target.value)}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            Disposição dos Itens
+          </button>
+          <button
+            onClick={() => setAbaAtiva('lista')}
+            className={`px-6 py-2 rounded-md font-medium transition-colors ${
+              abaAtiva === 'lista'
+                ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+            }`}
           >
-            <option value="">Selecione um sub-corredor</option>
-            {corredores
-              .find(c => c.id === corredorSelecionado)
-              ?.subCorredores.map(sub => (
-                <option key={sub.id} value={sub.id}>
-                  {sub.nome}
-                </option>
-              ))}
-          </select>
+            Lista de Itens
+          </button>
         </div>
       </div>
 
-      {/* Conteúdo Principal */}
-      <div className="min-h-96">
-        {renderizarConteudo()}
-      </div>
+      {/* Conteúdo das Abas */}
+      {abaAtiva === 'disposicao' ? (
+        <div className="space-y-6">
+          {/* Seletores de Corredor */}
+          <div className="flex gap-4 items-center">
+            <div className="flex items-center gap-2">
+              <label className="text-gray-700 dark:text-gray-300 font-medium">
+                Corredor:
+              </label>
+              <select
+                value={corredorSelecionado}
+                onChange={(e) => {
+                  setCorredorSelecionado(e.target.value);
+                  setSubCorredorSelecionado('');
+                }}
+                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              >
+                {corredores.map(corredor => (
+                  <option key={corredor.id} value={corredor.id}>
+                    {corredor.nome}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <label className="text-gray-700 dark:text-gray-300 font-medium">
+                Sub corredor:
+              </label>
+              <select
+                value={subCorredorSelecionado}
+                onChange={(e) => setSubCorredorSelecionado(e.target.value)}
+                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              >
+                <option value="">Selecione um sub-corredor</option>
+                {corredores
+                  .find(c => c.id === corredorSelecionado)
+                  ?.subCorredores.map(sub => (
+                    <option key={sub.id} value={sub.id}>
+                      {sub.nome}
+                    </option>
+                  ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Conteúdo Principal - Disposição */}
+          <div className="min-h-96 max-h-[calc(100vh-300px)] overflow-y-auto">
+            {renderizarConteudo()}
+          </div>
+        </div>
+      ) : (
+        /* Conteúdo Principal - Lista */
+        <div className="min-h-96 max-h-[calc(100vh-300px)]">
+          {renderizarListaItens()}
+        </div>
+      )}
+
+      {/* Modal Seletor de Item Modelo */}
+      {mostrarModalSeletor && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-4xl max-h-[90vh] flex flex-col">
+            {/* Cabeçalho fixo */}
+            <div className="p-6 border-b border-gray-200 dark:border-gray-600">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                Selecionar Item como Modelo
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                Escolha um item existente para criar uma nova instância com TAG diferente
+              </p>
+            </div>
+            
+            {/* Conteúdo com scroll */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {itens.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="text-gray-400 text-6xl mb-4">📦</div>
+                  <p className="text-gray-500 dark:text-gray-400 text-lg">
+                    Nenhum item cadastrado ainda
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {itens.map(item => (
+                    <div
+                      key={item.id}
+                      className="bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 p-4 hover:shadow-md transition-shadow cursor-pointer"
+                      onClick={() => selecionarItemModelo(item)}
+                    >
+                      {/* Imagem do item */}
+                      <div className="w-16 h-16 bg-gray-200 dark:bg-gray-600 rounded-lg mx-auto mb-3 flex items-center justify-center overflow-hidden">
+                        {item.imagem ? (
+                          <img 
+                            src={`http://localhost:5000/static/images/${item.imagem}`} 
+                            alt={item.nome}
+                            className="w-full h-full object-cover rounded-lg"
+                          />
+                        ) : (
+                          <span className="text-2xl">📦</span>
+                        )}
+                      </div>
+
+                      {/* Informações do item */}
+                      <div className="text-center space-y-1">
+                        <h4 className="font-medium text-gray-900 dark:text-white text-sm">
+                          {item.nome}
+                        </h4>
+                        <div className="text-xs text-gray-600 dark:text-gray-400 space-y-0.5">
+                          <p><span className="font-medium">Tag:</span> {item.tag}</p>
+                          <p><span className="font-medium">Categoria:</span> {item.categoria}</p>
+                        </div>
+                        
+                        <button className="w-full mt-2 px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition-colors">
+                          Selecionar
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Botões fixos na parte inferior */}
+            <div className="p-6 border-t border-gray-200 dark:border-gray-600">
+              <button
+                onClick={() => setMostrarModalSeletor(false)}
+                className="w-full px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Edição Atualizado */}
       {modoEdicao && itemEditando && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
-              {itemEditando.id ? `Editar: ${itemEditando.nome}` : 'Adicionar Novo Item'}
-            </h3>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-lg max-h-[90vh] flex flex-col">
+            {/* Cabeçalho fixo */}
+            <div className="p-6 border-b border-gray-200 dark:border-gray-600">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                {itemEditando.id ? `Editar: ${itemEditando.nome}` : 
+                 tipoAdicao === 'baseado' ? `Nova Instância de: ${itemEditando.nome}` : 
+                 'Adicionar Novo Item'}
+              </h3>
+              {tipoAdicao === 'baseado' && itemModelo && (
+                <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
+                  Baseado no item: {itemModelo.nome} (Tag original: {itemModelo.tag})
+                </p>
+              )}
+            </div>
             
-            <div className="space-y-4">
+            {/* Conteúdo com scroll */}
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="space-y-4">
               {/* Upload de Imagem */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -637,23 +962,26 @@ export default function Armazem({ usuario }) {
                   ))}
                 </select>
               </div>
+              </div>
             </div>
 
-            {/* Botões do Modal */}
-            <div className="flex gap-4 mt-6">
-              <button
-                onClick={cancelarEdicao}
-                className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={salvarEdicao}
-                disabled={loading || !itemEditando.nome.trim()}
-                className="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50"
-              >
-                {loading ? 'Salvando...' : 'Salvar'}
-              </button>
+            {/* Botões do Modal - Fixos na parte inferior */}
+            <div className="p-6 border-t border-gray-200 dark:border-gray-600">
+              <div className="flex gap-4">
+                <button
+                  onClick={cancelarEdicao}
+                  className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={salvarEdicao}
+                  disabled={loading || !itemEditando.nome.trim()}
+                  className="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50"
+                >
+                  {loading ? 'Salvando...' : 'Salvar'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
