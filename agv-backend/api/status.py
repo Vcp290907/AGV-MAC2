@@ -4,4 +4,4 @@ status_bp = Blueprint('status', __name__)
 
 @status_bp.route("/status")
 def status():
-    return {"bateria": 87, "conexao": "ok"}
+    return {"bateria": 90, "conexao": "ok"}

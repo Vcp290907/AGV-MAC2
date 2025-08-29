@@ -6,9 +6,8 @@ from database import get_db_connection
 
 armazem_bp = Blueprint('armazem', __name__)
 
-# Configurações de upload
 UPLOAD_FOLDER = 'static/images'
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -22,7 +21,6 @@ def listar_categorias():
     ''').fetchall()
     conn.close()
     
-    # Se não houver categorias, retornar padrões
     if not categorias:
         return jsonify([
             {"id": 1, "nome": "Fixação"},
@@ -38,7 +36,6 @@ def gerar_proxima_tag():
     """Gera a próxima tag automática"""
     conn = get_db_connection()
     
-    # Buscar a maior tag numérica atual
     result = conn.execute('''
         SELECT MAX(CAST(SUBSTR(tag, 4) AS INTEGER)) as max_num
         FROM itens 
@@ -48,7 +45,7 @@ def gerar_proxima_tag():
     conn.close()
     
     proximo_numero = (result['max_num'] or 0) + 1
-    proxima_tag = f"TAG{proximo_numero:04d}"  # TAG0001, TAG0002, etc.
+    proxima_tag = f"TAG{proximo_numero:04d}" 
     
     return jsonify({"tag": proxima_tag})
 
@@ -63,14 +60,11 @@ def upload_imagem():
         return jsonify({"error": "Nenhum arquivo selecionado"}), 400
     
     if file and allowed_file(file.filename):
-        # Gerar nome único para o arquivo
         filename = secure_filename(file.filename)
         unique_filename = f"{uuid.uuid4().hex}_{filename}"
         
-        # Garantir que a pasta existe
         os.makedirs(UPLOAD_FOLDER, exist_ok=True)
         
-        # Salvar arquivo
         filepath = os.path.join(UPLOAD_FOLDER, unique_filename)
         file.save(filepath)
         
