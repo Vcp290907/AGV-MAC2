@@ -108,11 +108,3 @@ AGV-MAC/
 ├── start.bat            # Script Windows
 └── README.md
 ```
-
-## 🔌 API Endpoints
-
-### Autenticação
-- `POST /login` - Login do usuário
-
-### Status
-- `GET /status` - Status do AGV
