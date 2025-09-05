@@ -6,7 +6,7 @@ O sistema AGV é dividido em **dois componentes principais** que se comunicam vi
 
 ```
 ┌─────────────────────┐     WiFi     ┌─────────────────────┐
-│   💻 COMPUTADOR     │◄────────────►│  🤖 RASPBERRY PI    │
+│   💻 COMPUTADOR     │◄───────────►│   🤖 RASPBERRY PI   │
 │                     │              │                     │
 │ ┌─────────────────┐ │              │ ┌─────────────────┐ │
 │ │   Frontend      │ │              │ │  Sistema de     │ │

@@ -3,21 +3,22 @@ from database import verificar_usuario
 
 auth_bp = Blueprint('auth', __name__)
 
-@auth_bp.route("/login", methods=["POST"])
+@auth_bp.route("/login", methods=["POST"]) # Ao apertar o botão de realizar o login, é executado esse código
 def login():
     """Autenticar usuário"""
     data = request.json
-    username = data.get('username', '').strip()
-    password = data.get('password', '').strip()
+    username = data.get('username', '').strip() # Recebe a informação do username/nome colocado no campo
+    password = data.get('password', '').strip() # Recebe a informação da senha colocada no campo
     
-    if not username or not password:
+    if not username or not password: # Verifica se há informação nos campos obrigatórios para o login
         return jsonify({
             "success": False,
-            "message": "Username e senha são obrigatórios"
+            "message": "Username e senha são obrigatórios" # Se não tiver, manda um alert para o site falando que falta informações
         }), 400
     
-    usuario = verificar_usuario(username, password)
+    usuario = verificar_usuario(username, password) # Chama a função verificar_usuario, passando as informações obtidas, isso é necessário pois deixa o código mais legivél e explicativo, ainda mais que é utilizado criptografia na senha. Essa função retorna true ou false para a variável usuario.
     
+    # Se for encontrado as informações do usuário, ele será logado e essas informções guardadas em um Json para sua identificação
     if usuario:
         return jsonify({
             "success": True,
@@ -29,7 +30,7 @@ def login():
                 "perfil": usuario['perfil']
             }
         })
-    else:
+    else:  #Se não forem encontradas, ou ele estiver desativado, não deixa logar
         return jsonify({
             "success": False,
             "message": "Credenciais inválidas"

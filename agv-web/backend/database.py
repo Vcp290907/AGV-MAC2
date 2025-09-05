@@ -184,19 +184,20 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-def verificar_usuario(username, password):
+def verificar_usuario(username, password): #Aqui é realizado a criptografia da senha e o retorno com as informações do usuário, se encotrado
     """Verifica credenciais do usuário"""
-    conn = get_db_connection()
-    password_hash = hash_password(password)
+    conn = get_db_connection() #Coneção estabelecida com o Banco da dados
+    password_hash = hash_password(password) #Criptografia da senha para verificar com a armazenada no banco de dados
     
+    #Pesquisa no banco de dados, com as informações obtidas, e a reficiação de se o usuários está ativo
     usuario = conn.execute('''
         SELECT id, nome, username, perfil, ativo
         FROM usuarios 
         WHERE username = ? AND password_hash = ? AND ativo = 1
     ''', (username, password_hash)).fetchone()
     
-    conn.close()
+    conn.close() #Fecha a coenção com o Banco de dados
     
-    if usuario:
+    if usuario: #Se encontrar usuário, retorna as informações dele, como nome, cargo, etc
         return dict(usuario)
     return None
