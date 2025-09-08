@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import socketService from '../services/socketService';
 
 export default function Status({ usuario }) {
   const [pedidoAtual, setPedidoAtual] = useState(null);
@@ -8,18 +9,68 @@ export default function Status({ usuario }) {
   const [agvs, setAgvs] = useState([]);
   const [agvSelecionado, setAgvSelecionado] = useState('');
   const [statusAgv, setStatusAgv] = useState(null);
-  const [pedidoCancelado, setPedidoCancelado] = useState(false); // Novo estado
 
   useEffect(() => {
     carregarAgvs();
+
+    // Set up WebSocket event listeners for real-time updates
+    const handleSystemStatus = (data) => {
+      console.log('Received real-time status update:', data);
+
+      // Update devices
+      setAgvs(data.devices || []);
+
+      // Update status system
+      setStatusSistema(prev => ({
+        ...prev,
+        bateria: data.devices?.find(d => d.id == agvSelecionado)?.bateria || prev.bateria,
+        conexao: data.devices?.length > 0 ? 'ok' : 'offline'
+      }));
+
+      // Update AGV status
+      if (agvSelecionado) {
+        const selectedDevice = data.devices?.find(d => d.id == agvSelecionado);
+        if (selectedDevice) {
+          setStatusAgv(selectedDevice);
+        }
+      }
+
+      // Update active orders for the selected AGV
+      const activeOrders = data.active_orders || [];
+      const ordersForSelectedAgv = activeOrders.filter(order =>
+        agvSelecionado && order.dispositivo_id == agvSelecionado
+      );
+
+      if (ordersForSelectedAgv.length > 0) {
+        const pedidoAtivo = ordersForSelectedAgv[0]; // Get the most recent active order for this AGV
+        console.log('Setting active order:', pedidoAtivo);
+        setPedidoAtual(pedidoAtivo);
+
+        // Generate route if there's an active order
+        if (pedidoAtivo && pedidoAtivo.itens) {
+          gerarRotaAtual(pedidoAtivo);
+        }
+      } else {
+        console.log('No active orders for selected AGV, clearing data');
+        setPedidoAtual(null);
+        setRotaAtual([]);
+      }
+    };
+
+    // Add event listener
+    socketService.addEventListener('system_status', handleSystemStatus);
+
+    // Initial data load
     carregarDados();
-    const interval = setInterval(carregarDados, 5000); // Atualiza a cada 5 segundos
-    return () => clearInterval(interval);
-  }, []);
+
+    // Cleanup
+    return () => {
+      socketService.removeEventListener('system_status', handleSystemStatus);
+    };
+  }, [agvSelecionado]);
 
   useEffect(() => {
     if (agvSelecionado) {
-      setPedidoCancelado(false); // Reset flag quando trocar de AGV
       carregarDados();
     }
   }, [agvSelecionado]);
@@ -75,20 +126,8 @@ export default function Status({ usuario }) {
           }
         }
         
-        // Se não há pedido real e não foi cancelado recentemente, criar um de demonstração se o AGV estiver "ocupado"
-        if (!pedidoAtivo && !pedidoCancelado && agvData.status === 'ocupado') {
-          pedidoAtivo = {
-            id: 'demo_' + agvSelecionado,
-            usuario_nome: 'Demo User',
-            status: 'em_andamento',
-            dispositivo_nome: agvData.nome,
-            dispositivo_codigo: agvData.codigo,
-            itens: 'Prego,Pilha,Resistor,Filamento',
-            corredores: '1,1,1,1',
-            sub_corredores: '1,1,2,3',
-            posicoes_x: '1,2,1,1'
-          };
-        }
+        // Se não há pedido real, não criar dados de demonstração
+        // O usuário verá "Nenhum pedido em andamento" em vez de dados falsos
         
         setPedidoAtual(pedidoAtivo);
 
@@ -108,7 +147,7 @@ export default function Status({ usuario }) {
 
   const gerarRotaAtual = (pedido) => {
     console.log('Gerando rota para pedido:', pedido); // Debug
-    
+
     // Gerar rota baseada nos dados reais do pedido
     if (!pedido.itens) {
       console.log('Pedido sem itens'); // Debug
@@ -124,16 +163,9 @@ export default function Status({ usuario }) {
     console.log('Dados do pedido:', { itens, corredores, subCorredores, posicoesX }); // Debug
 
     const rota = itens.map((item, index) => {
-      // Simular status baseado no tempo decorrido ou progresso do pedido
-      let status = 'N'; // Não pego ainda por padrão
-      
-      // Simular progresso mais dinâmico
-      const agora = new Date();
-      const seed = (agora.getMinutes() + index) % 4; // Muda a cada minuto
-      
-      if (seed === 0) status = 'P'; // Pego
-      else if (seed === 1 && Math.random() > 0.7) status = 'F'; // Às vezes não encontrado
-      else status = 'N'; // Não pego ainda
+      // Para pedidos reais, todos os itens começam com status 'N' (não pego ainda)
+      // O status será atualizado quando o AGV realmente coletar/processar os itens
+      const status = 'N'; // Não pego ainda
 
       return {
         id: index + 1,
@@ -142,7 +174,7 @@ export default function Status({ usuario }) {
         subCorredor: subCorredores[index] || '1',
         posicao: posicoesX[index] || '1',
         status: status,
-        coletado: status === 'P'
+        coletado: false
       };
     });
 
@@ -267,14 +299,8 @@ export default function Status({ usuario }) {
       // Limpar estado local
       setPedidoAtual(null);
       setRotaAtual([]);
-      setPedidoCancelado(true); // Marcar como cancelado
 
       alert('Rota cancelada com sucesso! Itens coletados foram removidos do armazém.');
-      
-      // Reset do flag após 30 segundos para permitir que novos dados demo sejam criados se necessário
-      setTimeout(() => {
-        setPedidoCancelado(false);
-      }, 30000);
       
       // Recarregar dados após um pequeno delay
       setTimeout(() => {

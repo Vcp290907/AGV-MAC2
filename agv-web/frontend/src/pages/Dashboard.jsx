@@ -4,6 +4,7 @@ import Controle from './Controle';
 import Armazem from './Armazem';
 import AdminUsuarios from './AdminUsuarios';
 import Status from './Status';
+import Analise from './Analise';
 
 export default function Dashboard({ usuario, onLogout, darkMode, toggleDarkMode }) {
   const [paginaAtiva, setPaginaAtiva] = useState('controle');
@@ -63,7 +64,7 @@ function renderizarConteudo(pagina, usuario) {
     case 'status':
       return <Status usuario={usuario} />;
     case 'analise':
-      return <div className="p-6">Conteúdo da Análise</div>;
+      return <Analise usuario={usuario} />;
     case 'configuracao':
       return <div className="p-6">Conteúdo da Configuração</div>;
     case 'rotina':

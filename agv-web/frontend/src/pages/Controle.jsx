@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import socketService from '../services/socketService';
 
 export default function Controle({ usuario }) {
   const [itens, setItens] = useState([]);
+  const [itensDisponiveis, setItensDisponiveis] = useState([]);
   const [itensSelecionados, setItensSelecionados] = useState([]);
   const [dispositivos, setDispositivos] = useState([]);
   const [dispositivoSelecionado, setDispositivoSelecionado] = useState('');
+  const [pedidosAtivos, setPedidosAtivos] = useState([]);
   const [pesquisa, setPesquisa] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -12,6 +15,34 @@ export default function Controle({ usuario }) {
   useEffect(() => {
     carregarItens();
     carregarDispositivos();
+    carregarPedidosAtivos();
+
+    // Set up WebSocket listener for real-time updates
+    const handleSystemStatus = (data) => {
+      // Update available devices
+      if (data.devices) {
+        setDispositivos(data.devices.filter(d => d.status === 'disponivel'));
+      }
+
+      // Update active orders
+      if (data.active_orders) {
+        setPedidosAtivos(data.active_orders);
+      } else {
+        setPedidosAtivos([]);
+      }
+
+      // Only update available items if we have both items and active orders data
+      // This prevents updating with empty items array
+      if (data.active_orders !== undefined && itens.length > 0) {
+        atualizarItensDisponiveis(data.active_orders || []);
+      }
+    };
+
+    socketService.addEventListener('system_status', handleSystemStatus);
+
+    return () => {
+      socketService.removeEventListener('system_status', handleSystemStatus);
+    };
   }, []);
 
   const carregarItens = async () => {
@@ -19,6 +50,8 @@ export default function Controle({ usuario }) {
       const response = await fetch('http://localhost:5000/itens');
       const data = await response.json();
       setItens(data);
+      // Update available items after loading all items
+      atualizarItensDisponiveis(pedidosAtivos);
     } catch (error) {
       console.error('Erro ao carregar itens:', error);
     }
@@ -34,16 +67,62 @@ export default function Controle({ usuario }) {
     }
   };
 
+  const carregarPedidosAtivos = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/pedidos?status=pendente,em_andamento,coletando');
+      const data = await response.json();
+      setPedidosAtivos(data);
+
+      // Update available items based on active orders
+      atualizarItensDisponiveis(data);
+    } catch (error) {
+      console.error('Erro ao carregar pedidos ativos:', error);
+    }
+  };
+
+  const atualizarItensDisponiveis = (pedidosAtivos) => {
+    // Get all item IDs that are part of active orders
+    const itensEmPedidosAtivos = new Set();
+    pedidosAtivos.forEach(pedido => {
+      if (pedido.itens) {
+        // Parse comma-separated item names and find their IDs
+        const itemNames = pedido.itens.split(',');
+        itemNames.forEach(itemName => {
+          const item = itens.find(i => i.nome.trim() === itemName.trim());
+          if (item) {
+            itensEmPedidosAtivos.add(item.id);
+          }
+        });
+      }
+    });
+
+    // Filter out items that are in active orders
+    const itensDisponiveis = itens.filter(item => !itensEmPedidosAtivos.has(item.id));
+    setItensDisponiveis(itensDisponiveis);
+  };
+
   const pesquisarItens = async () => {
     if (!pesquisa.trim()) {
-      carregarItens();
+      // Reset to show all available items
+      atualizarItensDisponiveis(pedidosAtivos);
       return;
     }
 
     try {
       const response = await fetch(`http://localhost:5000/itens/pesquisar?q=${pesquisa}`);
       const data = await response.json();
-      setItens(data);
+      // Filter search results to only show available items
+      const itensFiltrados = data.filter(item => {
+        const itemEmPedidoAtivo = pedidosAtivos.some(pedido => {
+          if (pedido.itens) {
+            const itemNames = pedido.itens.split(',');
+            return itemNames.some(name => name.trim() === item.nome.trim());
+          }
+          return false;
+        });
+        return !itemEmPedidoAtivo;
+      });
+      setItensDisponiveis(itensFiltrados);
     } catch (error) {
       console.error('Erro ao pesquisar:', error);
     }
@@ -96,6 +175,8 @@ export default function Controle({ usuario }) {
         setItensSelecionados([]);
         setDispositivoSelecionado('');
         carregarDispositivos();
+        // Refresh available items after placing order
+        carregarPedidosAtivos();
       } else {
         alert('Erro ao enviar pedido: ' + data.error);
       }
@@ -178,7 +259,7 @@ export default function Controle({ usuario }) {
 
       {/* Lista de itens disponíveis */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        {itens.map(item => (
+        {itensDisponiveis.map(item => (
           <div
             key={item.id}
             onClick={() => adicionarItem(item)}

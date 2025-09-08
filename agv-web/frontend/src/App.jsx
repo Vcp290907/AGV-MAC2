@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import socketService from "./services/socketService";
 
 function App() {
   const [usuario, setUsuario] = useState(null);
@@ -10,7 +11,7 @@ function App() {
   useEffect(() => {
     const savedUsuario = localStorage.getItem('usuario');
     const savedDarkMode = localStorage.getItem('darkMode') === 'true';
-    
+
     if (savedUsuario) {
       try {
         setUsuario(JSON.parse(savedUsuario));
@@ -18,13 +19,21 @@ function App() {
         localStorage.removeItem('usuario');
       }
     }
-    
+
     setDarkMode(savedDarkMode);
     if (savedDarkMode) {
       document.documentElement.classList.add('dark');
     }
-    
+
+    // Connect to WebSocket server
+    socketService.connect();
+
     setLoading(false);
+
+    // Cleanup on unmount
+    return () => {
+      socketService.disconnect();
+    };
   }, []);
 
   const handleLogin = (dadosUsuario) => {
