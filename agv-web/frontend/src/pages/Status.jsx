@@ -80,7 +80,7 @@ export default function Status({ usuario }) {
       const response = await fetch('http://localhost:5000/dispositivos');
       const data = await response.json();
       setAgvs(data);
-      
+
       // Selecionar o primeiro AGV por padrão se não há nenhum selecionado
       if (data.length > 0 && !agvSelecionado) {
         setAgvSelecionado(data[0].id.toString());
@@ -107,11 +107,11 @@ export default function Status({ usuario }) {
         // Carregar pedidos ativos para este AGV específico
         const pedidosResponse = await fetch(`http://localhost:5000/pedidos?dispositivo_id=${agvSelecionado}&status=pendente,em_andamento,coletando`);
         const pedidosData = await pedidosResponse.json();
-        
+
         console.log('Pedidos carregados:', pedidosData); // Debug
-        
+
         let pedidoAtivo = pedidosData.length > 0 ? pedidosData[0] : null;
-        
+
         // Se encontrou um pedido pendente, automaticamente iniciar ele
         if (pedidoAtivo && pedidoAtivo.status === 'pendente') {
           try {
@@ -125,10 +125,10 @@ export default function Status({ usuario }) {
             console.error('Erro ao iniciar pedido automaticamente:', error);
           }
         }
-        
+
         // Se não há pedido real, não criar dados de demonstração
         // O usuário verá "Nenhum pedido em andamento" em vez de dados falsos
-        
+
         setPedidoAtual(pedidoAtivo);
 
         // Se há pedido ativo, gerar rota
@@ -221,7 +221,7 @@ export default function Status({ usuario }) {
       sub_corredores: '1,1,2,3',
       posicoes_x: '1,2,1,1'
     };
-    
+
     setPedidoAtual(pedidoTeste);
     gerarRotaAtual(pedidoTeste);
   };
@@ -238,9 +238,9 @@ export default function Status({ usuario }) {
         const response = await fetch(`http://localhost:5000/pedidos/${pedidoAtual.id}/remover-item`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             item_index: itemIndex,
-            item_nome: rotaAtual[itemIndex].nome 
+            item_nome: rotaAtual[itemIndex].nome
           })
         });
 
@@ -280,7 +280,7 @@ export default function Status({ usuario }) {
         const response = await fetch(`http://localhost:5000/pedidos/${pedidoAtual.id}/cancelar-completo`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             itens_rota: rotaAtual.map(item => ({
               nome: item.nome,
               status: item.status,
@@ -301,7 +301,7 @@ export default function Status({ usuario }) {
       setRotaAtual([]);
 
       alert('Rota cancelada com sucesso! Itens coletados foram removidos do armazém.');
-      
+
       // Recarregar dados após um pequeno delay
       setTimeout(() => {
         carregarDados();
@@ -370,7 +370,7 @@ export default function Status({ usuario }) {
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
             Status do AGV: {statusAgv.nome}
           </h3>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Bateria */}
             <div className="flex items-center space-x-3">
@@ -383,11 +383,10 @@ export default function Status({ usuario }) {
                 <p className="text-sm text-gray-600 dark:text-gray-400">Bateria</p>
                 <div className="flex items-center space-x-2">
                   <div className="w-24 h-2 bg-gray-200 dark:bg-gray-700 rounded-full">
-                    <div 
-                      className={`h-2 rounded-full ${
-                        statusSistema.bateria > 50 ? 'bg-green-500' : 
-                        statusSistema.bateria > 20 ? 'bg-yellow-500' : 'bg-red-500'
-                      }`}
+                    <div
+                      className={`h-2 rounded-full ${statusSistema.bateria > 50 ? 'bg-green-500' :
+                          statusSistema.bateria > 20 ? 'bg-yellow-500' : 'bg-red-500'
+                        }`}
                       style={{ width: `${statusSistema.bateria}%` }}
                     ></div>
                   </div>
@@ -400,29 +399,26 @@ export default function Status({ usuario }) {
 
             {/* Status do AGV */}
             <div className="flex items-center space-x-3">
-              <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-                statusAgv.status === 'disponivel' ? 'bg-green-100 dark:bg-green-900/20' :
-                statusAgv.status === 'ocupado' ? 'bg-yellow-100 dark:bg-yellow-900/20' :
-                'bg-red-100 dark:bg-red-900/20'
-              }`}>
-                <svg className={`w-6 h-6 ${
-                  statusAgv.status === 'disponivel' ? 'text-green-600 dark:text-green-400' :
-                  statusAgv.status === 'ocupado' ? 'text-yellow-600 dark:text-yellow-400' :
-                  'text-red-600 dark:text-red-400'
-                }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${statusAgv.status === 'disponivel' ? 'bg-green-100 dark:bg-green-900/20' :
+                  statusAgv.status === 'ocupado' ? 'bg-yellow-100 dark:bg-yellow-900/20' :
+                    'bg-red-100 dark:bg-red-900/20'
+                }`}>
+                <svg className={`w-6 h-6 ${statusAgv.status === 'disponivel' ? 'text-green-600 dark:text-green-400' :
+                    statusAgv.status === 'ocupado' ? 'text-yellow-600 dark:text-yellow-400' :
+                      'text-red-600 dark:text-red-400'
+                  }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Status</p>
-                <p className={`text-sm font-medium ${
-                  statusAgv.status === 'disponivel' ? 'text-green-600 dark:text-green-400' :
-                  statusAgv.status === 'ocupado' ? 'text-yellow-600 dark:text-yellow-400' :
-                  'text-red-600 dark:text-red-400'
-                }`}>
+                <p className={`text-sm font-medium ${statusAgv.status === 'disponivel' ? 'text-green-600 dark:text-green-400' :
+                    statusAgv.status === 'ocupado' ? 'text-yellow-600 dark:text-yellow-400' :
+                      'text-red-600 dark:text-red-400'
+                  }`}>
                   {statusAgv.status === 'disponivel' ? 'Disponível' :
-                   statusAgv.status === 'ocupado' ? 'Em Operação' :
-                   statusAgv.status === 'manutencao' ? 'Manutenção' : 'Offline'}
+                    statusAgv.status === 'ocupado' ? 'Em Operação' :
+                      statusAgv.status === 'manutencao' ? 'Manutenção' : 'Offline'}
                 </p>
               </div>
             </div>
@@ -436,9 +432,8 @@ export default function Status({ usuario }) {
               </div>
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Conexão</p>
-                <p className={`text-sm font-medium ${
-                  statusSistema.conexao === 'ok' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                }`}>
+                <p className={`text-sm font-medium ${statusSistema.conexao === 'ok' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                  }`}>
                   {statusSistema.conexao === 'ok' ? 'Online' : 'Offline'}
                 </p>
               </div>
@@ -488,7 +483,7 @@ export default function Status({ usuario }) {
                 )}
               </p>
             </div>
-            
+
             {usuario.perfil === 'gerente' && (
               <div className="flex gap-2">
                 <button
@@ -501,7 +496,7 @@ export default function Status({ usuario }) {
                   </svg>
                   {loading ? 'Cancelando...' : 'Cancelar Rota Completa'}
                 </button>
-                
+
                 {pedidoAtual && !pedidoAtual.id.toString().startsWith('demo_') && (
                   <button
                     onClick={cancelarPedido}
@@ -528,21 +523,21 @@ export default function Status({ usuario }) {
                   </div>
                   <div className="text-sm text-blue-600 dark:text-blue-400">Total de Itens</div>
                 </div>
-                
+
                 <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 text-center">
                   <div className="text-2xl font-bold text-green-600 dark:text-green-400">
                     {rotaAtual.filter(item => item.status === 'P').length}
                   </div>
                   <div className="text-sm text-green-600 dark:text-green-400">Coletados</div>
                 </div>
-                
+
                 <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4 text-center">
                   <div className="text-2xl font-bold text-red-600 dark:text-red-400">
                     {rotaAtual.filter(item => item.status === 'F').length}
                   </div>
                   <div className="text-sm text-red-600 dark:text-red-400">Não Encontrados</div>
                 </div>
-                
+
                 <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-center">
                   <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">
                     {rotaAtual.filter(item => item.status === 'N').length}
@@ -553,79 +548,76 @@ export default function Status({ usuario }) {
 
               {/* Tabela de Itens */}
               <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="border-b-2 border-gray-200 dark:border-gray-600">
-                    <th className="text-left py-4 px-4 font-semibold text-gray-900 dark:text-white">Item</th>
-                    <th className="text-center py-4 px-4 font-semibold text-gray-900 dark:text-white">Corredor</th>
-                    <th className="text-center py-4 px-4 font-semibold text-gray-900 dark:text-white">SubCorredor</th>
-                    <th className="text-center py-4 px-4 font-semibold text-gray-900 dark:text-white">Status</th>
-                    <th className="text-center py-4 px-4 font-semibold text-gray-900 dark:text-white"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rotaAtual.map((item, index) => (
-                    <tr key={item.id} className={`border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/30 ${
-                      item.status === 'P' ? 'bg-green-50 dark:bg-green-900/10' :
-                      item.status === 'F' ? 'bg-red-50 dark:bg-red-900/10' :
-                      'bg-white dark:bg-gray-800'
-                    }`}>
-                      <td className="py-4 px-4">
-                        <div className="flex items-center space-x-3">
-                          <div className={`w-3 h-3 rounded-full ${
-                            item.status === 'P' ? 'bg-green-500' :
-                            item.status === 'F' ? 'bg-red-500' :
-                            'bg-gray-400'
-                          }`}></div>
-                          <span className={`font-medium ${
-                            item.status === 'P' ? 'text-green-900 dark:text-green-100' :
-                            item.status === 'F' ? 'text-red-900 dark:text-red-100' :
-                            'text-gray-900 dark:text-white'
-                          }`}>{item.nome}</span>
-                          {item.status === 'P' && (
-                            <span className="px-2 py-1 bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300 rounded text-xs font-medium">
-                              Coletado
-                            </span>
-                          )}
-                          {item.status === 'F' && (
-                            <span className="px-2 py-1 bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded text-xs font-medium">
-                              Não encontrado
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="text-center py-4 px-4 text-gray-700 dark:text-gray-300 font-medium">{item.corredor}</td>
-                      <td className="text-center py-4 px-4 text-gray-700 dark:text-gray-300 font-medium">{item.subCorredor}</td>
-                      <td className="text-center py-4 px-4">
-                        <span className={`font-bold text-lg ${getStatusColor(item.status)}`}>
-                          {item.status}
-                        </span>
-                      </td>
-                      <td className="text-center py-4 px-4">
-                        {usuario.perfil === 'gerente' ? (
-                          <button 
-                            onClick={() => removerItemDaRota(index)}
-                            disabled={loading}
-                            className="w-8 h-8 mx-auto rounded bg-red-500 hover:bg-red-600 disabled:opacity-50 flex items-center justify-center transition-colors"
-                            title="Remover item da rota"
-                          >
-                            <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
-                              <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
-                        ) : (
-                          <div className="w-8 h-8 mx-auto rounded bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
-                            <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
-                              <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </div>
-                        )}
-                      </td>
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="border-b-2 border-gray-200 dark:border-gray-600">
+                      <th className="text-left py-4 px-4 font-semibold text-gray-900 dark:text-white">Item</th>
+                      <th className="text-center py-4 px-4 font-semibold text-gray-900 dark:text-white">Corredor</th>
+                      <th className="text-center py-4 px-4 font-semibold text-gray-900 dark:text-white">SubCorredor</th>
+                      <th className="text-center py-4 px-4 font-semibold text-gray-900 dark:text-white">Status</th>
+                      <th className="text-center py-4 px-4 font-semibold text-gray-900 dark:text-white"></th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {rotaAtual.map((item, index) => (
+                      <tr key={item.id} className={`border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/30 ${item.status === 'P' ? 'bg-green-50 dark:bg-green-900/10' :
+                          item.status === 'F' ? 'bg-red-50 dark:bg-red-900/10' :
+                            'bg-white dark:bg-gray-800'
+                        }`}>
+                        <td className="py-4 px-4">
+                          <div className="flex items-center space-x-3">
+                            <div className={`w-3 h-3 rounded-full ${item.status === 'P' ? 'bg-green-500' :
+                                item.status === 'F' ? 'bg-red-500' :
+                                  'bg-gray-400'
+                              }`}></div>
+                            <span className={`font-medium ${item.status === 'P' ? 'text-green-900 dark:text-green-100' :
+                                item.status === 'F' ? 'text-red-900 dark:text-red-100' :
+                                  'text-gray-900 dark:text-white'
+                              }`}>{item.nome}</span>
+                            {item.status === 'P' && (
+                              <span className="px-2 py-1 bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300 rounded text-xs font-medium">
+                                Coletado
+                              </span>
+                            )}
+                            {item.status === 'F' && (
+                              <span className="px-2 py-1 bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded text-xs font-medium">
+                                Não encontrado
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="text-center py-4 px-4 text-gray-700 dark:text-gray-300 font-medium">{item.corredor}</td>
+                        <td className="text-center py-4 px-4 text-gray-700 dark:text-gray-300 font-medium">{item.subCorredor}</td>
+                        <td className="text-center py-4 px-4">
+                          <span className={`font-bold text-lg ${getStatusColor(item.status)}`}>
+                            {item.status}
+                          </span>
+                        </td>
+                        <td className="text-center py-4 px-4">
+                          {usuario.perfil === 'gerente' ? (
+                            <button
+                              onClick={() => removerItemDaRota(index)}
+                              disabled={loading}
+                              className="w-8 h-8 mx-auto rounded bg-red-500 hover:bg-red-600 disabled:opacity-50 flex items-center justify-center transition-colors"
+                              title="Remover item da rota"
+                            >
+                              <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          ) : (
+                            <div className="w-8 h-8 mx-auto rounded bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
+                              <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           ) : (
             <div className="text-center py-8">
@@ -668,7 +660,7 @@ export default function Status({ usuario }) {
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
             Rota Atual - {statusAgv?.nome}
           </h3>
-          
+
           <div className="text-center py-12">
             <div className="text-gray-400 text-6xl mb-4">🚛</div>
             <p className="text-gray-500 dark:text-gray-400 text-lg mb-2">
@@ -677,7 +669,7 @@ export default function Status({ usuario }) {
             <p className="text-gray-400 dark:text-gray-500 text-sm mb-4">
               Este AGV está aguardando novos pedidos
             </p>
-            
+
             {/* Botão para simular pedido de teste */}
             <button
               onClick={simularPedidoTeste}

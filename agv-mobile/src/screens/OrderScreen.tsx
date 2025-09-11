@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, FlatList } from 'react-native';
+import { View, StyleSheet, ScrollView, FlatList, Alert } from 'react-native';
 import { Card, Title, Paragraph, Button, Chip, FAB } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface OrderScreenProps {
   navigation: any;
+  route: any;
 }
 
 interface Item {
@@ -23,7 +24,7 @@ interface Order {
   dispositivo_nome: string;
 }
 
-const OrderScreen: React.FC<OrderScreenProps> = ({ navigation }) => {
+const OrderScreen: React.FC<OrderScreenProps> = ({ navigation, route }) => {
   const [items, setItems] = useState<Item[]>([]);
   const [selectedItems, setSelectedItems] = useState<Item[]>([]);
   const [devices, setDevices] = useState<any[]>([]);
@@ -33,7 +34,13 @@ const OrderScreen: React.FC<OrderScreenProps> = ({ navigation }) => {
 
   useEffect(() => {
     loadData();
-  }, []);
+
+    // Verificar se há um item para adicionar (vindo do QR Scanner)
+    const itemParaAdicionar = route.params?.itemParaAdicionar;
+    if (itemParaAdicionar) {
+      adicionarItemDoQR(itemParaAdicionar);
+    }
+  }, [route.params]);
 
   const loadData = async () => {
     try {
@@ -60,6 +67,27 @@ const OrderScreen: React.FC<OrderScreenProps> = ({ navigation }) => {
     } catch (error) {
       console.error('Error loading data:', error);
     }
+  };
+
+  const adicionarItemDoQR = (item: Item) => {
+    // Verificar se o item já foi selecionado
+    const jaSelecionado = selectedItems.find(i => i.id === item.id);
+    if (jaSelecionado) {
+      Alert.alert('Atenção', 'Este item já foi adicionado ao pedido!');
+      return;
+    }
+
+    // Verificar limite de itens
+    if (selectedItems.length >= 4) {
+      Alert.alert('Limite Atingido', 'Máximo de 4 itens por pedido!');
+      return;
+    }
+
+    // Adicionar item à lista selecionada
+    setSelectedItems([...selectedItems, item]);
+
+    // Mostrar confirmação
+    Alert.alert('Item Adicionado!', `${item.nome} foi adicionado ao seu pedido.`);
   };
 
   const toggleItemSelection = (item: Item) => {

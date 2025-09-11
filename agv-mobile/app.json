@@ -9,10 +9,32 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Este aplicativo precisa de acesso à câmera para escanear códigos QR",
+        "NSMicrophoneUsageDescription": "Este aplicativo precisa de acesso ao microfone para funcionalidades futuras"
+      }
     },
     "android": {
-      "package": "com.agvmobile.app"
-    }
+      "package": "com.agvmobile.app",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Este aplicativo precisa de acesso à câmera para escanear códigos QR"
+        }
+      ],
+      [
+        "expo-barcode-scanner",
+        {
+          "cameraPermission": "Este aplicativo precisa de acesso à câmera para escanear códigos QR"
+        }
+      ]
+    ]
   }
 }

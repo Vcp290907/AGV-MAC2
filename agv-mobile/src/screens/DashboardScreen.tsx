@@ -77,6 +77,20 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation }) => {
             </Button>
           </Card.Content>
         </Card>
+
+        <Card style={styles.actionCard}>
+          <Card.Content>
+            <Title style={styles.cardTitle}>📱 Scanner QR Code</Title>
+            <Paragraph>Escanear códigos de itens</Paragraph>
+            <Button
+              mode="contained"
+              onPress={() => navigation.navigate('QRScanner')}
+              style={styles.actionButton}
+            >
+              Abrir Scanner
+            </Button>
+          </Card.Content>
+        </Card>
       </View>
 
       {/* System Status */}

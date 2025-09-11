@@ -9,6 +9,7 @@ import LoginScreen from './src/screens/LoginScreen';
 import DashboardScreen from './src/screens/DashboardScreen';
 import OrderScreen from './src/screens/OrderScreen';
 import StatusScreen from './src/screens/StatusScreen';
+import QRScannerScreen from './src/screens/QRScannerScreen';
 
 // Import theme
 import { theme } from './src/theme/theme';
@@ -51,6 +52,17 @@ export default function App() {
             name="Status"
             component={StatusScreen}
             options={{ title: 'Status AGV' }}
+          />
+          <Stack.Screen
+            name="QRScanner"
+            component={QRScannerScreen}
+            options={{
+              title: 'Scanner QR Code',
+              headerStyle: {
+                backgroundColor: '#000',
+              },
+              headerTintColor: '#fff',
+            }}
           />
         </Stack.Navigator>
       </NavigationContainer>
