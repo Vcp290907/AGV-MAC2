@@ -10,6 +10,8 @@ import netifaces
 import ipaddress
 import threading
 import time
+import re
+import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 def get_local_ip():
@@ -102,7 +104,6 @@ def test_pc_connection(pc_ip, pc_port=5000):
             return False
 
         # Testa endpoint de teste
-        import requests
         try:
             response = requests.get(f"http://{pc_ip}:{pc_port}/test", timeout=5)
             if response.status_code == 200:
@@ -204,23 +205,11 @@ def main():
                 try:
                     with open('config.py', 'r') as f:
                         content = f.read()
-                    print(f"📝 CONFIGURAÇÃO RECOMENDADA:")
-                    print(f"   Adicione no config.py ou /home/pi/agv_config.json:")
-                    print(f'   "pc_ip": "{pc_ip}"')
-                    print(f'   "pc_port": 5000')
 
-            # Oferece atualizar automaticamente
-            update_auto = input(f"\n🤖 Deseja atualizar config.py automaticamente com {pc_ip}? (y/N): ")
-            if update_auto.lower() in ['y', 'yes', 's', 'sim']:
-                try:
-                    with open('config.py', 'r') as f:
-                        content = f.read()
-
-                    # Substitui o IP do PC
-                    import re
+                    # Substitui o IP do PC (assumindo formato Python: pc_ip = "value")
                     new_content = re.sub(
-                        r'pc_ip\s*:\s*["\'][^"\']*["\']',
-                        f'pc_ip: "{pc_ip}"',
+                        r'pc_ip\s*=\s*["\'][^"\']*["\']',
+                        f'pc_ip = "{pc_ip}"',
                         content
                     )
 
