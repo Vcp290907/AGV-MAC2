@@ -1,0 +1,103 @@
+{
+  "network": {
+    "pc_ip": "192.168.0.100",
+    "pc_port": 5000,
+    "local_port": 8080,
+    "wifi_ssid": "AGV_NETWORK",
+    "wifi_password": "agv_password",
+    "auto_discovery": true
+  },
+  "hardware": {
+    "camera": {
+      "enabled": true,
+      "resolution": [640, 480],
+      "fps": 30,
+      "qr_detection": true,
+      "device": 0
+    },
+    "esp32": {
+      "enabled": true,
+      "port": "/dev/ttyUSB0",
+      "baudrate": 115200,
+      "timeout": 1
+    },
+    "motors": {
+      "max_speed": 100,
+      "acceleration": 50,
+      "deceleration": 50
+    },
+    "sensors": {
+      "ultrasonic": {
+        "enabled": true,
+        "trigger_pin": 23,
+        "echo_pin": 24,
+        "max_distance": 200
+      },
+      "imu": {
+        "enabled": false,
+        "address": "0x68"
+      }
+    }
+  },
+  "system": {
+    "log_level": "INFO",
+    "log_file": "/var/log/agv_system.log",
+    "data_directory": "/home/pi/agv_data",
+    "backup_interval": 3600,
+    "heartbeat_interval": 10,
+    "status_update_interval": 5,
+    "command_poll_interval": 2,
+    "data_sync_interval": 60
+  },
+  "navigation": {
+    "map_size": [1000, 1000],
+    "grid_resolution": 10,
+    "safety_margin": 20,
+    "max_path_length": 500,
+    "path_planning_algorithm": "astar",
+    "obstacle_detection_range": 50
+  },
+  "vision": {
+    "qr_code": {
+      "enabled": true,
+      "detection_area": [0.2, 0.8, 0.2, 0.8],
+      "min_size": 50,
+      "max_size": 300,
+      "confidence_threshold": 0.7
+    },
+    "obstacle_detection": {
+      "enabled": true,
+      "min_area": 1000,
+      "max_distance": 200
+    },
+    "color_tracking": {
+      "enabled": false,
+      "target_color": [0, 255, 0],
+      "color_tolerance": 30
+    }
+  },
+  "motor": {
+    "pid": {
+      "kp": 1.0,
+      "ki": 0.1,
+      "kd": 0.05
+    },
+    "wheel_diameter": 6.5,
+    "wheel_base": 20.0,
+    "encoder_pulses_per_revolution": 20,
+    "max_linear_speed": 50,
+    "max_angular_speed": 180
+  },
+  "battery": {
+    "monitoring": {
+      "enabled": true,
+      "voltage_pin": 26,
+      "current_pin": 27,
+      "reference_voltage": 3.3,
+      "adc_resolution": 1024,
+      "battery_capacity": 2000,
+      "low_battery_threshold": 20,
+      "critical_battery_threshold": 10
+    }
+  }
+}

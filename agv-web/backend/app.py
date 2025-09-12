@@ -10,6 +10,7 @@ from api.itens import itens_bp
 from api.pedidos import pedidos_bp
 from api.dispositivos import dispositivos_bp
 from api.armazem import armazem_bp
+from api.raspberry import raspberry_bp
 from database import init_db, get_db_connection
 
 app = Flask(__name__)
@@ -33,6 +34,7 @@ app.register_blueprint(itens_bp)
 app.register_blueprint(pedidos_bp)
 app.register_blueprint(dispositivos_bp)
 app.register_blueprint(armazem_bp)
+app.register_blueprint(raspberry_bp)
 
 init_db()
 
