@@ -160,6 +160,33 @@ pip install -r requirements.txt
 
 ### 3. Configuração de Rede
 
+#### Descobrir IP do PC Automaticamente
+
+```bash
+# Script automático de descoberta
+python find_pc_ip.py
+
+# Este script irá:
+# ✅ Detectar a rede local
+# ✅ Procurar PCs com backend rodando
+# ✅ Testar conectividade
+# ✅ Atualizar config.py automaticamente (opcional)
+```
+
+#### Configurar IP Manualmente
+
+```bash
+# No PC, descobrir o IP:
+hostname -I  # Linux
+ipconfig     # Windows (linha Ethernet/WiFi)
+
+# No Raspberry Pi, editar config.py:
+nano config.py
+# Alterar: pc_ip = "192.168.0.100"  # IP do seu PC
+```
+
+#### Configurar WiFi (se necessário)
+
 ```bash
 # Configurar WiFi (opcional, se não usar interface gráfica)
 sudo nano /etc/wpa_supplicant/wpa_supplicant.conf

@@ -2,6 +2,60 @@
 
 Este guia contém soluções específicas para os problemas mais comuns durante a instalação no Raspberry Pi.
 
+## 🔍 Como Descobrir o IP do PC
+
+### Método Automático (Mais Fácil)
+```bash
+# Execute no Raspberry Pi (recomendado)
+python find_pc_ip.py
+
+# Este script irá:
+# ✅ Detectar automaticamente a rede local
+# ✅ Procurar PCs com backend AGV rodando
+# ✅ Testar conectividade com cada PC encontrado
+# ✅ Atualizar config.py automaticamente (opcional)
+```
+
+### Método Manual - PC Linux
+```bash
+# No terminal do PC Linux:
+hostname -I
+
+# Ou:
+ip addr show | grep "inet " | grep -v 127.0.0.1
+```
+
+### Método Manual - PC Windows
+```bash
+# No Prompt de Comando do Windows:
+ipconfig
+
+# Procure por:
+# - "Endereço IPv4" na seção "Ethernet" ou "Wi-Fi"
+# - Geralmente começa com 192.168.x.x
+```
+
+### Verificar se o Backend está Rodando
+```bash
+# No PC Linux:
+netstat -tlnp | grep :5000
+
+# No PC Windows:
+netstat -ano | findstr :5000
+
+# Ou testar diretamente:
+curl http://SEU_IP_PC:5000/test
+```
+
+### Testar Conectividade
+```bash
+# Do Raspberry Pi, testar conexão com PC:
+ping SEU_IP_PC
+
+# Testar porta específica:
+telnet SEU_IP_PC 5000
+```
+
 ## 📋 Problemas Identificados e Soluções
 
 ### ❌ Problema: "libtbb2 has no installation candidate"
