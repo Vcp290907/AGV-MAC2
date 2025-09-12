@@ -261,34 +261,94 @@ export LOG_LEVEL=DEBUG
 
 ## 🎮 Como Usar
 
-### 1. Iniciar Sistema
+### 🚀 Método Automático (Recomendado)
 
+```bash
+# Execute este script - ele faz tudo automaticamente!
+python next_steps.py
+
+# O script irá:
+# ✅ Verificar configuração
+# ✅ Testar conexão com PC
+# ✅ Registrar Raspberry Pi
+# ✅ Iniciar sistema AGV
+# ✅ Mostrar próximos passos
+```
+
+### 📋 Método Manual
+
+#### 1. Verificar Configuração
+```bash
+# Verificar se IP do PC está configurado
+cat config.py | grep pc_ip
+
+# Se não estiver, execute:
+python find_pc_ip.py
+```
+
+#### 2. Testar Conexão
+```bash
+# Testar comunicação com PC
+python test_connection.py
+```
+
+#### 3. Iniciar Sistema
 ```bash
 # Ativar ambiente virtual
 source venv/bin/activate
 
-# Executar sistema
-python main.py
+# Executar sistema em background
+python main.py &
 ```
 
-### 2. Verificar Status
-
+#### 4. Verificar Status
 ```bash
 # Verificar se API está rodando
 curl http://localhost:8080/status
 
 # Verificar conexão com PC
 curl http://localhost:8080/test
-```
 
-### 3. Monitoramento
-
-```bash
 # Ver logs em tempo real
 tail -f /var/log/agv_system.log
+```
 
-# Verificar processos
+### 🎯 Após Configuração Bem-Sucedida
+
+#### Acesse o Sistema:
+- **Interface Web**: `http://SEU_PC_IP:5000`
+- **API Local**: `http://localhost:8080`
+- **Mobile App**: Use o aplicativo instalado
+
+#### Funcionalidades Disponíveis:
+- ✅ **Controle de pedidos** via interface web
+- ✅ **Gerenciamento de armazém** (itens, localização)
+- ✅ **Administração de usuários** (gerentes)
+- ✅ **Monitoramento em tempo real**
+- ✅ **Comunicação PC ↔ Raspberry Pi**
+
+#### Monitoramento:
+```bash
+# Ver logs do sistema
+tail -f /var/log/agv_system.log
+
+# Ver processos ativos
 ps aux | grep python
+
+# Status da API
+curl http://localhost:8080/status
+```
+
+#### Manutenção:
+```bash
+# Parar sistema
+curl -X POST http://localhost:8080/shutdown
+
+# Reiniciar
+python main.py &
+
+# Verificar conectividade
+python test_connection.py
 ```
 
 ## 📡 API Local
