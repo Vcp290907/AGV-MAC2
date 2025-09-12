@@ -47,7 +47,7 @@ export default function Controle({ usuario }) {
 
   const carregarItens = async () => {
     try {
-      const response = await fetch('http://localhost:5000/itens');
+      const response = await fetch('http://10.56.218.93:5000/itens');
       const data = await response.json();
       setItens(data);
       // Update available items after loading all items
@@ -59,7 +59,7 @@ export default function Controle({ usuario }) {
 
   const carregarDispositivos = async () => {
     try {
-      const response = await fetch('http://localhost:5000/dispositivos/disponiveis');
+      const response = await fetch('http://10.56.218.93:5000/dispositivos/disponiveis');
       const data = await response.json();
       setDispositivos(data);
     } catch (error) {
@@ -69,7 +69,7 @@ export default function Controle({ usuario }) {
 
   const carregarPedidosAtivos = async () => {
     try {
-      const response = await fetch('http://localhost:5000/pedidos?status=pendente,em_andamento,coletando');
+      const response = await fetch('http://10.56.218.93:5000/pedidos?status=pendente,em_andamento,coletando');
       const data = await response.json();
       setPedidosAtivos(data);
 
@@ -109,7 +109,7 @@ export default function Controle({ usuario }) {
     }
 
     try {
-      const response = await fetch(`http://localhost:5000/itens/pesquisar?q=${pesquisa}`);
+      const response = await fetch(`http://10.56.218.93:5000/itens/pesquisar?q=${pesquisa}`);
       const data = await response.json();
       // Filter search results to only show available items
       const itensFiltrados = data.filter(item => {
@@ -159,7 +159,7 @@ export default function Controle({ usuario }) {
 
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:5000/pedidos', {
+      const response = await fetch('http://10.56.218.93:5000/pedidos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -268,7 +268,7 @@ export default function Controle({ usuario }) {
             <div className="w-16 h-16 bg-gray-200 dark:bg-gray-600 rounded-lg mx-auto mb-2 flex items-center justify-center">
               {item.imagem ? (
                 <img 
-                  src={`http://localhost:5000/static/images/${item.imagem}`} 
+                  src={`http://10.56.218.93:5000/static/images/${item.imagem}`} 
                   alt={item.nome}
                   className="w-full h-full object-cover rounded-lg"
                 />
@@ -301,7 +301,7 @@ export default function Controle({ usuario }) {
                 <div className="w-16 h-16 bg-teal-500 rounded-lg mx-auto mb-2 flex items-center justify-center text-white">
                   {item.imagem ? (
                     <img 
-                      src={`http://localhost:5000/static/images/${item.imagem}`} 
+                      src={`http://10.56.218.93:5000/static/images/${item.imagem}`} 
                       alt={item.nome}
                       className="w-full h-full object-cover rounded-lg"
                     />

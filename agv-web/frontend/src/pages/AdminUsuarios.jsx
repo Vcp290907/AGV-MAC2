@@ -20,7 +20,7 @@ export default function AdminUsuarios({ usuario }) {
 
   const carregarUsuarios = async () => {
     try {
-      const response = await fetch('http://localhost:5000/usuarios');
+      const response = await fetch('http://10.56.218.93:5000/usuarios');
       const data = await response.json();
       setUsuarios(data);
     } catch (error) {
@@ -73,14 +73,14 @@ export default function AdminUsuarios({ usuario }) {
     setError('');
 
     try {
-      const url = usuarioEditando 
-        ? `http://localhost:5000/usuarios/${usuarioEditando.id}`
-        : 'http://localhost:5000/usuarios';
-      
+      const url = usuarioEditando
+        ? `http://10.56.218.93:5000/usuarios/${usuarioEditando.id}`
+        : 'http://10.56.218.93:5000/usuarios';
+
       const method = usuarioEditando ? 'PUT' : 'POST';
-      
+
       const dadosEnvio = { ...formData };
-      
+
       // Se estiver editando e a senha estiver vazia, remover do payload
       if (usuarioEditando && !dadosEnvio.password) {
         delete dadosEnvio.password;
@@ -115,7 +115,7 @@ export default function AdminUsuarios({ usuario }) {
     }
 
     try {
-      const response = await fetch(`http://localhost:5000/usuarios/${usuarioId}`, {
+      const response = await fetch(`http://10.56.218.93:5000/usuarios/${usuarioId}`, {
         method: 'DELETE'
       });
 
@@ -133,7 +133,7 @@ export default function AdminUsuarios({ usuario }) {
 
   const alternarStatus = async (usuarioId, statusAtual) => {
     try {
-      const response = await fetch(`http://localhost:5000/usuarios/${usuarioId}`, {
+      const response = await fetch(`http://10.56.218.93:5000/usuarios/${usuarioId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -230,20 +230,18 @@ export default function AdminUsuarios({ usuario }) {
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                    user.perfil === 'gerente' 
+                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${user.perfil === 'gerente'
                       ? 'bg-purple-100 text-purple-800 dark:bg-purple-800 dark:text-purple-100'
                       : 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100'
-                  }`}>
+                    }`}>
                     {user.perfil}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                    user.ativo 
+                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${user.ativo
                       ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100'
                       : 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100'
-                  }`}>
+                    }`}>
                     {user.ativo ? 'Ativo' : 'Inativo'}
                   </span>
                 </td>
@@ -259,11 +257,10 @@ export default function AdminUsuarios({ usuario }) {
                   </button>
                   <button
                     onClick={() => alternarStatus(user.id, user.ativo)}
-                    className={`${
-                      user.ativo 
-                        ? 'text-yellow-600 hover:text-yellow-900 dark:text-yellow-400' 
+                    className={`${user.ativo
+                        ? 'text-yellow-600 hover:text-yellow-900 dark:text-yellow-400'
                         : 'text-green-600 hover:text-green-900 dark:text-green-400'
-                    }`}
+                      }`}
                   >
                     {user.ativo ? 'Desativar' : 'Ativar'}
                   </button>
@@ -297,7 +294,7 @@ export default function AdminUsuarios({ usuario }) {
                 <input
                   type="text"
                   value={formData.nome}
-                  onChange={(e) => setFormData({...formData, nome: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 dark:bg-gray-700 dark:text-white"
                   required
                 />
@@ -311,7 +308,7 @@ export default function AdminUsuarios({ usuario }) {
                 <input
                   type="text"
                   value={formData.username}
-                  onChange={(e) => setFormData({...formData, username: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 dark:bg-gray-700 dark:text-white"
                   required
                 />
@@ -325,7 +322,7 @@ export default function AdminUsuarios({ usuario }) {
                 <input
                   type="password"
                   value={formData.password}
-                  onChange={(e) => setFormData({...formData, password: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 dark:bg-gray-700 dark:text-white"
                   required={!usuarioEditando}
                 />
@@ -338,7 +335,7 @@ export default function AdminUsuarios({ usuario }) {
                 </label>
                 <select
                   value={formData.perfil}
-                  onChange={(e) => setFormData({...formData, perfil: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, perfil: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 dark:bg-gray-700 dark:text-white"
                 >
                   <option value="funcionario">Funcionário</option>
@@ -353,7 +350,7 @@ export default function AdminUsuarios({ usuario }) {
                     <input
                       type="checkbox"
                       checked={formData.ativo}
-                      onChange={(e) => setFormData({...formData, ativo: e.target.checked})}
+                      onChange={(e) => setFormData({ ...formData, ativo: e.target.checked })}
                       className="mr-2"
                     />
                     <span className="text-sm text-gray-700 dark:text-gray-300">
