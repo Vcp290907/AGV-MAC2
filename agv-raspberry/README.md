@@ -103,11 +103,28 @@ sudo bash install.sh
 
 | Situação | Recomendação | Script | Confiabilidade |
 |----------|-------------|---------|----------------|
+| Ambiente gerenciado externamente | `install_ultra_simple.sh` | ✅ Máxima | ⭐⭐⭐⭐⭐ |
 | Problemas de dependências | `install_ultra_simple.sh` | ✅ Máxima | ⭐⭐⭐⭐⭐ |
 | Primeiro teste | `quick_start.sh` | ✅ Alta | ⭐⭐⭐⭐⭐ |
 | Sem câmera/OpenCV | `install_basic.sh` | ✅ Boa | ⭐⭐⭐⭐ |
 | Sistema completo | `install.sh` | ⚠️ Variável | ⭐⭐⭐ |
 | Raspberry Pi antigo | `install_ultra_simple.sh` | ✅ Máxima | ⭐⭐⭐⭐⭐ |
+
+### ⚠️ Importante: Ambiente Python Gerenciado
+
+**Raspberry Pi OS Bookworm** tem proteção PEP 668 que impede instalação direta de pacotes Python:
+
+```bash
+# ❌ NÃO FUNCIONA (ambiente gerenciado)
+pip install Flask
+
+# ✅ FUNCIONA (ambiente virtual)
+python3 -m venv venv
+source venv/bin/activate
+pip install Flask
+```
+
+**Todos os scripts foram atualizados para lidar com isso automaticamente!**
 
 ### 📦 Instalação do OpenCV (Opcional)
 

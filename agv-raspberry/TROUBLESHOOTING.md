@@ -63,6 +63,58 @@ sudo bash install_ultra_simple.sh
 # ✅ Permite instalar recursos gradualmente
 ```
 
+### ❌ Problema: "externally-managed-environment" ao instalar pacotes Python
+
+**Sintomas:**
+```
+error: externally-managed-environment
+
+× This environment is externally managed
+â•°â”€> To install Python packages system-wide, try apt install
+    python3-xyz, where xyz is the package you are trying to
+    install.
+
+    If you wish to install a non-Debian-packaged Python package,
+    create a virtual environment using python3 -m venv path/to/venv.
+    Then use path/to/venv/bin/python and path/to/venv/bin/pip. Make
+    sure you have python3-full installed.
+```
+
+**Causa:** Raspberry Pi OS Bookworm protege o ambiente Python global (PEP 668).
+
+**✅ Solução DEFINITIVA:**
+```bash
+# 1. Instalar python3-full (necessário para venv completo)
+sudo apt install -y python3-full
+
+# 2. Criar ambiente virtual
+python3 -m venv venv
+
+# 3. Ativar ambiente virtual
+source venv/bin/activate
+
+# 4. Instalar pacotes no ambiente virtual
+pip install Flask Flask-CORS requests pyserial
+
+# 5. Usar sempre o ambiente virtual
+source venv/bin/activate  # Sempre que for usar
+```
+
+**✅ Solução ALTERNATIVA (NÃO RECOMENDADA):**
+```bash
+# Forçar instalação (pode quebrar o sistema)
+pip install --break-system-packages Flask Flask-CORS requests pyserial
+```
+
+**✅ Solução com Scripts:**
+```bash
+# Usar instalação básica (já configura ambiente virtual)
+sudo bash install_basic.sh
+
+# Ou usar ultra simples e configurar manualmente
+sudo bash install_ultra_simple.sh
+```
+
 ## 🚀 Plano de Ação Recomendado
 
 ### Para seu caso específico:

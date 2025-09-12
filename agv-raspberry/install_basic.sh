@@ -22,12 +22,13 @@ fi
 echo "📦 Atualizando sistema..."
 apt update && apt upgrade -y
 
-# Instalar dependências básicas do sistema
-echo "🔧 Instalando dependências básicas..."
+# Instalar Python completo e dependências básicas do sistema
+echo "🔧 Instalando Python completo e dependências básicas..."
 apt install -y \
     python3 \
     python3-pip \
     python3-venv \
+    python3-full \
     python3-dev \
     git \
     build-essential \
