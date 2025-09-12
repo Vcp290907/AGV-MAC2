@@ -45,7 +45,21 @@ Sistema embarcado do AGV (Automated Guided Vehicle) que roda no Raspberry Pi, re
 
 ## 🚀 Instalação
 
-### ⚡ Opção 1: Instalação ULTRA Rápida (Mais Fácil)
+### ⚡ Opção 1: ULTRA SIMPLES (MAIS CONFIÁVEL)
+
+```bash
+# Instalação mais básica possível
+sudo bash install_ultra_simple.sh
+```
+
+**Ideal para:** Qualquer situação, máxima compatibilidade
+- ✅ Python 3 e pip apenas
+- ✅ Estrutura de diretórios
+- ✅ Sem dependências problemáticas
+- ✅ Funciona em qualquer Raspberry Pi OS
+- ❌ **Instalação manual de pacotes Python**
+
+### ⚡ Opção 2: Instalação ULTRA Rápida (Fácil)
 
 ```bash
 # Apenas instala Python e cria estrutura
@@ -58,7 +72,7 @@ sudo bash quick_start.sh
 - ✅ Permissões configuradas
 - ❌ **Nenhuma dependência pesada**
 
-### 🏗️ Opção 2: Instalação Básica (Equilibrada)
+### 🏗️ Opção 3: Instalação Básica (Equilibrada)
 
 ```bash
 # Instala essencial sem OpenCV
@@ -71,7 +85,7 @@ sudo bash install_basic.sh
 - ✅ Ambiente virtual completo
 - ❌ **Sem OpenCV** (evita problemas de dependências)
 
-### 🔧 Opção 3: Instalação Completa (Recomendada)
+### 🔧 Opção 4: Instalação Completa (Avançada)
 
 ```bash
 # Instala tudo incluindo OpenCV
@@ -83,16 +97,17 @@ sudo bash install.sh
 - ✅ OpenCV para processamento de imagem
 - ✅ Ambiente virtual Python
 - ✅ Todas as bibliotecas necessárias
-- ⚠️ **Pode falhar em sistemas antigos**
+- ⚠️ **Pode falhar em sistemas com dependências desatualizadas**
 
 ### 🎯 Qual Escolher?
 
-| Situação | Recomendação | Script |
-|----------|-------------|---------|
-| Primeiro teste | `quick_start.sh` | Mais rápido |
-| Sem câmera/OpenCV | `install_basic.sh` | Equilibrado |
-| Sistema completo | `install.sh` | Completo |
-| Problemas de dependências | `quick_start.sh` + instalação manual | Seguro |
+| Situação | Recomendação | Script | Confiabilidade |
+|----------|-------------|---------|----------------|
+| Problemas de dependências | `install_ultra_simple.sh` | ✅ Máxima | ⭐⭐⭐⭐⭐ |
+| Primeiro teste | `quick_start.sh` | ✅ Alta | ⭐⭐⭐⭐⭐ |
+| Sem câmera/OpenCV | `install_basic.sh` | ✅ Boa | ⭐⭐⭐⭐ |
+| Sistema completo | `install.sh` | ⚠️ Variável | ⭐⭐⭐ |
+| Raspberry Pi antigo | `install_ultra_simple.sh` | ✅ Máxima | ⭐⭐⭐⭐⭐ |
 
 ### 📦 Instalação do OpenCV (Opcional)
 
@@ -314,13 +329,25 @@ python main.py --debug
 
 ## 🚨 Troubleshooting
 
-### Problema: Pacotes não encontrados (libjasper-dev, libqtgui4, etc.)
+### Problema: Pacotes não encontrados (libjasper-dev, libqtgui4, libtbb2, etc.)
 ```bash
-# Usar instalação básica (sem OpenCV)
+# SOLUÇÃO: Usar instalação ultra simples (mais confiável)
+sudo bash install_ultra_simple.sh
+
+# Ou usar instalação básica (sem OpenCV)
 sudo bash install_basic.sh
 
-# Ou instalar OpenCV separadamente depois
-sudo apt install -y python3-opencv
+# Evitar instalação completa se sistema for antigo
+# sudo bash install.sh  # Pode falhar em sistemas antigos
+```
+
+### Problema: Erro "Unable to locate package"
+```bash
+# SOLUÇÃO: Atualizar lista de pacotes
+sudo apt update
+
+# Ou usar instalação que não depende desses pacotes
+sudo bash install_ultra_simple.sh
 ```
 
 ### Problema: OpenCV falha ao instalar
@@ -437,10 +464,23 @@ python main.py
 ## 📞 Suporte
 
 Para problemas ou dúvidas:
-1. Verificar logs em `/var/log/agv_system.log`
+
+### 📋 Documentação de Suporte:
+- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Soluções para problemas comuns
+- **[CONNECTION_TEST.md](CONNECTION_TEST.md)** - Guia de teste de comunicação
+- **README.md** - Esta documentação completa
+
+### 🔍 Passos de Diagnóstico:
+1. Verificar logs: `tail -f /var/log/agv_system.log`
 2. Testar conectividade: `curl http://localhost:8080/test`
 3. Verificar status do hardware
 4. Consultar documentação específica do módulo
+
+### 🚨 Problemas Comuns:
+- **Pacotes não encontrados**: Use `install_ultra_simple.sh`
+- **OpenCV falha**: Instale separadamente ou pule por enquanto
+- **Conectividade WiFi**: Verifique IPs e portas
+- **ESP32 não conecta**: Verifique permissões USB
 
 ## 🎯 Próximos Passos
 

@@ -35,8 +35,8 @@ apt install -y \
     build-essential \
     pkg-config
 
-# Instalar bibliotecas para OpenCV (versão compatível com Bookworm)
-echo "📦 Instalando bibliotecas para OpenCV..."
+# Instalar bibliotecas básicas para OpenCV (compatível com Bookworm)
+echo "📦 Instalando bibliotecas básicas para OpenCV..."
 apt install -y \
     libjpeg-dev \
     libtiff5-dev \
@@ -45,24 +45,10 @@ apt install -y \
     libavformat-dev \
     libswscale-dev \
     libv4l-dev \
-    libxvidcore-dev \
-    libx264-dev \
-    libfontconfig1-dev \
-    libcairo2-dev \
-    libgdk-pixbuf2.0-dev \
-    libpango1.0-dev \
     libgtk-3-dev \
     libatlas-base-dev \
-    gfortran \
     libhdf5-dev \
-    libgtk2.0-dev \
-    libgstreamer1.0-dev \
-    libgstreamer-plugins-base1.0-dev \
-    libtbb2 \
-    libtbb-dev \
-    libdc1394-22-dev \
-    libopenexr-dev \
-    libgphoto2-dev
+    libgtk2.0-dev
 
 # Instalar Python packages
 echo "🐍 Instalando pacotes Python..."

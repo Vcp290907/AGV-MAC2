@@ -36,15 +36,12 @@ apt install -y \
     libpng-dev \
     libtiff5-dev
 
-# Instalar bibliotecas básicas para imagens
+# Instalar bibliotecas básicas para imagens (simplificado)
 echo "🖼️  Instalando bibliotecas básicas para imagens..."
 apt install -y \
-    libfreetype6-dev \
-    liblcms2-dev \
-    libwebp-dev \
-    zlib1g-dev \
-    libharfbuzz-dev \
-    libfribidi-dev
+    libjpeg-dev \
+    libpng-dev \
+    zlib1g-dev
 
 # Criar diretórios necessários
 echo "📁 Criando diretórios..."
