@@ -30,20 +30,20 @@ apt install -y \
 
 # Criar estrutura de diretórios
 echo "📁 Criando estrutura de diretórios..."
-mkdir -p /home/pi/agv-raspberry
+mkdir -p /home/vcp2909/agv-raspberry
 mkdir -p /var/log
-mkdir -p /home/pi/agv_data
+mkdir -p /home/vcp2909/agv_data
 
 # Ajustar permissões
 echo "🔐 Ajustando permissões..."
-chown -R vcp2909:vcp2909 /home/pi/agv-raspberry
-chown -R vcp2909:vcp2909 /home/pi/agv_data
+chown -R vcp2909:vcp2909 /home/vcp2909/agv-raspberry
+chown -R vcp2909:vcp2909 /home/vcp2909/agv_data
 touch /var/log/agv_system.log
 chown vcp2909:vcp2909 /var/log/agv_system.log
 
 # GPIO permissions
-usermod -a -G gpio pi 2>/dev/null || true
-usermod -a -G dialout pi
+usermod -a -G gpio vcp2909 2>/dev/null || true
+usermod -a -G dialout vcp2909
 
 echo ""
 echo "✅ Instalação ultra simples concluída!"
@@ -51,10 +51,10 @@ echo ""
 echo "📋 MANUALMENTE, execute como usuário pi:"
 echo ""
 echo "1. Acesse como usuário pi:"
-echo "   su - pi"
+echo "   su - vcp2909"
 echo ""
 echo "2. Vá para o diretório:"
-echo "   cd /home/pi/agv-raspberry"
+echo "   cd /home/vcp2909/agv-raspberry"
 echo ""
 echo "3. Instale python3-full (necessário para venv):"
 echo "   sudo apt install -y python3-full"
@@ -93,7 +93,7 @@ echo "🔌 ESP32 (se usar):"
 echo "   sudo apt install python3-serial"
 echo ""
 echo "🚀 Comando para iniciar:"
-echo "   cd /home/pi/agv-raspberry && source venv/bin/activate && python main.py"
+echo "   cd /home/vcp2909/agv-raspberry && source venv/bin/activate && python main.py"
 echo ""
 echo "📊 Para monitorar:"
 echo "   tail -f /var/log/agv_system.log"
