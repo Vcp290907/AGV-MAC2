@@ -187,16 +187,26 @@ def main():
             working_pcs.append(pc_ip)
 
     if working_pcs:
-        print("
-✅ PC(s) funcional(is):"        for i, pc_ip in enumerate(working_pcs, 1):
+        print("✅ PC(s) funcional(is):")
+        for i, pc_ip in enumerate(working_pcs, 1):
             print(f"   {i}. {pc_ip}:5000")
 
         if len(working_pcs) == 1:
             pc_ip = working_pcs[0]
-            print("
-📝 CONFIGURAÇÃO RECOMENDADA:"            print(f"   Adicione no config.py ou /home/pi/agv_config.json:")
+            print(f"   Adicione no config.py ou /home/pi/agv_config.json:")
             print(f'   "pc_ip": "{pc_ip}"')
             print(f'   "pc_port": 5000')
+
+            # Oferece atualizar automaticamente
+            update_auto = input(f"\n🤖 Deseja atualizar config.py automaticamente com {pc_ip}? (y/N): ")
+            if update_auto.lower() in ['y', 'yes', 's', 'sim']:
+                try:
+                    with open('config.py', 'r') as f:
+                        content = f.read()
+                    print(f"📝 CONFIGURAÇÃO RECOMENDADA:")
+                    print(f"   Adicione no config.py ou /home/pi/agv_config.json:")
+                    print(f'   "pc_ip": "{pc_ip}"')
+                    print(f'   "pc_port": 5000')
 
             # Oferece atualizar automaticamente
             update_auto = input(f"\n🤖 Deseja atualizar config.py automaticamente com {pc_ip}? (y/N): ")
@@ -222,8 +232,8 @@ def main():
                     print(f"❌ Erro ao atualizar config.py: {e}")
                     print(f"   Atualize manualmente: pc_ip = '{pc_ip}'")
         else:
-            print("
-📝 Vários PCs encontrados. Configure manualmente:"            print("   Edite config.py e defina pc_ip com o IP correto")
+            print("📝 Vários PCs encontrados. Configure manualmente:")
+            print("   Edite config.py e defina pc_ip com o IP correto")
     else:
         print("\n❌ Nenhum PC responde corretamente")
         print("   Verifique se o backend Flask está rodando no PC")
