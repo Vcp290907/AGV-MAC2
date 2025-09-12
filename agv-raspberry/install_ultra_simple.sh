@@ -36,10 +36,10 @@ mkdir -p /home/pi/agv_data
 
 # Ajustar permissões
 echo "🔐 Ajustando permissões..."
-chown -R pi:pi /home/pi/agv-raspberry
-chown -R pi:pi /home/pi/agv_data
+chown -R vcp2909:vcp2909 /home/pi/agv-raspberry
+chown -R vcp2909:vcp2909 /home/pi/agv_data
 touch /var/log/agv_system.log
-chown pi:pi /var/log/agv_system.log
+chown vcp2909:vcp2909 /var/log/agv_system.log
 
 # GPIO permissions
 usermod -a -G gpio pi 2>/dev/null || true
