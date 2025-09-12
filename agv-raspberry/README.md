@@ -45,34 +45,84 @@ Sistema embarcado do AGV (Automated Guided Vehicle) que roda no Raspberry Pi, re
 
 ## 🚀 Instalação
 
-### 1. Configuração do Sistema
+### ⚡ Opção 1: Instalação ULTRA Rápida (Mais Fácil)
 
 ```bash
-# Atualizar sistema
-sudo apt update && sudo apt upgrade -y
-
-# Instalar dependências do sistema
-sudo apt install -y python3 python3-pip python3-venv git
-
-# Instalar bibliotecas para câmera (se usar câmera USB)
-sudo apt install -y v4l-utils
-
-# Instalar OpenCV dependencies
-sudo apt install -y libatlas-base-dev libjasper-dev libqtgui4 libqt4-test libhdf5-dev
+# Apenas instala Python e cria estrutura
+sudo bash quick_start.sh
 ```
 
-### 2. Clonagem e Configuração
+**Ideal para:** Testes rápidos, desenvolvimento inicial
+- ✅ Python 3 e pip
+- ✅ Estrutura de diretórios
+- ✅ Permissões configuradas
+- ❌ **Nenhuma dependência pesada**
+
+### 🏗️ Opção 2: Instalação Básica (Equilibrada)
 
 ```bash
-# Clonar repositório
-git clone <repository-url>
-cd agv-raspberry
+# Instala essencial sem OpenCV
+sudo bash install_basic.sh
+```
 
-# Criar ambiente virtual
+**Ideal para:** Desenvolvimento sem visão computacional
+- ✅ Flask, comunicação, PySerial
+- ✅ Pillow, NumPy para imagens básicas
+- ✅ Ambiente virtual completo
+- ❌ **Sem OpenCV** (evita problemas de dependências)
+
+### 🔧 Opção 3: Instalação Completa (Recomendada)
+
+```bash
+# Instala tudo incluindo OpenCV
+sudo bash install.sh
+```
+
+**Ideal para:** Sistema completo com visão computacional
+- ✅ Todas as dependências do sistema
+- ✅ OpenCV para processamento de imagem
+- ✅ Ambiente virtual Python
+- ✅ Todas as bibliotecas necessárias
+- ⚠️ **Pode falhar em sistemas antigos**
+
+### 🎯 Qual Escolher?
+
+| Situação | Recomendação | Script |
+|----------|-------------|---------|
+| Primeiro teste | `quick_start.sh` | Mais rápido |
+| Sem câmera/OpenCV | `install_basic.sh` | Equilibrado |
+| Sistema completo | `install.sh` | Completo |
+| Problemas de dependências | `quick_start.sh` + instalação manual | Seguro |
+
+### 📦 Instalação do OpenCV (Opcional)
+
+Se usou instalação rápida/básica e quer adicionar OpenCV:
+
+```bash
+# Opção 1: Via apt (mais rápido, mais compatível)
+sudo apt install -y python3-opencv
+
+# Opção 2: Via pip (mais recente, pode demorar)
+source venv/bin/activate
+pip install opencv-python --no-cache-dir
+```
+
+### Instalação Manual
+
+Se preferir instalar manualmente:
+
+```bash
+# 1. Atualizar sistema
+sudo apt update && sudo apt upgrade -y
+
+# 2. Instalar Python e ferramentas básicas
+sudo apt install -y python3 python3-pip python3-venv git build-essential
+
+# 3. Criar ambiente virtual
 python3 -m venv venv
 source venv/bin/activate
 
-# Instalar dependências Python
+# 4. Instalar dependências Python
 pip install -r requirements.txt
 ```
 
@@ -264,10 +314,31 @@ python main.py --debug
 
 ## 🚨 Troubleshooting
 
+### Problema: Pacotes não encontrados (libjasper-dev, libqtgui4, etc.)
+```bash
+# Usar instalação básica (sem OpenCV)
+sudo bash install_basic.sh
+
+# Ou instalar OpenCV separadamente depois
+sudo apt install -y python3-opencv
+```
+
+### Problema: OpenCV falha ao instalar
+```bash
+# Instalar versão do repositório (mais rápida)
+sudo apt install -y python3-opencv
+
+# Ou tentar versão mais recente (mais demorada)
+pip install opencv-python --no-cache-dir
+```
+
 ### Problema: "Permission denied" no GPIO
 ```bash
 # Executar como root
 sudo python main.py
+
+# Ou ajustar permissões
+sudo usermod -a -G gpio pi
 ```
 
 ### Problema: Câmera não detectada
@@ -275,8 +346,11 @@ sudo python main.py
 # Verificar dispositivos
 ls /dev/video*
 
-# Instalar driver
-sudo apt install uv4l
+# Instalar ferramentas
+sudo apt install -y v4l-utils
+
+# Verificar permissões
+sudo usermod -a -G video pi
 ```
 
 ### Problema: ESP32 não conecta
@@ -286,6 +360,33 @@ ls /dev/ttyUSB*
 
 # Verificar permissões
 sudo usermod -a -G dialout pi
+
+# Testar comunicação
+python3 -c "import serial; s=serial.Serial('/dev/ttyUSB0', 115200); print('OK')"
+```
+
+### Problema: Erro de conectividade WiFi
+```bash
+# Verificar IP do PC
+hostname -I  # No PC
+
+# Testar ping
+ping 192.168.0.100
+
+# Verificar se backend está rodando
+netstat -tlnp | grep :5000
+```
+
+### Problema: Dependências Python falham
+```bash
+# Atualizar pip
+pip install --upgrade pip
+
+# Instalar com --no-cache-dir
+pip install --no-cache-dir -r requirements.txt
+
+# Ou instalar pacotes individualmente
+pip install Flask Flask-CORS requests pyserial Pillow
 ```
 
 ### Problema: WiFi não conecta

@@ -1,12 +1,16 @@
 #!/bin/bash
 
-# Script de instalação do AGV Raspberry Pi
-# Execute como root: sudo bash install.sh
+# Script de instalação básica do AGV Raspberry Pi
+# Versão simplificada sem OpenCV para evitar problemas de dependências
+# Execute como root: sudo bash install_basic.sh
 
 set -e
 
-echo "🚀 Iniciando instalação do Sistema AGV - Raspberry Pi"
-echo "=================================================="
+echo "🚀 Iniciando instalação BÁSICA do Sistema AGV - Raspberry Pi"
+echo "=========================================================="
+echo "⚠️  NOTA: Esta versão NÃO inclui OpenCV para evitar problemas de dependências"
+echo "📦 OpenCV pode ser instalado separadamente depois se necessário"
+echo ""
 
 # Verificar se está executando como root
 if [ "$EUID" -ne 0 ]; then
@@ -18,56 +22,29 @@ fi
 echo "📦 Atualizando sistema..."
 apt update && apt upgrade -y
 
-# Instalar dependências do sistema (compatível com Raspberry Pi OS Bookworm)
-echo "🔧 Instalando dependências do sistema..."
-
-# Atualizar lista de pacotes
-apt update
-
-# Instalar pacotes básicos
+# Instalar dependências básicas do sistema
+echo "🔧 Instalando dependências básicas..."
 apt install -y \
     python3 \
     python3-pip \
     python3-venv \
     python3-dev \
     git \
-    v4l-utils \
     build-essential \
-    pkg-config
-
-# Instalar bibliotecas para OpenCV (versão compatível com Bookworm)
-echo "📦 Instalando bibliotecas para OpenCV..."
-apt install -y \
+    pkg-config \
     libjpeg-dev \
-    libtiff5-dev \
     libpng-dev \
-    libavcodec-dev \
-    libavformat-dev \
-    libswscale-dev \
-    libv4l-dev \
-    libxvidcore-dev \
-    libx264-dev \
-    libfontconfig1-dev \
-    libcairo2-dev \
-    libgdk-pixbuf2.0-dev \
-    libpango1.0-dev \
-    libgtk-3-dev \
-    libatlas-base-dev \
-    gfortran \
-    libhdf5-dev \
-    libgtk2.0-dev \
-    libgstreamer1.0-dev \
-    libgstreamer-plugins-base1.0-dev \
-    libtbb2 \
-    libtbb-dev \
-    libdc1394-22-dev \
-    libopenexr-dev \
-    libgphoto2-dev
+    libtiff5-dev
 
-# Instalar Python packages
-echo "🐍 Instalando pacotes Python..."
-pip3 install --upgrade pip
-pip3 install -r requirements.txt
+# Instalar bibliotecas básicas para imagens
+echo "🖼️  Instalando bibliotecas básicas para imagens..."
+apt install -y \
+    libfreetype6-dev \
+    liblcms2-dev \
+    libwebp-dev \
+    zlib1g-dev \
+    libharfbuzz-dev \
+    libfribidi-dev
 
 # Criar diretórios necessários
 echo "📁 Criando diretórios..."
@@ -86,22 +63,39 @@ echo "📌 Configurando GPIO..."
 usermod -a -G gpio pi 2>/dev/null || true
 usermod -a -G dialout pi  # Para acesso serial
 
-# Configurar câmera (se existir)
+# Verificar câmera (opcional)
 echo "📷 Verificando câmera..."
 if [ -e /dev/video0 ]; then
     echo "✅ Câmera detectada em /dev/video0"
+    apt install -y v4l-utils
     usermod -a -G video pi
 else
-    echo "⚠️  Nenhuma câmera detectada"
+    echo "⚠️  Nenhuma câmera detectada (instale uma câmera USB se necessário)"
 fi
 
-# Configurar ESP32 (se conectado)
+# Verificar ESP32 (opcional)
 echo "🔌 Verificando ESP32..."
 if [ -e /dev/ttyUSB0 ]; then
     echo "✅ ESP32 detectado em /dev/ttyUSB0"
 else
-    echo "⚠️  ESP32 não detectado (verifique conexão USB)"
+    echo "⚠️  ESP32 não detectado (conecte via USB se necessário)"
 fi
+
+# Criar ambiente virtual e instalar pacotes básicos
+echo "🐍 Criando ambiente virtual..."
+su - pi -c "
+cd /home/pi/agv-raspberry
+python3 -m venv venv
+source venv/bin/activate
+
+echo '📦 Instalando pacotes Python básicos...'
+pip install --upgrade pip
+
+# Instalar pacotes essenciais primeiro
+pip install Flask Flask-CORS requests pyserial Pillow numpy
+
+echo '✅ Pacotes básicos instalados'
+"
 
 # Criar arquivo de configuração padrão
 echo "⚙️  Criando configuração padrão..."
@@ -115,8 +109,7 @@ cat > /home/pi/agv_config.json << EOF
   },
   "hardware": {
     "camera": {
-      "enabled": true,
-      "device": 0,
+      "enabled": false,
       "resolution": [640, 480],
       "fps": 30
     },
@@ -150,21 +143,34 @@ EOF
 fi
 
 # Verificar instalação
-echo "🔍 Verificando instalação..."
-python3 -c "import flask, cv2, serial; print('✅ Todas as dependências instaladas')"
+echo "🔍 Verificando instalação básica..."
+su - pi -c "
+cd /home/pi/agv-raspberry
+source venv/bin/activate
+python3 -c 'import flask, requests, serial, PIL, numpy; print(\"✅ Dependências básicas OK\")'
+"
 
 echo ""
-echo "🎉 Instalação concluída com sucesso!"
-echo "==================================="
+echo "🎉 Instalação BÁSICA concluída com sucesso!"
+echo "==========================================="
+echo ""
+echo "📋 O que foi instalado:"
+echo "✅ Python 3 e pip"
+echo "✅ Flask e bibliotecas web"
+echo "✅ Requests para HTTP"
+echo "✅ PySerial para ESP32"
+echo "✅ Pillow e NumPy para imagens"
+echo "✅ Ambiente virtual configurado"
 echo ""
 echo "📋 Próximos passos:"
 echo "1. Configure o IP do PC no arquivo config.py ou /home/pi/agv_config.json"
-echo "2. Conecte a câmera USB (se não conectada)"
-echo "3. Conecte o ESP32 via USB (se não conectado)"
-echo "4. Execute: python main.py"
+echo "2. Teste a comunicação: python test_connection.py"
+echo "3. Execute o sistema: python main.py"
 echo ""
-echo "📖 Para mais informações, consulte o README.md"
+echo "📋 Para instalar OpenCV (opcional):"
+echo "   sudo apt install python3-opencv"
+echo "   # Ou use: pip install opencv-python (pode demorar)"
 echo ""
-echo "🚀 Comando para iniciar: python main.py"
+echo "🚀 Comando para iniciar: cd /home/pi/agv-raspberry && source venv/bin/activate && python main.py"
 echo "📊 Monitorar logs: tail -f /var/log/agv_system.log"
 echo "🛑 Parar sistema: curl -X POST http://localhost:8080/shutdown"
