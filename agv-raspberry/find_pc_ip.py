@@ -167,8 +167,7 @@ def main():
             print(f"   {name}: {info['ip']}")
 
     # Procura pelo PC na rede
-    print("
-🔍 Procurando PC na rede..."    found_ips = find_pc_in_network(network_info)
+    print("Procurando PC na rede..."    found_ips = find_pc_in_network(network_info)
 
     if not found_ips:
         print("\n❌ Nenhum PC encontrado na rede")
