@@ -14,27 +14,33 @@ def check_config():
     print("🔍 Verificando configuração...")
 
     try:
-        # Tenta ler config.py
-        with open('config.py', 'r') as f:
-            config_content = f.read()
+        # Primeiro, tenta importar o config.py diretamente
+        import sys
+        import os
 
-        # Procura pelo IP do PC
-        import re
-        pc_ip_match = re.search(r'pc_ip\s*[:=]\s*["\']([^"\']+)["\']', config_content)
+        # Adiciona o diretório atual ao path para importar config
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        if current_dir not in sys.path:
+            sys.path.insert(0, current_dir)
 
-        if pc_ip_match:
-            pc_ip = pc_ip_match.group(1)
-            print(f"✅ IP do PC configurado: {pc_ip}")
-            return pc_ip
-        else:
-            print("❌ IP do PC não encontrado em config.py")
-            return None
+        # Importa o módulo config
+        import config
 
-    except FileNotFoundError:
-        print("❌ Arquivo config.py não encontrado")
+        # Obtém o IP do PC da configuração
+        pc_ip = config.NETWORK_CONFIG.get('pc_ip', '192.168.0.100')
+
+        # Se o IP ainda é o padrão, verifica se há variável de ambiente
+        if pc_ip == '192.168.0.100':
+            pc_ip = os.getenv('PC_IP', pc_ip)
+
+        print(f"✅ IP do PC configurado: {pc_ip}")
+        return pc_ip
+
+    except ImportError as e:
+        print(f"❌ Erro ao importar config.py: {e}")
         return None
     except Exception as e:
-        print(f"❌ Erro ao ler config.py: {e}")
+        print(f"❌ Erro ao ler configuração: {e}")
         return None
 
 def test_connection(pc_ip, pc_port=5000):

@@ -203,13 +203,18 @@ def main():
             update_auto = input(f"\n🤖 Deseja atualizar config.py automaticamente com {pc_ip}? (y/N): ")
             if update_auto.lower() in ['y', 'yes', 's', 'sim']:
                 try:
+                    # Define variável de ambiente
+                    import os
+                    os.environ['PC_IP'] = pc_ip
+
+                    # Também atualiza o arquivo config.py diretamente
                     with open('config.py', 'r') as f:
                         content = f.read()
 
-                    # Substitui o IP do PC (assumindo formato Python: pc_ip = "value")
+                    # Substitui a linha do pc_ip no NETWORK_CONFIG
                     new_content = re.sub(
-                        r'pc_ip\s*=\s*["\'][^"\']*["\']',
-                        f'pc_ip = "{pc_ip}"',
+                        r"'pc_ip': os\.getenv\('PC_IP', '[^']+'\)",
+                        f"'pc_ip': os.getenv('PC_IP', '{pc_ip}')",
                         content
                     )
 
@@ -217,10 +222,11 @@ def main():
                         f.write(new_content)
 
                     print(f"✅ config.py atualizado com IP: {pc_ip}")
+                    print(f"✅ Variável de ambiente PC_IP definida: {pc_ip}")
 
                 except Exception as e:
                     print(f"❌ Erro ao atualizar config.py: {e}")
-                    print(f"   Atualize manualmente: pc_ip = '{pc_ip}'")
+                    print(f"   Execute manualmente: export PC_IP={pc_ip}")
         else:
             print("📝 Vários PCs encontrados. Configure manualmente:")
             print("   Edite config.py e defina pc_ip com o IP correto")
