@@ -74,8 +74,8 @@ def test_connection(pc_ip, pc_port=5000):
 
 def register_raspberry(pc_ip, pc_port=5000):
     """Registra o Raspberry Pi no PC"""
-    print("
-📝 Registrando Raspberry Pi no PC..."    try:
+    print("\n📝 Registrando Raspberry Pi no PC...")
+    try:
         register_data = {
             'ip': get_local_ip(),
             'port': 8080,
@@ -125,8 +125,8 @@ def get_local_ip():
 
 def start_agv_system():
     """Inicia o sistema AGV"""
-    print("
-🚀 Iniciando sistema AGV..."    try:
+    print("\n🚀 Iniciando sistema AGV...")
+    try:
         # Verifica se já está rodando
         import subprocess
         result = subprocess.run(
@@ -167,21 +167,47 @@ def start_agv_system():
 
 def show_next_steps(pc_ip):
     """Mostra próximos passos"""
-    print("
-🎯 PRÓXIMOS PASSOS:"    print("=" * 50)
-    print("
-1. 🖥️  NO PC (mantenha rodando):"    print("   python app.py"    print("   # Backend deve estar rodando na porta 5000"    print("
-2. 🤖 NO RASPBERRY PI (já configurado):"    print("   Sistema AGV rodando em background"    print("   API local: http://localhost:8080"    print("
-3. 🌐 ACESSO AO SISTEMA:"    print(f"   Web Interface: http://{pc_ip}:5000"    print("   Mobile App: Use o app instalado"    print("
-4. 📊 MONITORAMENTO:"    print("   Ver logs: tail -f /var/log/agv_system.log"    print("   Status API: curl http://localhost:8080/status"    print("
-5. 🧪 TESTES:"    print("   Teste comunicação: python test_connection.py"    print("   Teste movimento: Use interface web"    print("
-6. 🔧 MANUTENÇÃO:"    print("   Parar sistema: curl -X POST http://localhost:8080/shutdown"    print("   Reiniciar: python main.py &"    print("
-📋 FUNCIONALIDADES DISPONÍVEIS:"    print("   ✅ Comunicação PC ↔ Raspberry Pi"    print("   ✅ Interface web completa"    print("   ✅ App mobile"    print("   ⏳ ESP32 + motores (próxima fase)"    print("   ⏳ Visão computacional (próxima fase)"    print("   ⏳ Navegação autônoma (próxima fase)"    print("
-🎉 SISTEMA AGV OPERACIONAL!"    print("
-💡 DICAS:"    print("   - Mantenha PC e Raspberry na mesma rede WiFi"    print("   - Monitore logs para detectar problemas"    print("   - Use interface web para controlar AGV"    print("   - Teste funcionalidades gradualmente"    print("
-🚨 EM CASO DE PROBLEMAS:"    print("   1. Verifique se PC está acessível: ping " + pc_ip)
-    print("   2. Teste comunicação: python test_connection.py"    print("   3. Verifique logs: tail -f /var/log/agv_system.log"    print("   4. Consulte: cat TROUBLESHOOTING.md"    print("
-🎊 Parabéns! Seu sistema AGV está pronto para uso!"def main():
+    print("\n🎯 PRÓXIMOS PASSOS:")
+    print("=" * 50)
+    print("\n1. 🖥️  NO PC (mantenha rodando):")
+    print("   python app.py")
+    print("   # Backend deve estar rodando na porta 5000")
+    print("\n2. 🤖 NO RASPBERRY PI (já configurado):")
+    print("   Sistema AGV rodando em background")
+    print("   API local: http://localhost:8080")
+    print("\n3. 🌐 ACESSO AO SISTEMA:")
+    print(f"   Web Interface: http://{pc_ip}:5000")
+    print("   Mobile App: Use o app instalado")
+    print("\n4. 📊 MONITORAMENTO:")
+    print("   Ver logs: tail -f /var/log/agv_system.log")
+    print("   Status API: curl http://localhost:8080/status")
+    print("\n5. 🧪 TESTES:")
+    print("   Teste comunicação: python test_connection.py")
+    print("   Teste movimento: Use interface web")
+    print("\n6. 🔧 MANUTENÇÃO:")
+    print("   Parar sistema: curl -X POST http://localhost:8080/shutdown")
+    print("   Reiniciar: python main.py &")
+    print("\n📋 FUNCIONALIDADES DISPONÍVEIS:")
+    print("   ✅ Comunicação PC ↔ Raspberry Pi")
+    print("   ✅ Interface web completa")
+    print("   ✅ App mobile")
+    print("   ⏳ ESP32 + motores (próxima fase)")
+    print("   ⏳ Visão computacional (próxima fase)")
+    print("   ⏳ Navegação autônoma (próxima fase)")
+    print("\n🎉 SISTEMA AGV OPERACIONAL!")
+    print("\n💡 DICAS:")
+    print("   - Mantenha PC e Raspberry na mesma rede WiFi")
+    print("   - Monitore logs para detectar problemas")
+    print("   - Use interface web para controlar AGV")
+    print("   - Teste funcionalidades gradualmente")
+    print("\n🚨 EM CASO DE PROBLEMAS:")
+    print("   1. Verifique se PC está acessível: ping " + pc_ip)
+    print("   2. Teste comunicação: python test_connection.py")
+    print("   3. Verifique logs: tail -f /var/log/agv_system.log")
+    print("   4. Consulte: cat TROUBLESHOOTING.md")
+    print("\n🎊 Parabéns! Seu sistema AGV está pronto para uso!")
+
+def main():
     """Função principal"""
     print("🎯 GUIA DOS PRÓXIMOS PASSOS - Sistema AGV")
     print("=" * 50)
@@ -189,23 +215,27 @@ def show_next_steps(pc_ip):
     # Verifica configuração
     pc_ip = check_config()
     if not pc_ip:
-        print("
-❌ Configuração incompleta!"        print("Execute primeiro: python find_pc_ip.py"        return
+        print("\n❌ Configuração incompleta!")
+        print("Execute primeiro: python find_pc_ip.py")
+        return
 
     # Testa conexão
     if not test_connection(pc_ip):
-        print("
-❌ Problema de conectividade!"        print("Verifique se o PC está ligado e o backend rodando"        return
+        print("\n❌ Problema de conectividade!")
+        print("Verifique se o PC está ligado e o backend rodando")
+        return
 
     # Registra Raspberry Pi
     if not register_raspberry(pc_ip):
-        print("
-❌ Falha no registro!"        print("Verifique conectividade e tente novamente"        return
+        print("\n❌ Falha no registro!")
+        print("Verifique conectividade e tente novamente")
+        return
 
     # Inicia sistema AGV
     if not start_agv_system():
-        print("
-❌ Falha ao iniciar sistema!"        print("Verifique logs e tente novamente"        return
+        print("\n❌ Falha ao iniciar sistema!")
+        print("Verifique logs e tente novamente")
+        return
 
     # Mostra próximos passos
     show_next_steps(pc_ip)
