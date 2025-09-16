@@ -483,6 +483,22 @@ ESP32 Pin → Função
     python test_esp32_connection.py basic --port /dev/ttyUSB1
     ```
 
+5. **Diagnosticar Servo Motores**:
+    ```bash
+    # Diagnóstico completo dos servos
+    python diagnose_servos.py connection    # Testa conexão
+    python diagnose_servos.py movement      # Testa movimento
+    python diagnose_servos.py interactive   # Modo interativo/calibração
+
+    # No modo interativo você pode:
+    # f - Mover para frente
+    # b - Mover para trás
+    # l - Testar apenas servo esquerdo
+    # r - Testar apenas servo direito
+    # c - Calibração manual
+    # t - Status dos servos
+    ```
+
 ### Câmera
 - Porta USB ou CSI
 - Resolução: 640x480

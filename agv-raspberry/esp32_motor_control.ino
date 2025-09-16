@@ -135,6 +135,42 @@ void processCommand(const char* jsonString) {
     // This command is kept for compatibility but has no effect
     sendResponse("success", "Speed control not available for servo motors");
 
+  } else if (command == "test_left_servo") {
+    // Teste individual do servo esquerdo
+    motorEsq.write(SERVO_FRENTE);
+    delay(1000);
+    motorEsq.write(SERVO_TRAS);
+    delay(1000);
+    motorEsq.write(SERVO_PARADO);
+    sendResponse("success", "Left servo test completed");
+
+  } else if (command == "test_right_servo") {
+    // Teste individual do servo direito
+    motorDir.write(SERVO_TRAS);  // Invertido para frente
+    delay(1000);
+    motorDir.write(SERVO_FRENTE);  // Invertido para trás
+    delay(1000);
+    motorDir.write(SERVO_PARADO);
+    sendResponse("success", "Right servo test completed");
+
+  } else if (command == "manual_test") {
+    // Teste manual com ângulos específicos
+    if (doc.containsKey("left_angle") && doc.containsKey("right_angle")) {
+      int left_angle = doc["left_angle"];
+      int right_angle = doc["right_angle"];
+      float duration = doc["duration"] | 1.0;
+
+      motorEsq.write(left_angle);
+      motorDir.write(right_angle);
+      delay(duration * 1000);
+      stopMotors();
+
+      String response = "Manual test: L=" + String(left_angle) + "°, R=" + String(right_angle) + "°";
+      sendResponse("success", response.c_str());
+    } else {
+      sendError("Missing 'left_angle' or 'right_angle' fields");
+    }
+
   } else if (command == "status") {
     // Retornar status
     sendStatus();
