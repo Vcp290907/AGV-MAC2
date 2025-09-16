@@ -15,24 +15,83 @@ logger = logging.getLogger(__name__)
 class ESP32Controller:
     """Controlador para comunicação com ESP32 via serial"""
 
-    def __init__(self, port: str = '/dev/ttyUSB0', baudrate: int = 115200, timeout: float = 2.0):
-        self.port = port
+    def __init__(self, port: str = None, baudrate: int = 115200, timeout: float = 2.0):
+        self.default_port = port or '/dev/ttyUSB0'
+        self.port = self.default_port
         self.baudrate = baudrate
         self.timeout = timeout
         self.serial_connection: Optional[serial.Serial] = None
         self.connected = False
 
-        logger.info(f"ESP32 Controller inicializado - Porta: {port}, Baudrate: {baudrate}")
+        logger.info(f"ESP32 Controller inicializado - Porta: {self.port}, Baudrate: {baudrate}")
+
+    def _auto_detect_port(self) -> Optional[str]:
+        """Tenta detectar automaticamente a porta do ESP32"""
+        import serial.tools.list_ports
+
+        logger.info("🔍 Procurando ESP32 automaticamente...")
+
+        ports = serial.tools.list_ports.comports()
+        usb_ports = [port.device for port in ports if 'USB' in port.device or 'ACM' in port.device]
+
+        for port in usb_ports:
+            logger.debug(f"Testando porta: {port}")
+            try:
+                # Tentar conectar rapidamente
+                test_serial = serial.Serial(port, self.baudrate, timeout=1)
+
+                # Enviar ping
+                ping_cmd = {'command': 'ping', 'timestamp': time.time()}
+                test_serial.write((json.dumps(ping_cmd) + '\n').encode('utf-8'))
+                test_serial.flush()
+
+                # Aguardar resposta
+                response = test_serial.readline().decode('utf-8').strip()
+                test_serial.close()
+
+                if response:
+                    try:
+                        response_data = json.loads(response)
+                        if response_data.get('status') in ['ok', 'success']:
+                            logger.info(f"✅ ESP32 encontrado na porta: {port}")
+                            return port
+                    except json.JSONDecodeError:
+                        pass
+
+            except (serial.SerialException, OSError):
+                continue
+
+        logger.warning("❌ ESP32 não encontrado automaticamente")
+        return None
 
     def connect(self) -> bool:
         """Estabelece conexão serial com ESP32"""
         try:
-            self.serial_connection = serial.Serial(
-                port=self.port,
-                baudrate=self.baudrate,
-                timeout=self.timeout,
-                write_timeout=self.timeout
-            )
+            # Primeiro tentar a porta especificada
+            try:
+                self.serial_connection = serial.Serial(
+                    port=self.port,
+                    baudrate=self.baudrate,
+                    timeout=self.timeout,
+                    write_timeout=self.timeout
+                )
+            except (serial.SerialException, OSError) as e:
+                logger.warning(f"❌ Porta {self.port} não disponível: {e}")
+
+                # Tentar auto-detecção
+                auto_port = self._auto_detect_port()
+                if auto_port:
+                    logger.info(f"🔄 Tentando porta detectada automaticamente: {auto_port}")
+                    self.port = auto_port
+                    self.serial_connection = serial.Serial(
+                        port=self.port,
+                        baudrate=self.baudrate,
+                        timeout=self.timeout,
+                        write_timeout=self.timeout
+                    )
+                else:
+                    logger.error("❌ ESP32 não encontrado em nenhuma porta")
+                    return False
 
             # Pequena pausa para estabilizar conexão
             time.sleep(2)

@@ -468,12 +468,20 @@ ESP32 Pin → Função
    ```
 
 4. **Testar Comunicação**:
-   ```bash
-   # No Raspberry Pi
-   python test_esp32_connection.py basic
-   python test_esp32_connection.py motors
-   python test_esp32_connection.py interactive
-   ```
+    ```bash
+    # No Raspberry Pi
+
+    # 1. Detectar automaticamente a porta do ESP32
+    python detect_esp32.py
+
+    # 2. Testar comunicação básica
+    python test_esp32_connection.py basic
+    python test_esp32_connection.py motors
+    python test_esp32_connection.py interactive
+
+    # Ou especificar porta manualmente se auto-detecção falhar:
+    python test_esp32_connection.py basic --port /dev/ttyUSB1
+    ```
 
 ### Câmera
 - Porta USB ou CSI
