@@ -167,6 +167,15 @@ def main():
     port = None
     test_type = None
 
+    if not port:
+        # Tentar ler do arquivo esp32_port.txt
+        try:
+            with open('esp32_port.txt', 'r') as f:
+                port = f.read().strip()
+                print(f"📁 Porta lida do arquivo: {port}")
+        except FileNotFoundError:
+            print("🔍 Arquivo esp32_port.txt não encontrado, usando auto-detecção")
+    
     args = sys.argv[1:]
     i = 0
     while i < len(args):
