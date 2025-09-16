@@ -107,12 +107,10 @@ class ESP32Controller:
                         logger.error("❌ ESP32 não encontrado em nenhuma porta")
                         return False
 
-            # Limpar buffer serial antes de usar
+            # Limpar buffer serial e aguardar estabilização
+            time.sleep(2)  # Mesmo tempo que debug_serial.py usa
             if self.serial_connection.in_waiting > 0:
                 self.serial_connection.read(self.serial_connection.in_waiting)
-
-            # Pequena pausa para estabilizar conexão
-            time.sleep(1)
 
             # Testar conexão enviando comando de status
             if self._test_connection():
@@ -141,16 +139,27 @@ class ESP32Controller:
     def _test_connection(self) -> bool:
         """Testa se a conexão com ESP32 está funcionando"""
         try:
-            # Enviar comando de teste
-            test_command = {
-                'command': 'ping',
-                'timestamp': time.time()
-            }
+            # Aguardar ESP32 estabilizar
+            time.sleep(2)
 
-            response = self._send_command(test_command)
+            # Enviar comando de teste simples (igual ao debug_serial.py)
+            test_command = {'command': 'ping'}
+            command_json = json.dumps(test_command) + '\n'
 
-            if response and response.get('status') == 'ok':
-                return True
+            # Enviar comando
+            self.serial_connection.write(command_json.encode('utf-8'))
+            self.serial_connection.flush()
+
+            # Aguardar resposta
+            response_line = self.serial_connection.readline().decode('utf-8').strip()
+
+            if response_line:
+                try:
+                    response = json.loads(response_line)
+                    if response.get('status') == 'ok':
+                        return True
+                except json.JSONDecodeError:
+                    pass
 
             return False
 
