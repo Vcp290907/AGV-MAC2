@@ -67,34 +67,52 @@ class ESP32Controller:
     def connect(self) -> bool:
         """Estabelece conexão serial com ESP32"""
         try:
-            # Primeiro tentar a porta especificada
-            try:
-                self.serial_connection = serial.Serial(
-                    port=self.port,
-                    baudrate=self.baudrate,
-                    timeout=self.timeout,
-                    write_timeout=self.timeout
-                )
-            except (serial.SerialException, OSError) as e:
-                logger.warning(f"❌ Porta {self.port} não disponível: {e}")
-
-                # Tentar auto-detecção
-                auto_port = self._auto_detect_port()
-                if auto_port:
-                    logger.info(f"🔄 Tentando porta detectada automaticamente: {auto_port}")
-                    self.port = auto_port
+            # Se porta foi especificada explicitamente, não fazer auto-detecção
+            if self.port != self.default_port:
+                # Porta específica fornecida - tentar conectar diretamente
+                try:
                     self.serial_connection = serial.Serial(
                         port=self.port,
                         baudrate=self.baudrate,
                         timeout=self.timeout,
                         write_timeout=self.timeout
                     )
-                else:
-                    logger.error("❌ ESP32 não encontrado em nenhuma porta")
+                except (serial.SerialException, OSError) as e:
+                    logger.error(f"❌ Porta especificada {self.port} não disponível: {e}")
                     return False
+            else:
+                # Porta padrão - tentar auto-detecção
+                try:
+                    self.serial_connection = serial.Serial(
+                        port=self.port,
+                        baudrate=self.baudrate,
+                        timeout=self.timeout,
+                        write_timeout=self.timeout
+                    )
+                except (serial.SerialException, OSError) as e:
+                    logger.warning(f"❌ Porta padrão {self.port} não disponível: {e}")
+
+                    # Tentar auto-detecção
+                    auto_port = self._auto_detect_port()
+                    if auto_port:
+                        logger.info(f"🔄 Tentando porta detectada automaticamente: {auto_port}")
+                        self.port = auto_port
+                        self.serial_connection = serial.Serial(
+                            port=self.port,
+                            baudrate=self.baudrate,
+                            timeout=self.timeout,
+                            write_timeout=self.timeout
+                        )
+                    else:
+                        logger.error("❌ ESP32 não encontrado em nenhuma porta")
+                        return False
+
+            # Limpar buffer serial antes de usar
+            if self.serial_connection.in_waiting > 0:
+                self.serial_connection.read(self.serial_connection.in_waiting)
 
             # Pequena pausa para estabilizar conexão
-            time.sleep(2)
+            time.sleep(1)
 
             # Testar conexão enviando comando de status
             if self._test_connection():
