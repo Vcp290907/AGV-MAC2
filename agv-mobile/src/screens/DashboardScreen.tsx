@@ -93,24 +93,6 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation }) => {
         </Card>
       </View>
 
-      {/* Gerencia Users */}
-
-      {user?.perfil === 'gerente' && (
-        <Card style={styles.managementCard}>
-          <Card.Content>
-            <Title style={styles.cardTitle}>👥 Gerenciar Usuários</Title>
-            <Paragraph>Adicionar, editar ou remover usuários</Paragraph>
-            <Button
-              mode="contained"
-              onPress={() => navigation.navigate('AdminUsuarios')}
-              style={styles.actionButton}
-            >
-              Gerenciar Usuários
-            </Button>
-          </Card.Content>
-        </Card>
-      )}
-
       {/* System Status */}
       <Card style={styles.statusCard}>
         <Card.Content>
@@ -185,11 +167,6 @@ const styles = StyleSheet.create({
   },
   actionCard: {
     marginBottom: 15,
-    elevation: 3,
-  },
-  managementCard: {
-    margin: 20,
-    marginTop: 0,
     elevation: 3,
   },
   cardTitle: {

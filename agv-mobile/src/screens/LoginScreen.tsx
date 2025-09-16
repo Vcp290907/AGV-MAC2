@@ -35,7 +35,9 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
     setLoading(true);
 
     try {
-      const response = await fetch('http://10.56.218.93:5000/login', { // For physical device (your PC IP)
+      // const response = await fetch('http://10.0.2.2:5000/login', { // For Android emulator
+      // const response = await fetch('http://localhost:5000/login', { // For iOS simulator
+      const response = await fetch('http://192.168.0.134:5000/login', { // For physical device (your PC IP)
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -296,23 +296,43 @@ class RaspberryAPI:
         try:
             logger.info(f"Executando movimento: {direction} por {duration}s")
 
-            # TODO: Implementar comunicação real com ESP32
-            # Por enquanto, apenas simular o movimento
+            # Importar controlador ESP32
+            from esp32_control import get_esp32_controller
 
-            # Simulação de movimento
-            import time
-            time.sleep(duration)  # Simular tempo de movimento
+            # Obter controlador ESP32
+            esp32 = get_esp32_controller()
 
-            # Simular sucesso
-            result = {
-                'success': True,
-                'message': f'Movimento {direction} executado por {duration} segundos',
-                'direction': direction,
-                'duration': duration,
-                'timestamp': datetime.now().isoformat()
-            }
+            # Conectar se não estiver conectado
+            if not esp32.connected:
+                logger.info("Conectando ao ESP32...")
+                if not esp32.connect():
+                    return {
+                        'success': False,
+                        'message': 'Falha ao conectar com ESP32',
+                        'direction': direction,
+                        'duration': duration,
+                        'error': 'ESP32 não conectado',
+                        'timestamp': datetime.now().isoformat()
+                    }
 
-            logger.info(f"Movimento simulado concluído: {result['message']}")
+            # Executar movimento baseado na direção
+            if direction == 'forward':
+                result = esp32.move_forward(duration)
+            elif direction == 'backward':
+                result = esp32.move_backward(duration)
+            else:
+                return {
+                    'success': False,
+                    'message': f'Direção inválida: {direction}',
+                    'direction': direction,
+                    'duration': duration,
+                    'error': 'Direção não suportada',
+                    'timestamp': datetime.now().isoformat()
+                }
+
+            # Retornar resultado
+            result['timestamp'] = datetime.now().isoformat()
+            logger.info(f"Movimento ESP32 concluído: {result['message']}")
             return result
 
         except Exception as e:

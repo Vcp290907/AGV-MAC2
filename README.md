@@ -6,6 +6,7 @@
 AGV-Sistema/
 ├── 📁 agv-web/          # Sistema WEB (Computador)
 ├── 📁 agv-raspberry/    # Sistema EMBARCADO (Raspberry Pi)
+├── 📁 agv-shared/       # Bibliotecas compartilhadas
 └── 📁 docs/             # Documentação
 ```
 

@@ -77,7 +77,7 @@ export default function Status({ usuario }) {
 
   const carregarAgvs = async () => {
     try {
-      const response = await fetch('http://10.56.218.93:5000/dispositivos');
+      const response = await fetch('http://localhost:5000/dispositivos');
       const data = await response.json();
       setAgvs(data);
 
@@ -93,19 +93,19 @@ export default function Status({ usuario }) {
   const carregarDados = async () => {
     try {
       // Carregar status do sistema
-      const statusResponse = await fetch('http://10.56.218.93:5000/status');
+      const statusResponse = await fetch('http://localhost:5000/status');
       const statusData = await statusResponse.json();
       setStatusSistema(statusData);
 
       // Se há AGV selecionado, carregar dados específicos dele
       if (agvSelecionado) {
         // Carregar status específico do AGV
-        const agvResponse = await fetch(`http://10.56.218.93:5000/dispositivos/${agvSelecionado}`);
+        const agvResponse = await fetch(`http://localhost:5000/dispositivos/${agvSelecionado}`);
         const agvData = await agvResponse.json();
         setStatusAgv(agvData);
 
         // Carregar pedidos ativos para este AGV específico
-        const pedidosResponse = await fetch(`http://10.56.218.93:5000/pedidos?dispositivo_id=${agvSelecionado}&status=pendente,em_andamento,coletando`);
+        const pedidosResponse = await fetch(`http://localhost:5000/pedidos?dispositivo_id=${agvSelecionado}&status=pendente,em_andamento,coletando`);
         const pedidosData = await pedidosResponse.json();
 
         console.log('Pedidos carregados:', pedidosData); // Debug
@@ -116,7 +116,7 @@ export default function Status({ usuario }) {
         if (pedidoAtivo && pedidoAtivo.status === 'pendente') {
           try {
             console.log('Iniciando pedido pendente automaticamente:', pedidoAtivo.id);
-            await fetch(`http://10.56.218.93:5000/pedidos/${pedidoAtivo.id}/iniciar`, {
+            await fetch(`http://localhost:5000/pedidos/${pedidoAtivo.id}/iniciar`, {
               method: 'PUT'
             });
             // Atualizar o status local
@@ -189,7 +189,7 @@ export default function Status({ usuario }) {
 
     setLoading(true);
     try {
-      const response = await fetch(`http://10.56.218.93:5000/pedidos/${pedidoAtual.id}/cancelar`, {
+      const response = await fetch(`http://localhost:5000/pedidos/${pedidoAtual.id}/cancelar`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' }
       });
@@ -235,7 +235,7 @@ export default function Status({ usuario }) {
     try {
       // Se é um pedido real, atualizar no backend
       if (!pedidoAtual.id.toString().startsWith('demo_')) {
-        const response = await fetch(`http://10.56.218.93:5000/pedidos/${pedidoAtual.id}/remover-item`, {
+        const response = await fetch(`http://localhost:5000/pedidos/${pedidoAtual.id}/remover-item`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -277,7 +277,7 @@ export default function Status({ usuario }) {
     try {
       // Se é um pedido real, processar no backend
       if (!pedidoAtual.id.toString().startsWith('demo_')) {
-        const response = await fetch(`http://10.56.218.93:5000/pedidos/${pedidoAtual.id}/cancelar-completo`, {
+        const response = await fetch(`http://localhost:5000/pedidos/${pedidoAtual.id}/cancelar-completo`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

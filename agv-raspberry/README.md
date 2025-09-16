@@ -434,9 +434,46 @@ python main.py --debug
 ## 🔌 Conexões de Hardware
 
 ### ESP32
-- Conectar via USB: `/dev/ttyUSB0`
-- Baudrate: 115200
-- Protocolo: Serial JSON
+- **Conexão**: USB Serial (`/dev/ttyUSB0`)
+- **Baudrate**: 115200
+- **Protocolo**: JSON via Serial
+- **Firmware**: Carregar `esp32_motor_control.ino`
+
+#### Pinout dos Servo Motores:
+```
+ESP32 Pin → Função
+1         → Servo Motor Esquerdo (PWM)
+3         → Servo Motor Direito (PWM)
+2         → LED Status (onboard)
+```
+
+#### Configuração dos Servos:
+- **Servo Esquerdo (GPIO 1)**: 0° = frente, 180° = trás, 90° = parado
+- **Servo Direito (GPIO 3)**: 180° = frente, 0° = trás, 90° = parado
+- **Alimentação**: 5V e GND dos servos devem ser conectados adequadamente
+
+#### Como Configurar ESP32:
+
+1. **Instalar Arduino IDE**
+2. **Instalar ESP32 Board**:
+   - Arquivo → Preferências → URLs adicionais
+   - Adicionar: `https://dl.espressif.com/dl/package_esp32_index.json`
+   - Ferramentas → Placa → ESP32 Dev Module
+
+3. **Carregar Firmware**:
+   ```bash
+   # Abrir esp32_motor_control.ino no Arduino IDE
+   # Selecionar porta correta (/dev/ttyUSB0)
+   # Upload
+   ```
+
+4. **Testar Comunicação**:
+   ```bash
+   # No Raspberry Pi
+   python test_esp32_connection.py basic
+   python test_esp32_connection.py motors
+   python test_esp32_connection.py interactive
+   ```
 
 ### Câmera
 - Porta USB ou CSI
