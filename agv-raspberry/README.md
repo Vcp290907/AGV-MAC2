@@ -499,6 +499,16 @@ ESP32 Pin → Função
     # t - Status dos servos
     ```
 
+6. **Debug Comunicação Serial**:
+    ```bash
+    # Debug detalhado do que é enviado/recebido
+    python debug_serial.py                    # Porta padrão (/dev/ttyACM0)
+    python debug_serial.py /dev/ttyACM0       # Porta específica
+
+    # Mostra exatamente os bytes enviados e recebidos
+    # Útil para identificar problemas de parsing JSON
+    ```
+
 ### Câmera
 - Porta USB ou CSI
 - Resolução: 640x480
