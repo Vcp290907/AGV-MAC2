@@ -171,10 +171,14 @@ def main():
         # Tentar ler do arquivo esp32_port.txt
         try:
             with open('esp32_port.txt', 'r') as f:
-                port = f.read().strip()
+                file_content = f.read().strip()
+                # Limpar conteúdo (remover caracteres estranhos)
+                port = file_content.split('/dev/tty')[1]  # Pega apenas a parte após /dev/tty
+                port = f'/dev/tty{port.split()[0]}'  # Remove qualquer coisa após espaço
                 print(f"📁 Porta lida do arquivo: {port}")
-        except FileNotFoundError:
-            print("🔍 Arquivo esp32_port.txt não encontrado, usando auto-detecção")
+        except (FileNotFoundError, IndexError):
+            print("🔍 Arquivo esp32_port.txt não encontrado ou inválido, usando auto-detecção")
+            port = None
     
     args = sys.argv[1:]
     i = 0
