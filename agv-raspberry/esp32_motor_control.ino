@@ -103,7 +103,8 @@ void processCommand(const char* jsonString) {
   DeserializationError error = deserializeJson(doc, jsonString);
 
   if (error) {
-    sendError("JSON parse error: " + String(error.c_str()));
+    String errorMsg = "JSON parse error: " + String(error.c_str());
+    sendError(errorMsg.c_str());
     return;
   }
 
@@ -127,7 +128,7 @@ void processCommand(const char* jsonString) {
   } else if (command == "stop") {
     // Parar motores
     stopMotors();
-    sendResponse("success", "Motors stopped");
+    sendResponse("success", "Servos stopped");
 
   } else if (command == "set_speed") {
     // Servo motors don't have variable speed control
@@ -139,7 +140,8 @@ void processCommand(const char* jsonString) {
     sendStatus();
 
   } else {
-    sendError("Unknown command: " + command);
+    String errorMsg = "Unknown command: " + command;
+    sendError(errorMsg.c_str());
   }
 }
 
@@ -154,14 +156,17 @@ void handleMoveCommand(DynamicJsonDocument& doc) {
 
   if (direction == "forward") {
     moveForward(duration);
-    sendResponse("success", "Moved forward for " + String(duration) + "s");
+    String message = "Moved forward for " + String(duration) + "s";
+    sendResponse("success", message.c_str());
 
   } else if (direction == "backward") {
     moveBackward(duration);
-    sendResponse("success", "Moved backward for " + String(duration) + "s");
+    String message = "Moved backward for " + String(duration) + "s";
+    sendResponse("success", message.c_str());
 
   } else {
-    sendError("Invalid direction: " + direction);
+    String errorMsg = "Invalid direction: " + direction;
+    sendError(errorMsg.c_str());
   }
 }
 
