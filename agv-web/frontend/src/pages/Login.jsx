@@ -14,7 +14,7 @@ export default function Login({ onLogin }) {
     setError("");
 
     try {
-      const response = await fetch('http://localhost:5000/login', {
+      const response = await fetch('http://10.56.218.93:5000/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -70,7 +70,7 @@ export default function Login({ onLogin }) {
                 type="text"
                 placeholder="LOGIN"
                 value={credentials.username}
-                onChange={(e) => setCredentials({...credentials, username: e.target.value})}
+                onChange={(e) => setCredentials({ ...credentials, username: e.target.value })}
                 required
               />
             </div>
@@ -82,7 +82,7 @@ export default function Login({ onLogin }) {
                 type="password"
                 placeholder="SENHA"
                 value={credentials.password}
-                onChange={(e) => setCredentials({...credentials, password: e.target.value})}
+                onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
                 required
               />
             </div>

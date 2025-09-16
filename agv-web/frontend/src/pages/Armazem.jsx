@@ -53,7 +53,7 @@ export default function Armazem({ usuario }) {
 
   const carregarItens = async () => {
     try {
-      const response = await fetch('http://localhost:5000/armazem/itens');
+      const response = await fetch('http://10.56.218.93:5000/armazem/itens');
       const data = await response.json();
       setItens(data);
     } catch (error) {
@@ -63,7 +63,7 @@ export default function Armazem({ usuario }) {
 
   const carregarCategorias = async () => {
     try {
-      const response = await fetch('http://localhost:5000/armazem/categorias');
+      const response = await fetch('http://10.56.218.93:5000/armazem/categorias');
       const data = await response.json();
       setCategorias(data);
     } catch (error) {
@@ -80,7 +80,7 @@ export default function Armazem({ usuario }) {
 
   const gerarProximaTag = async () => {
     try {
-      const response = await fetch('http://localhost:5000/armazem/proxima-tag');
+      const response = await fetch('http://10.56.218.93:5000/armazem/proxima-tag');
       const data = await response.json();
       return data.tag;
     } catch (error) {
@@ -198,7 +198,7 @@ export default function Armazem({ usuario }) {
     const formData = new FormData();
     formData.append('imagem', file);
 
-    const response = await fetch('http://localhost:5000/armazem/upload-imagem', {
+    const response = await fetch('http://10.56.218.93:5000/armazem/upload-imagem', {
       method: 'POST',
       body: formData
     });
@@ -233,8 +233,8 @@ export default function Armazem({ usuario }) {
       }
 
       const url = itemEditando.id 
-        ? `http://localhost:5000/armazem/itens/${itemEditando.id}`
-        : 'http://localhost:5000/armazem/itens';
+        ? `http://10.56.218.93:5000/armazem/itens/${itemEditando.id}`
+        : 'http://10.56.218.93:5000/armazem/itens';
       
       const method = itemEditando.id ? 'PUT' : 'POST';
 
@@ -280,7 +280,7 @@ export default function Armazem({ usuario }) {
     if (!window.confirm('Tem certeza que deseja excluir este item?')) return;
 
     try {
-      const response = await fetch(`http://localhost:5000/armazem/itens/${itemId}`, {
+      const response = await fetch(`http://10.56.218.93:5000/armazem/itens/${itemId}`, {
         method: 'DELETE'
       });
 
@@ -364,7 +364,7 @@ export default function Armazem({ usuario }) {
                   <div className="w-24 h-24 bg-gray-200 dark:bg-gray-600 rounded-lg mx-auto mb-4 flex items-center justify-center overflow-hidden">
                     {item.imagem ? (
                       <img 
-                        src={`http://localhost:5000/static/images/${item.imagem}`} 
+                        src={`http://10.56.218.93:5000/static/images/${item.imagem}`} 
                         alt={item.nome}
                         className="w-full h-full object-cover rounded-lg"
                       />
@@ -488,7 +488,7 @@ export default function Armazem({ usuario }) {
                           <div className="w-12 h-12 bg-gray-200 dark:bg-gray-600 rounded-lg mx-auto mb-2 flex items-center justify-center">
                             {item.imagem ? (
                               <img 
-                                src={`http://localhost:5000/static/images/${item.imagem}`} 
+                                src={`http://10.56.218.93:5000/static/images/${item.imagem}`} 
                                 alt={item.nome}
                                 className="w-full h-full object-cover rounded-lg"
                               />
@@ -584,7 +584,7 @@ export default function Armazem({ usuario }) {
                     <div className="w-16 h-16 bg-gray-200 dark:bg-gray-600 rounded-lg mx-auto mb-3 flex items-center justify-center">
                       {item.imagem ? (
                         <img 
-                          src={`http://localhost:5000/static/images/${item.imagem}`} 
+                          src={`http://10.56.218.93:5000/static/images/${item.imagem}`} 
                           alt={item.nome}
                           className="w-full h-full object-cover rounded-lg"
                         />
@@ -759,7 +759,7 @@ export default function Armazem({ usuario }) {
                       <div className="w-16 h-16 bg-gray-200 dark:bg-gray-600 rounded-lg mx-auto mb-3 flex items-center justify-center overflow-hidden">
                         {item.imagem ? (
                           <img 
-                            src={`http://localhost:5000/static/images/${item.imagem}`} 
+                            src={`http://10.56.218.93:5000/static/images/${item.imagem}`} 
                             alt={item.nome}
                             className="w-full h-full object-cover rounded-lg"
                           />
@@ -833,7 +833,7 @@ export default function Armazem({ usuario }) {
                   {previewImagem || itemEditando.imagem ? (
                     <div className="w-32 h-32 mx-auto bg-gray-200 dark:bg-gray-600 rounded-lg overflow-hidden">
                       <img 
-                        src={previewImagem || `http://localhost:5000/static/images/${itemEditando.imagem}`}
+                        src={previewImagem || `http://10.56.218.93:5000/static/images/${itemEditando.imagem}`}
                         alt="Preview"
                         className="w-full h-full object-cover"
                       />

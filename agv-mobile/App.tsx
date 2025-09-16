@@ -10,6 +10,7 @@ import DashboardScreen from './src/screens/DashboardScreen';
 import OrderScreen from './src/screens/OrderScreen';
 import StatusScreen from './src/screens/StatusScreen';
 import QRScannerScreen from './src/screens/QRScannerScreen';
+import AdminUsuariosScreen from './src/screens/AdminUsuariosScreen';
 
 // Import theme
 import { theme } from './src/theme/theme';
@@ -63,6 +64,11 @@ export default function App() {
               },
               headerTintColor: '#fff',
             }}
+          />
+          <Stack.Screen
+            name="AdminUsuarios"
+            component={AdminUsuariosScreen}
+            options={{ title: 'Gerenciar Usuários' }}
           />
         </Stack.Navigator>
       </NavigationContainer>

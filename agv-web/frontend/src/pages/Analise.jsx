@@ -35,15 +35,15 @@ export default function Analise({ usuario }) {
       setLoading(true);
 
       // Load orders data
-      const ordersResponse = await fetch('http://localhost:5000/pedidos');
+      const ordersResponse = await fetch('http://10.56.218.93:5000/pedidos');
       const ordersData = await ordersResponse.json();
 
       // Load devices data
-      const devicesResponse = await fetch('http://localhost:5000/dispositivos');
+      const devicesResponse = await fetch('http://10.56.218.93:5000/dispositivos');
       const devicesData = await devicesResponse.json();
 
       // Load warehouse data
-      const warehouseResponse = await fetch('http://localhost:5000/armazem/itens');
+      const warehouseResponse = await fetch('http://10.56.218.93:5000/armazem/itens');
       const warehouseData = await warehouseResponse.json();
 
       // Process analytics
