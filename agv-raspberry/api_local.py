@@ -111,6 +111,59 @@ class RaspberryAPI:
                     'error': str(e)
                 }), 500
 
+        @self.app.route('/move_forward', methods=['POST'])
+        def move_forward():
+            """Move o AGV para frente por 1 segundo"""
+            try:
+                self.api_status['requests_count'] += 1
+
+                logger.info("Comando: Mover para frente por 1 segundo")
+
+                # TODO: Implementar controle real do ESP32
+                # Por enquanto, apenas simular
+                result = self._execute_motor_command('forward', 1.0)
+
+                return jsonify({
+                    'success': result['success'],
+                    'message': result['message'],
+                    'command': 'move_forward',
+                    'duration': 1.0,
+                    'timestamp': datetime.now().isoformat()
+                })
+
+            except Exception as e:
+                logger.error(f"Erro ao mover para frente: {e}")
+                return jsonify({
+                    'success': False,
+                    'error': str(e)
+                }), 500
+
+        @self.app.route('/move_backward', methods=['POST'])
+        def move_backward():
+            """Move o AGV para trás por 1 segundo"""
+            try:
+                self.api_status['requests_count'] += 1
+
+                logger.info("Comando: Mover para trás por 1 segundo")
+
+                # TODO: Implementar controle real do ESP32
+                result = self._execute_motor_command('backward', 1.0)
+
+                return jsonify({
+                    'success': result['success'],
+                    'message': result['message'],
+                    'command': 'move_backward',
+                    'duration': 1.0,
+                    'timestamp': datetime.now().isoformat()
+                })
+
+            except Exception as e:
+                logger.error(f"Erro ao mover para trás: {e}")
+                return jsonify({
+                    'success': False,
+                    'error': str(e)
+                }), 500
+
         @self.app.route('/camera', methods=['GET'])
         def get_camera_status():
             """Retorna status da câmera"""
@@ -237,6 +290,41 @@ class RaspberryAPI:
                     'uptime': 'Test mode'
                 }
             })
+
+    def _execute_motor_command(self, direction, duration):
+        """Executa comando de movimento nos motores via ESP32"""
+        try:
+            logger.info(f"Executando movimento: {direction} por {duration}s")
+
+            # TODO: Implementar comunicação real com ESP32
+            # Por enquanto, apenas simular o movimento
+
+            # Simulação de movimento
+            import time
+            time.sleep(duration)  # Simular tempo de movimento
+
+            # Simular sucesso
+            result = {
+                'success': True,
+                'message': f'Movimento {direction} executado por {duration} segundos',
+                'direction': direction,
+                'duration': duration,
+                'timestamp': datetime.now().isoformat()
+            }
+
+            logger.info(f"Movimento simulado concluído: {result['message']}")
+            return result
+
+        except Exception as e:
+            logger.error(f"Erro ao executar movimento {direction}: {e}")
+            return {
+                'success': False,
+                'message': f'Erro ao executar movimento: {str(e)}',
+                'direction': direction,
+                'duration': duration,
+                'error': str(e),
+                'timestamp': datetime.now().isoformat()
+            }
 
 def run_api_server(api_instance):
     """Executa o servidor Flask em uma thread separada"""

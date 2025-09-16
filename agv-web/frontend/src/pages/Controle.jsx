@@ -10,6 +10,7 @@ export default function Controle({ usuario }) {
   const [pedidosAtivos, setPedidosAtivos] = useState([]);
   const [pesquisa, setPesquisa] = useState('');
   const [loading, setLoading] = useState(false);
+  const [motorLoading, setMotorLoading] = useState(false);
 
   // Carregar dados iniciais
   useEffect(() => {
@@ -205,6 +206,52 @@ export default function Controle({ usuario }) {
     return texts[status] || status;
   };
 
+  const moverParaFrente = async () => {
+    if (motorLoading) return;
+
+    setMotorLoading(true);
+    try {
+      const response = await fetch('http://localhost:5000/agv/move_forward', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        alert('Comando enviado: Mover para frente por 1 segundo');
+      } else {
+        alert('Erro ao enviar comando: ' + (data.error || 'Erro desconhecido'));
+      }
+    } catch (error) {
+      alert('Erro de conexão: ' + error.message);
+    } finally {
+      setMotorLoading(false);
+    }
+  };
+
+  const moverParaTras = async () => {
+    if (motorLoading) return;
+
+    setMotorLoading(true);
+    try {
+      const response = await fetch('http://localhost:5000/agv/move_backward', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        alert('Comando enviado: Mover para trás por 1 segundo');
+      } else {
+        alert('Erro ao enviar comando: ' + (data.error || 'Erro desconhecido'));
+      }
+    } catch (error) {
+      alert('Erro de conexão: ' + error.message);
+    } finally {
+      setMotorLoading(false);
+    }
+  };
+
   return (
     <div className="p-6 space-y-6">
       {/* Controles superiores */}
@@ -256,6 +303,68 @@ export default function Controle({ usuario }) {
           )}
         </div>
       )}
+
+      {/* Controles Manuais do AGV */}
+      <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 rounded-lg p-6">
+        <h3 className="text-lg font-semibold text-orange-900 dark:text-orange-300 mb-4 text-center">
+          🕹️ Controles Manuais do AGV
+        </h3>
+        <p className="text-sm text-orange-700 dark:text-orange-400 mb-6 text-center">
+          Teste básico de movimento - comandos enviados para ESP32 via Raspberry Pi
+        </p>
+
+        <div className="flex justify-center items-center space-x-8">
+          {/* Botão Mover para Frente */}
+          <div className="text-center">
+            <button
+              onClick={moverParaFrente}
+              disabled={motorLoading}
+              className="w-20 h-20 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white rounded-full flex items-center justify-center text-2xl font-bold transition-all duration-200 transform hover:scale-105 disabled:transform-none shadow-lg disabled:shadow-none"
+              title="Mover para frente (1 segundo)"
+            >
+              {motorLoading ? (
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+              ) : (
+                '↑'
+              )}
+            </button>
+            <p className="text-sm text-green-700 dark:text-green-400 mt-2 font-medium">
+              Para Frente
+            </p>
+            <p className="text-xs text-green-600 dark:text-green-500">
+              1 segundo
+            </p>
+          </div>
+
+          {/* Botão Mover para Trás */}
+          <div className="text-center">
+            <button
+              onClick={moverParaTras}
+              disabled={motorLoading}
+              className="w-20 h-20 bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white rounded-full flex items-center justify-center text-2xl font-bold transition-all duration-200 transform hover:scale-105 disabled:transform-none shadow-lg disabled:shadow-none"
+              title="Mover para trás (1 segundo)"
+            >
+              {motorLoading ? (
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+              ) : (
+                '↓'
+              )}
+            </button>
+            <p className="text-sm text-red-700 dark:text-red-400 mt-2 font-medium">
+              Para Trás
+            </p>
+            <p className="text-xs text-red-600 dark:text-red-500">
+              1 segundo
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-6 p-3 bg-orange-100 dark:bg-orange-800/30 rounded-lg">
+          <p className="text-sm text-orange-800 dark:text-orange-300 text-center">
+            <strong>⚠️ Importante:</strong> Certifique-se de que o Raspberry Pi está conectado e o ESP32 está ligado antes de usar os controles.
+          </p>
+        </div>
+      </div>
 
       {/* Lista de itens disponíveis */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">

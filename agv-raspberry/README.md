@@ -50,6 +50,9 @@ Sistema embarcado do AGV (Automated Guided Vehicle) que roda no Raspberry Pi, re
 ```bash
 # Instalação mais básica possível
 sudo bash install_ultra_simple.sh
+
+# Instalar dependências Python essenciais
+bash install_deps.sh
 ```
 
 **Ideal para:** Qualquer situação, máxima compatibilidade
@@ -57,7 +60,8 @@ sudo bash install_ultra_simple.sh
 - ✅ Estrutura de diretórios
 - ✅ Sem dependências problemáticas
 - ✅ Funciona em qualquer Raspberry Pi OS
-- ❌ **Instalação manual de pacotes Python**
+- ✅ **Script automático de dependências**
+- ❌ **Sem OpenCV** (pode ser instalado depois)
 
 ### ⚡ Opção 2: Instalação ULTRA Rápida (Fácil)
 
@@ -137,6 +141,18 @@ sudo apt install -y python3-opencv
 # Opção 2: Via pip (mais recente, pode demorar)
 source venv/bin/activate
 pip install opencv-python --no-cache-dir
+```
+
+### 📦 Instalação Rápida de Dependências
+
+Se você teve erro de "No module named 'flask_cors'", use este script:
+
+```bash
+# Instalar dependências essenciais automaticamente
+bash install_deps.sh
+
+# Ou instalar manualmente:
+pip3 install --user flask flask-cors requests pyserial
 ```
 
 ### Instalação Manual
@@ -506,6 +522,18 @@ ping 192.168.0.100
 
 # Verificar se backend está rodando
 netstat -tlnp | grep :5000
+```
+
+### Problema: "No module named 'flask_cors'"
+```bash
+# SOLUÇÃO: Instalar dependências essenciais
+bash install_deps.sh
+
+# Ou instalar manualmente:
+pip3 install --user flask flask-cors requests pyserial
+
+# Verificar instalação:
+python3 -c "import flask, flask_cors, requests, serial; print('✅ OK')"
 ```
 
 ### Problema: Dependências Python falham

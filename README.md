@@ -29,6 +29,18 @@ cd agv-raspberry && python main.py      # Sistema de controle
 - **Sistema Raspberry**: `http://IP_RASPBERRY:8080` (API local)
 - **Protocolo**: REST API + WebSocket para tempo real
 
-## 📚 Documentação
+## 🕹️ Controles Manuais do AGV
+
+Teste básico de movimento através da interface web:
+
+1. **Acesse**: `http://localhost:5000` → Página "Controle"
+2. **Use os botões**:
+   - **↑ Para Frente**: Move por 1 segundo
+   - **↓ Para Trás**: Move por 1 segundo
+3. **Arquitetura**: Frontend → Backend → Raspberry Pi → ESP32 → Motores
+
+**Documentação completa**: [`docs/controle_manual_agv.md`](docs/controle_manual_agv.md)
+
+##  Documentação
 
 Veja a pasta `docs/` para documentação detalhada de cada componente.

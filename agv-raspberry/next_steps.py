@@ -9,6 +9,55 @@ import requests
 import time
 from datetime import datetime
 
+def check_dependencies():
+    """Verifica e instala dependências necessárias"""
+    print("📦 Verificando dependências...")
+
+    required_packages = [
+        'flask',
+        'flask_cors',
+        'requests',
+        'pyserial'
+    ]
+
+    missing_packages = []
+
+    for package in required_packages:
+        try:
+            __import__(package.replace('_', ''))
+            print(f"✅ {package} - OK")
+        except ImportError:
+            missing_packages.append(package)
+            print(f"❌ {package} - FALTANDO")
+
+    if missing_packages:
+        print(f"\n⚠️  Dependências faltando: {', '.join(missing_packages)}")
+        print("📥 Instalando dependências...")
+
+        try:
+            import subprocess
+            import sys
+
+            # Instala pacotes faltando
+            for package in missing_packages:
+                print(f"   Instalando {package}...")
+                subprocess.check_call([
+                    sys.executable, '-m', 'pip', 'install',
+                    package.replace('_', '-')
+                ])
+
+            print("✅ Dependências instaladas com sucesso!")
+            return True
+
+        except Exception as e:
+            print(f"❌ Erro ao instalar dependências: {e}")
+            print("💡 Tente instalar manualmente:")
+            print(f"   pip install {' '.join(missing_packages)}")
+            return False
+
+    print("✅ Todas as dependências estão instaladas!")
+    return True
+
 def check_config():
     """Verifica se a configuração está correta"""
     print("🔍 Verificando configuração...")
@@ -217,6 +266,12 @@ def main():
     """Função principal"""
     print("🎯 GUIA DOS PRÓXIMOS PASSOS - Sistema AGV")
     print("=" * 50)
+
+    # Verifica e instala dependências
+    if not check_dependencies():
+        print("\n❌ Falha na instalação de dependências!")
+        print("Instale manualmente e tente novamente")
+        return
 
     # Verifica configuração
     pc_ip = check_config()

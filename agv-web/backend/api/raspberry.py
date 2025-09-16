@@ -394,6 +394,92 @@ def send_command_to_agv():
             'error': str(e)
         }), 500
 
+@raspberry_bp.route('/agv/move_forward', methods=['POST'])
+def move_forward():
+    """Envia comando para mover o AGV para frente por 1 segundo"""
+    return send_motor_command('forward', 1.0)
+
+@raspberry_bp.route('/agv/move_backward', methods=['POST'])
+def move_backward():
+    """Envia comando para mover o AGV para trás por 1 segundo"""
+    return send_motor_command('backward', 1.0)
+
+def send_motor_command(direction, duration):
+    """Função auxiliar para enviar comandos de movimento"""
+    try:
+        # Encontrar Raspberry Pi conectado
+        if not connected_raspberries:
+            return jsonify({
+                'success': False,
+                'error': 'Nenhum Raspberry Pi conectado'
+            }), 400
+
+        # Pegar o primeiro Raspberry Pi conectado (pode ser expandido para múltiplos)
+        raspberry_id = list(connected_raspberries.keys())[0]
+        raspberry_data = connected_raspberries[raspberry_id]
+
+        # Preparar comando de movimento
+        command_data = {
+            'type': 'motor_control',
+            'direction': direction,
+            'duration': duration,
+            'timestamp': datetime.now().isoformat()
+        }
+
+        logger.info(f"Enviando comando de movimento para Raspberry Pi {raspberry_id}: {command_data}")
+
+        # Enviar comando para o Raspberry Pi via HTTP
+        import requests
+
+        raspberry_url = f"http://{raspberry_data['ip']}:{raspberry_data['port']}"
+        endpoint = "/move_forward" if direction == "forward" else "/move_backward"
+
+        try:
+            response = requests.post(f"{raspberry_url}{endpoint}", timeout=10)
+            raspberry_response = response.json()
+
+            if response.status_code == 200 and raspberry_response.get('success'):
+                logger.info(f"Comando enviado com sucesso para Raspberry Pi: {raspberry_response}")
+
+                # Broadcast via WebSocket para atualização em tempo real
+                from app import socketio
+                socketio.emit('motor_command', {
+                    'direction': direction,
+                    'duration': duration,
+                    'raspberry_id': raspberry_id,
+                    'raspberry_response': raspberry_response,
+                    'timestamp': datetime.now().isoformat()
+                })
+
+                return jsonify({
+                    'success': True,
+                    'message': f'Comando de movimento enviado: {direction} por {duration}s',
+                    'command': command_data,
+                    'raspberry_id': raspberry_id,
+                    'raspberry_response': raspberry_response
+                })
+            else:
+                error_msg = raspberry_response.get('error', 'Erro desconhecido no Raspberry Pi')
+                logger.error(f"Erro no Raspberry Pi: {error_msg}")
+                return jsonify({
+                    'success': False,
+                    'error': f'Erro no Raspberry Pi: {error_msg}'
+                }), 500
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Erro de conexão com Raspberry Pi: {e}")
+            return jsonify({
+                'success': False,
+                'error': f'Erro de conexão com Raspberry Pi: {str(e)}'
+            }), 500
+
+    except Exception as e:
+        logger.error(f"Erro ao enviar comando de movimento: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 @raspberry_bp.route('/test', methods=['GET'])
 def test_endpoint():
     """Endpoint de teste para verificar conectividade"""
