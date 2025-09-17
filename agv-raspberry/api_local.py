@@ -294,33 +294,38 @@ class RaspberryAPI:
     def _execute_motor_command(self, direction, duration):
         """Executa comando de movimento nos motores via ESP32"""
         try:
-            logger.info(f"Executando movimento: {direction} por {duration}s")
+            logger.info(f"Executando movimento REAL: {direction} por {duration}s")
 
             # Importar controlador ESP32
-            from esp32_control import get_esp32_controller
+            from esp32_control import ESP32Controller
 
-            # Obter controlador ESP32
-            esp32 = get_esp32_controller()
+            # Criar controlador com porta específica
+            esp32 = ESP32Controller(port='/dev/ttyACM0')
 
-            # Conectar se não estiver conectado
-            if not esp32.connected:
-                logger.info("Conectando ao ESP32...")
-                if not esp32.connect():
-                    return {
-                        'success': False,
-                        'message': 'Falha ao conectar com ESP32',
-                        'direction': direction,
-                        'duration': duration,
-                        'error': 'ESP32 não conectado',
-                        'timestamp': datetime.now().isoformat()
-                    }
+            # Conectar ao ESP32
+            logger.info("Conectando ao ESP32...")
+            if not esp32.connect():
+                logger.error("Falha ao conectar com ESP32")
+                return {
+                    'success': False,
+                    'message': 'Falha ao conectar com ESP32',
+                    'direction': direction,
+                    'duration': duration,
+                    'error': 'ESP32 não conectado',
+                    'timestamp': datetime.now().isoformat()
+                }
+
+            logger.info("ESP32 conectado, executando movimento...")
 
             # Executar movimento baseado na direção
             if direction == 'forward':
                 result = esp32.move_forward(duration)
+                logger.info(f"Movimento para frente executado: {result}")
             elif direction == 'backward':
                 result = esp32.move_backward(duration)
+                logger.info(f"Movimento para trás executado: {result}")
             else:
+                esp32.disconnect()
                 return {
                     'success': False,
                     'message': f'Direção inválida: {direction}',
@@ -330,13 +335,19 @@ class RaspberryAPI:
                     'timestamp': datetime.now().isoformat()
                 }
 
+            # Desconectar
+            esp32.disconnect()
+            logger.info("ESP32 desconectado")
+
             # Retornar resultado
             result['timestamp'] = datetime.now().isoformat()
-            logger.info(f"Movimento ESP32 concluído: {result['message']}")
+            logger.info(f"Movimento ESP32 REAL concluído: {result['message']}")
             return result
 
         except Exception as e:
-            logger.error(f"Erro ao executar movimento {direction}: {e}")
+            logger.error(f"Erro ao executar movimento REAL {direction}: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return {
                 'success': False,
                 'message': f'Erro ao executar movimento: {str(e)}',

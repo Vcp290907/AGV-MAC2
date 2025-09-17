@@ -509,6 +509,15 @@ ESP32 Pin → Função
     # Útil para identificar problemas de parsing JSON
     ```
 
+7. **Teste Simplificado**:
+    ```bash
+    # Teste direto usando ESP32Controller (igual ao debug_serial.py)
+    python test_simple.py
+
+    # Deve funcionar se o ESP32 estiver OK
+    # Se funcionar, o problema está nos outros scripts
+    ```
+
 ### Câmera
 - Porta USB ou CSI
 - Resolução: 640x480
