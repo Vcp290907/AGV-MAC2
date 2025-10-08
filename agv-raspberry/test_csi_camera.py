@@ -120,10 +120,11 @@ def test_gstreamer_pipeline():
             ret, frame = cap.read()
             if ret and frame is not None:
                 height, width = frame.shape[:2]
-                print("✅ GStreamer pipeline funcionando!"                print(f"   📐 Resolução: {width}x{height}")
+                print("✅ GStreamer pipeline funcionando!")
+                print(f"   📐 Resolução: {width}x{height}")
 
                 cv2.imwrite('teste_gstreamer.jpg', frame)
-                print("   💾 Frame salvo: teste_gstreamer.jpg"
+                print("   💾 Frame salvo: teste_gstreamer.jpg")
 
                 cap.release()
                 return True
