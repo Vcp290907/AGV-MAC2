@@ -1,7 +1,7 @@
 #!/bin/bash
 """
 Script para executar todos echo ""
-echo "6️⃣ TESTANDO QR CODES (se disponível)..."
+echo "8️⃣ TESTANDO QR CODES (se disponível)..."
 echo "======================================"
 if python3 -c "import pyzbar" 2>/dev/null; then
     python3 test_qr_codes.py
@@ -10,7 +10,7 @@ else
 fi
 
 echo ""
-echo "7️⃣ VERIFICANDO IMAGENS CRIADAS..."
+echo "9️⃣ VERIFICANDO IMAGENS CRIADAS..."
 echo "=================================" câmera
 Execute: bash run_all_camera_tests.sh
 """
@@ -24,7 +24,17 @@ if [ ! -f "test_csi_camera.py" ]; then
     exit 1
 fi
 
-echo "1️⃣ EXECUTANDO DIAGNÓSTICO COMPLETO..."
+echo "1️⃣ VERIFICAÇÃO ULTRA RÁPIDA..."
+echo "=============================="
+python3 check_cameras.py
+
+echo ""
+echo "2️⃣ TESTE DE FOTO SIMPLES..."
+echo "==========================="
+python3 take_simple_photo.py
+
+echo ""
+echo "3️⃣ EXECUTANDO DIAGNÓSTICO COMPLETO..."
 echo "====================================="
 if [ -f "diagnose_csi_camera.sh" ]; then
     bash diagnose_csi_camera.sh
@@ -33,7 +43,7 @@ else
 fi
 
 echo ""
-echo "2️⃣ TENTATIVA DE CORREÇÃO AUTOMÁTICA..."
+echo "4️⃣ TENTATIVA DE CORREÇÃO AUTOMÁTICA..."
 echo "======================================"
 if [ -f "fix_csi_camera.sh" ]; then
     echo "🔧 Executando correções automáticas..."
@@ -43,22 +53,22 @@ else
 fi
 
 echo ""
-echo "3️⃣ EXECUTANDO TESTE ESPECÍFICO CSI..."
+echo "5️⃣ EXECUTANDO TESTE ESPECÍFICO CSI..."
 echo "====================================="
 python3 test_csi_camera.py
 
 echo ""
-echo "4️⃣ EXECUTANDO TESTE CSI CHINESA..."
+echo "6️⃣ EXECUTANDO TESTE CSI CHINESA..."
 echo "=================================="
 python3 test_chinese_csi_camera.py
 
 echo ""
-echo "5️⃣ DIAGNÓSTICO DETALHADO CHINÊS..."
+echo "7️⃣ DIAGNÓSTICO DETALHADO CHINÊS..."
 echo "=================================="
 bash diagnose_chinese_csi.sh
 
 echo ""
-echo "6️⃣ TESTANDO QR CODES (se disponível)..."
+echo "8️⃣ TESTANDO QR CODES (se disponível)..."
 echo "======================================"
 if python3 -c "import pyzbar" 2>/dev/null; then
     python3 test_qr_codes.py

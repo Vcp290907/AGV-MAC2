@@ -119,6 +119,29 @@ sudo reboot
 python3 test_camera.py
 ```
 
+## 🧪 Testes
+
+### Verificação Ultra Rápida 🔍 **(COMECE AQUI)**
+```bash
+python3 check_cameras.py
+```
+
+Verifica rapidamente quais índices de câmera estão disponíveis:
+- ✅ Testa índices 0-9 em segundos
+- ✅ Mostra resolução de cada câmera
+- ✅ Identifica câmeras funcionando
+
+### Foto Simples 📷 **(TESTE BÁSICO)**
+```bash
+python3 take_simple_photo.py
+```
+
+Teste mais simples possível - apenas abre câmera e tira uma foto:
+- ✅ Abre câmera no índice 0
+- ✅ Tira uma foto
+- ✅ Salva como `foto_simples.jpg`
+- ✅ Fecha câmera
+
 ### Teste Específico CSI ⭐ **(RECOMENDADO)**
 ```bash
 python3 test_csi_camera.py
