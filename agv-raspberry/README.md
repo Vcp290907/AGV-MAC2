@@ -105,14 +105,14 @@ sudo bash install.sh
 
 ### 🎯 Qual Escolher?
 
-| Situação | Recomendação | Script | Confiabilidade |
-|----------|-------------|---------|----------------|
-| Ambiente gerenciado externamente | `install_ultra_simple.sh` | ✅ Máxima | ⭐⭐⭐⭐⭐ |
-| Problemas de dependências | `install_ultra_simple.sh` | ✅ Máxima | ⭐⭐⭐⭐⭐ |
-| Primeiro teste | `quick_start.sh` | ✅ Alta | ⭐⭐⭐⭐⭐ |
-| Sem câmera/OpenCV | `install_basic.sh` | ✅ Boa | ⭐⭐⭐⭐ |
-| Sistema completo | `install.sh` | ⚠️ Variável | ⭐⭐⭐ |
-| Raspberry Pi antigo | `install_ultra_simple.sh` | ✅ Máxima | ⭐⭐⭐⭐⭐ |
+| Situação                         | Recomendação              | Script     | Confiabilidade |
+| -------------------------------- | ------------------------- | ---------- | -------------- |
+| Ambiente gerenciado externamente | `install_ultra_simple.sh` | ✅ Máxima   | ⭐⭐⭐⭐⭐          |
+| Problemas de dependências        | `install_ultra_simple.sh` | ✅ Máxima   | ⭐⭐⭐⭐⭐          |
+| Primeiro teste                   | `quick_start.sh`          | ✅ Alta     | ⭐⭐⭐⭐⭐          |
+| Sem câmera/OpenCV                | `install_basic.sh`        | ✅ Boa      | ⭐⭐⭐⭐           |
+| Sistema completo                 | `install.sh`              | ⚠️ Variável | ⭐⭐⭐            |
+| Raspberry Pi antigo              | `install_ultra_simple.sh` | ✅ Máxima   | ⭐⭐⭐⭐⭐          |
 
 ### ⚠️ Importante: Ambiente Python Gerenciado
 
@@ -142,6 +142,47 @@ sudo apt install -y python3-opencv
 source venv/bin/activate
 pip install opencv-python --no-cache-dir
 ```
+
+### 📦 Instalação do Picamera2 (Para câmeras chinesas CSI)
+
+**IMPORTANTE**: Câmeras chinesas CSI genéricas requerem Picamera2, NÃO funcionam com V4L2/OpenCV:
+
+```bash
+# Instalar Picamera2 (já incluído em install.sh)
+source venv/bin/activate
+pip install picamera2
+
+# Verificar instalação
+python3 -c "from picamera2 import Picamera2; print('✅ Picamera2 OK')"
+
+# Testar câmera chinesa CSI
+python3 test_picamera2_chinese.py
+```
+
+### 🧪 Teste das Câmeras
+
+Após a instalação, teste suas câmeras chinesas CSI:
+
+```bash
+# Teste ultra simples (mais rápido)
+python3 test_quick.py
+
+# Teste de resolução das câmeras
+python3 test_resolution.py
+
+# Teste básico das câmeras (recomendado primeiro)
+python3 test_picamera2_chinese.py
+
+# Teste do sistema dual camera AGV
+python3 test_agv_dual_camera.py
+
+# Visualização em tempo real (ambas as câmeras lado a lado)
+python3 agv_camera_live.py
+```
+
+**Controles da visualização em tempo real:**
+- `q` - Sair da visualização
+- `s` - Salvar screenshot das câmeras
 
 ### 📦 Instalação Rápida de Dependências
 
@@ -371,14 +412,14 @@ python test_connection.py
 
 ### Endpoints Principais
 
-| Método | Endpoint | Descrição |
-|--------|----------|-----------|
-| GET | `/` | Status da API |
-| GET | `/status` | Status completo do AGV |
-| POST | `/execute` | Executar comando |
-| GET | `/camera` | Status da câmera |
-| POST | `/shutdown` | Desligar sistema |
-| GET | `/logs` | Logs recentes |
+| Método | Endpoint    | Descrição              |
+| ------ | ----------- | ---------------------- |
+| GET    | `/`         | Status da API          |
+| GET    | `/status`   | Status completo do AGV |
+| POST   | `/execute`  | Executar comando       |
+| GET    | `/camera`   | Status da câmera       |
+| POST   | `/shutdown` | Desligar sistema       |
+| GET    | `/logs`     | Logs recentes          |
 
 ### Exemplos de Uso
 
@@ -519,9 +560,12 @@ ESP32 Pin → Função
     ```
 
 ### Câmera
-- Porta USB ou CSI
-- Resolução: 640x480
+- **Câmera 1 (camera_id=0)**: 640x480 (mais rápida, visão geral)
+- **Câmera 2 (camera_id=1)**: 1280x720 (mais detalhada, maior resolução)
+- **Câmeras chinesas CSI**: Usar Picamera2 (biblioteca oficial Raspberry Pi)
+- **Câmeras USB**: OpenCV com V4L2
 - FPS: 30
+- **IMPORTANTE**: Câmeras chinesas CSI genéricas NÃO funcionam com V4L2/OpenCV. Use apenas Picamera2.
 
 ### Sensores (Opcional)
 - Ultrassônico: GPIO 23 (Trigger), 24 (Echo)
@@ -568,7 +612,22 @@ sudo python main.py
 sudo usermod -a -G gpio pi
 ```
 
-### Problema: Câmera não detectada
+### Problema: Câmera chinesa CSI não detectada
+```bash
+# ✅ SOLUÇÃO PARA CÂMERAS CHINESAS CSI:
+# Usar Picamera2 (NÃO V4L2/OpenCV)
+pip install picamera2
+
+# Testar câmera
+python3 test_picamera2_chinese.py
+
+# Para código AGV, usar:
+from agv_camera import AGVDualCamera
+camera = AGVDualCamera()
+frames = camera.capture_frames()
+```
+
+### Problema: Câmera USB não detectada
 ```bash
 # Verificar dispositivos
 ls /dev/video*
