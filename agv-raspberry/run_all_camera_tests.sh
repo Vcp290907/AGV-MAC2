@@ -1,7 +1,7 @@
 #!/bin/bash
 """
 Script para executar todos echo ""
-echo "5️⃣ TESTANDO QR CODES (se disponível)..."
+echo "6️⃣ TESTANDO QR CODES (se disponível)..."
 echo "======================================"
 if python3 -c "import pyzbar" 2>/dev/null; then
     python3 test_qr_codes.py
@@ -10,7 +10,7 @@ else
 fi
 
 echo ""
-echo "6️⃣ VERIFICANDO IMAGENS CRIADAS..."
+echo "7️⃣ VERIFICANDO IMAGENS CRIADAS..."
 echo "=================================" câmera
 Execute: bash run_all_camera_tests.sh
 """
@@ -53,7 +53,12 @@ echo "=================================="
 python3 test_chinese_csi_camera.py
 
 echo ""
-echo "5️⃣ TESTANDO QR CODES (se disponível)..."
+echo "5️⃣ DIAGNÓSTICO DETALHADO CHINÊS..."
+echo "=================================="
+bash diagnose_chinese_csi.sh
+
+echo ""
+echo "6️⃣ TESTANDO QR CODES (se disponível)..."
 echo "======================================"
 if python3 -c "import pyzbar" 2>/dev/null; then
     python3 test_qr_codes.py

@@ -112,6 +112,18 @@ Este script testa câmeras CSI chinesas que **não funcionam com libcamera**:
 - ✅ Verificação de formatos suportados
 - ✅ Cria script de teste contínuo
 
+### Diagnóstico Detalhado Chinesa 🔬 **(ANÁLISE PROFUNDA)**
+```bash
+bash diagnose_chinese_csi.sh
+```
+
+Script específico para diagnosticar problemas em câmeras chinesas CSI:
+- ✅ Verificação detalhada de dispositivos V4L2
+- ✅ Testes de captura com diferentes formatos
+- ✅ Análise de drivers e módulos do kernel
+- ✅ Verificação de logs do sistema
+- ✅ Diagnóstico de problemas de hardware
+
 ### Teste de QR Codes
 ```bash
 python3 test_qr_codes.py

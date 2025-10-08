@@ -31,6 +31,10 @@ def test_chinese_csi_opencv():
     # Câmeras chinesas geralmente aparecem em índices baixos
     test_indices = [0, 1, 2, 3, 4]
 
+    # Também testar dispositivos específicos
+    test_devices = ['/dev/video0', '/dev/video1', '/dev/video2']
+
+    # Testar índices numéricos primeiro
     for index in test_indices:
         print(f"   Testando índice {index}...")
 
@@ -39,32 +43,50 @@ def test_chinese_csi_opencv():
             cap = cv2.VideoCapture(index, cv2.CAP_V4L2)
 
             if cap.isOpened():
-                # Configurar parâmetros comuns para câmeras chinesas
-                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-                cap.set(cv2.CAP_PROP_FPS, 30)
+                print(f"   ✅ Índice {index} abriu com sucesso!")
 
-                # Tentar ler alguns frames
-                for attempt in range(3):
-                    ret, frame = cap.read()
-                    if ret and frame is not None:
-                        height, width = frame.shape[:2]
-                        print(f"   ✅ Câmera chinesa funcionando (índice {index})")
-                        print(f"      📐 Resolução: {width}x{height}")
+                # Tentar configurações diferentes
+                configs = [
+                    (640, 480, 30),
+                    (320, 240, 30),
+                    (640, 480, 15),
+                    (320, 240, 15)
+                ]
 
-                        # Salvar frame de teste
-                        cv2.imwrite('teste_chinese_csi.jpg', frame)
-                        print("      💾 Frame salvo: teste_chinese_csi.jpg")
+                for width, height, fps in configs:
+                    print(f"      Testando {width}x{height}@{fps}fps...")
 
-                        # Verificar se imagem foi salva
-                        if os.path.exists('teste_chinese_csi.jpg'):
-                            file_size = os.path.getsize('teste_chinese_csi.jpg')
-                            print(f"      📁 Tamanho do arquivo: {file_size} bytes")
+                    cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+                    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+                    cap.set(cv2.CAP_PROP_FPS, fps)
 
-                        cap.release()
-                        return True
+                    # Aguardar inicialização
+                    time.sleep(1)
 
-                    time.sleep(0.5)  # Pequena pausa entre tentativas
+                    # Tentar ler alguns frames
+                    for attempt in range(5):
+                        ret, frame = cap.read()
+                        if ret and frame is not None and frame.size > 0:
+                            actual_height, actual_width = frame.shape[:2]
+                            print(f"   ✅ Câmera chinesa funcionando (índice {index})")
+                            print(f"      📐 Resolução: {actual_width}x{actual_height} (configurado: {width}x{height})")
+                            print(f"      🎬 FPS: {fps}")
+
+                            # Salvar frame de teste
+                            cv2.imwrite('teste_chinese_csi.jpg', frame)
+                            print("      💾 Frame salvo: teste_chinese_csi.jpg")
+
+                            # Verificar se imagem foi salva
+                            if os.path.exists('teste_chinese_csi.jpg'):
+                                file_size = os.path.getsize('teste_chinese_csi.jpg')
+                                print(f"      📁 Tamanho do arquivo: {file_size} bytes")
+
+                            cap.release()
+                            return True
+
+                        time.sleep(0.2)  # Pausa menor entre tentativas
+
+                    print(f"      ❌ Configuração {width}x{height}@{fps} falhou")
 
                 cap.release()
             else:
@@ -72,6 +94,42 @@ def test_chinese_csi_opencv():
 
         except Exception as e:
             print(f"   ❌ Erro no índice {index}: {e}")
+
+    # Se índices não funcionaram, tentar dispositivos específicos
+    print("   🔄 Índices numéricos falharam, tentando dispositivos específicos...")
+
+    for device in test_devices:
+        if os.path.exists(device):
+            print(f"   Testando dispositivo {device}...")
+            try:
+                cap = cv2.VideoCapture(device, cv2.CAP_V4L2)
+                if cap.isOpened():
+                    print(f"   ✅ Dispositivo {device} abriu!")
+
+                    # Mesmo teste de configurações
+                    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                    time.sleep(1)
+
+                    ret, frame = cap.read()
+                    if ret and frame is not None and frame.size > 0:
+                        height, width = frame.shape[:2]
+                        print(f"   ✅ Câmera funcionando via {device}")
+                        print(f"      📐 Resolução: {width}x{height}")
+
+                        cv2.imwrite('teste_chinese_csi.jpg', frame)
+                        print("      💾 Frame salvo: teste_chinese_csi.jpg")
+
+                        cap.release()
+                        return True
+
+                    cap.release()
+                else:
+                    print(f"   ❌ Dispositivo {device} não abriu")
+            except Exception as e:
+                print(f"   ❌ Erro no dispositivo {device}: {e}")
+        else:
+            print(f"   ⚠️  Dispositivo {device} não existe")
 
     print("❌ Não foi possível acessar câmera CSI chinesa")
     return False
@@ -98,28 +156,80 @@ def test_chinese_csi_v4l2():
     """Testa câmera chinesa usando v4l2 diretamente"""
     print("\n📷 Testando câmera chinesa com v4l2-ctl...")
 
-    try:
-        # Tentar capturar uma imagem com v4l2-ctl
-        result = subprocess.run([
-            'v4l2-ctl', '--device=/dev/video0',
-            '--set-fmt-video=width=640,height=480,pixelformat=YUYV',
-            '--stream-mmap', '--stream-count=1',
-            '--stream-to=teste_v4l2.raw'
-        ], capture_output=True, text=True, timeout=15)
+    # Testar diferentes dispositivos
+    devices = ['/dev/video0', '/dev/video1', '/dev/video2']
 
-        if result.returncode == 0:
-            print("✅ v4l2-ctl conseguiu acessar câmera")
-            if os.path.exists('teste_v4l2.raw'):
-                file_size = os.path.getsize('teste_v4l2.raw')
-                print(f"   📁 Dados brutos salvos: {file_size} bytes")
-            return True
-        else:
-            print(f"❌ Erro no v4l2-ctl: {result.stderr}")
-            return False
+    for device in devices:
+        if not os.path.exists(device):
+            continue
 
-    except Exception as e:
-        print(f"❌ Erro ao executar v4l2-ctl: {e}")
-        return False
+        print(f"   Testando {device}...")
+
+        # Primeiro verificar se dispositivo responde
+        try:
+            info_result = subprocess.run(['v4l2-ctl', '--device=' + device, '--info'],
+                                       capture_output=True, text=True, timeout=5)
+            if info_result.returncode == 0:
+                print(f"   ✅ {device} responde às consultas")
+            else:
+                print(f"   ❌ {device} não responde: {info_result.stderr.strip()}")
+                continue
+        except Exception as e:
+            print(f"   ❌ Erro ao consultar {device}: {e}")
+            continue
+
+        # Testar diferentes formatos e resoluções
+        test_configs = [
+            ('YUYV', 640, 480),
+            ('YUYV', 320, 240),
+            ('RGB3', 640, 480),
+            ('RGB3', 320, 240)
+        ]
+
+        for pixelformat, width, height in test_configs:
+            print(f"      Testando {pixelformat} {width}x{height}...")
+
+            try:
+                # Configurar formato
+                set_fmt_result = subprocess.run([
+                    'v4l2-ctl', '--device=' + device,
+                    f'--set-fmt-video=width={width},height={height},pixelformat={pixelformat}'
+                ], capture_output=True, text=True, timeout=5)
+
+                if set_fmt_result.returncode != 0:
+                    print(f"         ❌ Erro ao configurar formato: {set_fmt_result.stderr.strip()}")
+                    continue
+
+                # Tentar capturar
+                filename = f'teste_v4l2_{pixelformat}_{width}x{height}.raw'
+                capture_result = subprocess.run([
+                    'v4l2-ctl', '--device=' + device,
+                    '--stream-mmap', '--stream-count=1',
+                    '--stream-to=' + filename
+                ], capture_output=True, text=True, timeout=10)
+
+                if capture_result.returncode == 0:
+                    if os.path.exists(filename):
+                        file_size = os.path.getsize(filename)
+                        print(f"         ✅ Captura OK: {file_size} bytes salvos em {filename}")
+
+                        # Se conseguiu capturar dados, sucesso!
+                        if file_size > 0:
+                            print(f"   🎉 {device} funcionando com {pixelformat} {width}x{height}!")
+                            return True
+                        else:
+                            print(f"         ⚠️  Arquivo criado mas vazio")
+                            os.remove(filename)
+                    else:
+                        print("         ❌ Arquivo não foi criado")
+                else:
+                    print(f"         ❌ Erro na captura: {capture_result.stderr.strip()}")
+
+            except Exception as e:
+                print(f"         ❌ Erro: {e}")
+
+    print("❌ v4l2-ctl não conseguiu capturar dados da câmera")
+    return False
 
 def test_chinese_csi_gstreamer():
     """Testa câmera chinesa com GStreamer (sem libcamerasrc)"""
