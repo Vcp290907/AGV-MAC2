@@ -1,37 +1,56 @@
-# 🧪 Teste de Câmeras - Sistema AGV
+# 🧪 Teste de Câmera CSI - Sistema AGV
 
-Este guia ajuda você a testar e configurar câmeras no seu Raspberry Pi 5 para o sistema AGV.
+Este guia ajuda você a testar e configurar a câmera CSI (cabo flat) no seu Raspberry Pi 5 para o sistema AGV.
 
 ## 📋 Pré-requisitos
 
 - Raspberry Pi 5 com Raspberry Pi OS (64-bit)
-- Câmera CSI oficial ou webcam USB conectada
+- **Câmera CSI oficial** conectada via cabo flat
 - Python 3.9+ instalado
+
+## 🔌 Conexão da Câmera CSI
+
+### Verificar Conexão Física
+1. Certifique-se de que o cabo flat está **firmemente conectado** nos dois conectores
+2. O conector azul da câmera deve estar voltado para o cabo USB
+3. Não force a conexão - ela deve entrar suavemente
+
+### Habilitar no Sistema
+```bash
+# Executar configuração
+sudo raspi-config
+
+# Navegar: Interfacing Options -> Camera -> Enable
+# Depois: Finish -> Reboot
+```
+
+### Verificar Detecção
+```bash
+# Verificar se câmera é detectada
+vcgencmd get_camera
+
+# Deve mostrar: detected=1
+```
 
 ## 🚀 Instalação
 
-### 1. Instalar Dependências
+### 1. Verificar Conexão CSI
+```bash
+bash check_csi_connection.sh
+```
 
-Execute o script de instalação automática:
-
+### 2. Instalar Dependências
 ```bash
 bash install_camera_deps.sh
 ```
 
-Ou instale manualmente:
-
+### 3. Configurar Permissões
 ```bash
-# Atualizar sistema
-sudo apt update
+# Adicionar usuário ao grupo video
+sudo usermod -a -G video $USER
 
-# Instalar libcamera (Raspberry Pi 5)
-sudo apt install -y python3-libcamera python3-kms++ libcamera-tools
-
-# Instalar GStreamer
-sudo apt install -y gstreamer1.0-tools gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-libcamera
-
-# Instalar bibliotecas Python
-pip3 install opencv-python opencv-contrib-python numpy pillow
+# Logout/login ou reboot
+sudo reboot
 ```
 
 ### 2. Configurar Câmera CSI
@@ -50,19 +69,11 @@ sudo reboot
 ## 🧪 Testes
 
 ### Teste Básico (Todas as Câmeras)
-
 ```bash
 python3 test_camera.py
 ```
 
-Este script testa:
-- ✅ Câmeras USB (webcams)
-- ✅ Câmera CSI (oficial)
-- ✅ Câmeras IP (rede)
-- ✅ Funcionalidades do OpenCV
-
-### Teste Específico CSI
-
+### Teste Específico CSI ⭐ **(RECOMENDADO)**
 ```bash
 python3 test_csi_camera.py
 ```
@@ -73,102 +84,111 @@ Este script testa especificamente a câmera CSI com:
 - ✅ GStreamer pipelines
 - ✅ Cria script de teste contínuo
 
+### Teste de QR Codes
+```bash
+python3 test_qr_codes.py
+```
+
 ### Teste Contínuo
-
-Após identificar uma câmera funcionando, execute:
-
 ```bash
 python3 test_csi_continuous.py
 ```
 
-Este script:
-- 📹 Mostra preview contínuo
-- 📊 Exibe FPS e estatísticas
-- 💾 Salva frames periodicamente
-- 🛑 Para com Ctrl+C
+### Executar Todos os Testes
+```bash
+bash run_all_camera_tests.sh
+```
 
 ## 🔧 Solução de Problemas
 
-### Câmera CSI não funciona
+## 🔧 Solução de Problemas
 
+### Câmera CSI não Detectada
+
+#### Verificar Conexão Física
 ```bash
-# Verificar se câmera está detectada
+# Verificar detecção
 vcgencmd get_camera
 
-# Listar dispositivos de vídeo
-ls /dev/video*
-
-# Testar libcamera diretamente
-libcamera-hello -t 5000
-
-# Verificar logs do sistema
-dmesg | grep camera
+# Deve mostrar: detected=1
+# Se mostrar detected=0, verifique:
+# 1. Cabo flat conectado corretamente
+# 2. Conector não danificado
+# 3. Câmera compatível com Pi 5
 ```
 
-### OpenCV não encontra câmera
+#### Habilitar no raspi-config
+```bash
+sudo raspi-config
+# Interfacing Options -> Camera -> Enable
+# Finish -> Reboot
+```
+
+#### Verificar Configuração
+```bash
+# Verificar config.txt
+cat /boot/firmware/config.txt | grep camera
+
+# Se não encontrar, adicionar manualmente:
+echo "camera_auto_detect=1" | sudo tee -a /boot/firmware/config.txt
+sudo reboot
+```
+
+### libcamera não Funciona
 
 ```bash
-# Testar índices diferentes
+# Verificar instalação
+libcamera-hello --version
+
+# Teste básico
+libcamera-hello -t 2000
+
+# Com preview (se display disponível)
+libcamera-hello --qt-preview -t 5000
+```
+
+### OpenCV não Encontra Câmera
+
+```bash
+# Testar diferentes índices
 python3 -c "
 import cv2
-for i in range(10):
-    cap = cv2.VideoCapture(i)
+for i in [0, 1, 2, 10, 11, 12]:
+    cap = cv2.VideoCapture(i, cv2.CAP_V4L2)
     if cap.isOpened():
-        print(f'Camera {i}: OK')
+        print(f'CSI encontrada no índice {i}')
         cap.release()
+        break
+    cap.release()
 "
 ```
 
-### Erro de permissão
+### Problemas de Permissão
 
 ```bash
-# Adicionar usuário ao grupo video
+# Verificar grupo
+groups $USER
+
+# Adicionar ao grupo video
 sudo usermod -a -G video $USER
 
-# Reiniciar sessão
-# ou reboot
+# Logout e login novamente, ou:
 sudo reboot
+```
+
+### GStreamer Falha
+
+```bash
+# Testar pipeline básico
+gst-launch-1.0 libcamerasrc ! videoconvert ! autovideosink
+
+# Com resolução específica
+gst-launch-1.0 libcamerasrc ! video/x-raw,width=640,height=480 ! videoconvert ! autovideosink
 ```
 
 ## 📊 Resultados Esperados
 
-### Teste Básico (test_camera.py)
-```
-🔍 VERIFICANDO SISTEMA
-📋 Sistema: Linux
-🔧 Versão: 6.1.0-rpi7-rpi-v8
-💻 Arquitetura: aarch64
-🖥️  Modelo: Raspberry Pi 5 Model B Rev 1.0
-
-📷 VERIFICANDO HARDWARE DE CÂMERA
-🔌 Dispositivos USB conectados:
-   ✅ Logitech, Inc. Webcam C270
-📹 Verificando câmera CSI:
-   ✅ Câmera CSI detectada
-
-🐍 TESTANDO OPENCV
-📦 OpenCV versão: 4.8.0
-✅ OpenCV importado com sucesso
-✅ Funcionalidades básicas do OpenCV OK
-
-🔌 TESTANDO CÂMERAS USB
-📷 Testando Câmera USB 0 (índice 0)...
-   ✅ Câmera USB 0 aberta com sucesso
-   📐 Resolução: 640x480
-   🎬 FPS: 30.0
-   📸 Testando captura de frames...
-      ✅ Frame 1 capturado
-      ✅ Frame 2 capturado
-      ✅ Frame 3 capturado
-   ✅ Câmera USB 0 funcionando corretamente!
-
-📊 RESUMO DOS TESTES
-USB Cameras: ✅ OK
-CSI Camera:  ✅ OK
-IP Cameras:  ❌ FALHA
-```
-
-### Teste CSI (test_csi_camera.py)
+### Teste CSI (test_csi_camera.py) ⭐ **(RESULTADO ESPERADO)**
 ```
 🎥 TESTE ESPECÍFICO DE CÂMERA CSI - RASPBERRY PI 5
 🔍 Verificando libcamera...

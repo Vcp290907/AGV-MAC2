@@ -1,4 +1,4 @@
-# 🚀 Guia Rápido - Teste de Câmeras no Raspberry Pi 5
+# 🚀 Guia Rápido - Teste de Câmera CSI no Raspberry Pi 5
 
 ## 📋 Comandos Essenciais
 
@@ -15,7 +15,12 @@ vcgencmd get_camera
 ls /dev/video*
 ```
 
-### 2. Instalar Dependências
+### 2. Verificar Conexão CSI ⭐ **(IMPORTANTE)**
+```bash
+bash check_csi_connection.sh
+```
+
+### 3. Instalar Dependências
 ```bash
 # Executar script automático
 bash install_camera_deps.sh
@@ -27,31 +32,28 @@ sudo apt install -y gstreamer1.0-tools gstreamer1.0-plugins-good gstreamer1.0-pl
 pip3 install opencv-python opencv-contrib-python numpy pillow pyzbar qrcode[pil]
 ```
 
-### 3. Testes Rápidos
-
-#### Teste Básico de Todas as Câmeras
+### 4. Configurar Câmera CSI
 ```bash
-python3 test_camera.py
+# Habilitar câmera
+sudo raspi-config
+# Interfacing Options -> Camera -> Enable
+
+# Adicionar permissões
+sudo usermod -a -G video $USER
+
+# Reiniciar
+sudo reboot
 ```
 
-#### Teste Específico da CSI
+### 5. Testes Rápidos
+
+#### Verificar Detecção CSI
 ```bash
-python3 test_csi_camera.py
+vcgencmd get_camera
+# Deve mostrar: detected=1
 ```
 
-#### Teste de QR Codes
-```bash
-python3 test_qr_codes.py
-```
-
-#### Teste Contínuo
-```bash
-python3 test_csi_continuous.py
-```
-
-### 4. Testes Diretos com libcamera
-
-#### Preview da Câmera
+#### Teste Básico com libcamera
 ```bash
 # Preview por 5 segundos
 libcamera-hello -t 5000
@@ -75,48 +77,42 @@ libcamera-jpeg -t 2000 -o teste.jpg
 libcamera-jpeg --width 3280 --height 2464 -o high_res.jpg
 ```
 
-#### Gravação de Vídeo
-```bash
-# Vídeo por 10 segundos
-libcamera-vid -t 10000 -o video.h264
-
-# Vídeo com preview
-libcamera-vid --qt-preview -t 10000 -o video.h264
-```
-
-### 5. Testes com OpenCV
-
-#### Testar Índices de Câmera
+#### Teste com OpenCV
 ```bash
 python3 -c "
 import cv2
-for i in range(5):
-    cap = cv2.VideoCapture(i)
-    if cap.isOpened():
-        print(f'Camera {i}: OK')
-        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        fps = cap.get(cv2.CAP_PROP_FPS)
-        print(f'  Resolução: {width}x{height}, FPS: {fps}')
-        cap.release()
-    else:
-        print(f'Camera {i}: FALHA')
-"
-```
-
-#### Captura Simples com OpenCV
-```bash
-python3 -c "
-import cv2
-cap = cv2.VideoCapture(0)
-ret, frame = cap.read()
-if ret:
-    cv2.imwrite('opencv_test.jpg', frame)
-    print('Imagem capturada: opencv_test.jpg')
+cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
+if cap.isOpened():
+    ret, frame = cap.read()
+    if ret:
+        cv2.imwrite('opencv_test.jpg', frame)
+        print('Imagem capturada com OpenCV')
+    cap.release()
 else:
-    print('Erro na captura')
-cap.release()
+    print('Erro ao abrir câmera CSI')
 "
+```
+
+### 6. Testes do Sistema AGV
+
+#### Executar Todos os Testes CSI
+```bash
+bash run_all_camera_tests.sh
+```
+
+#### Teste Específico CSI
+```bash
+python3 test_csi_camera.py
+```
+
+#### Teste Contínuo
+```bash
+python3 test_csi_continuous.py
+```
+
+#### Teste de QR Codes
+```bash
+python3 test_qr_codes.py
 ```
 
 ### 6. Solução de Problemas
