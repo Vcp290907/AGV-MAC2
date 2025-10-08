@@ -54,7 +54,7 @@ def test_chinese_csi_opencv():
 
                         # Salvar frame de teste
                         cv2.imwrite('teste_chinese_csi.jpg', frame)
-                        print("      💾 Frame salvo: teste_chinese_csi.jpg"
+                        print("      💾 Frame salvo: teste_chinese_csi.jpg")
 
                         # Verificar se imagem foi salva
                         if os.path.exists('teste_chinese_csi.jpg'):
