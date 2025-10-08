@@ -13,27 +13,32 @@ if [ ! -f "test_csi_camera.py" ]; then
     exit 1
 fi
 
-echo "1️⃣ Verificando conexão CSI..."
-if [ -f "check_csi_connection.sh" ]; then
-    bash check_csi_connection.sh
+echo "1️⃣ EXECUTANDO DIAGNÓSTICO COMPLETO..."
+echo "====================================="
+if [ -f "diagnose_csi_camera.sh" ]; then
+    bash diagnose_csi_camera.sh
 else
-    echo "⚠️  Script check_csi_connection.sh não encontrado"
+    echo "⚠️  Script diagnose_csi_camera.sh não encontrado"
 fi
 
 echo ""
-echo "2️⃣ Instalando dependências..."
-if [ -f "install_camera_deps.sh" ]; then
-    bash install_camera_deps.sh
+echo "2️⃣ TENTATIVA DE CORREÇÃO AUTOMÁTICA..."
+echo "======================================"
+if [ -f "fix_csi_camera.sh" ]; then
+    echo "🔧 Executando correções automáticas..."
+    bash fix_csi_camera.sh
 else
-    echo "⚠️  Script install_camera_deps.sh não encontrado"
+    echo "⚠️  Script fix_csi_camera.sh não encontrado"
 fi
 
 echo ""
-echo "3️⃣ Executando teste específico CSI..."
+echo "3️⃣ EXECUTANDO TESTE ESPECÍFICO CSI..."
+echo "====================================="
 python3 test_csi_camera.py
 
 echo ""
-echo "4️⃣ Testando QR codes (se disponível)..."
+echo "4️⃣ TESTANDO QR CODES (se disponível)..."
+echo "======================================"
 if python3 -c "import pyzbar" 2>/dev/null; then
     python3 test_qr_codes.py
 else
@@ -41,12 +46,13 @@ else
 fi
 
 echo ""
-echo "5️⃣ Verificando imagens criadas..."
+echo "5️⃣ VERIFICANDO IMAGENS CRIADAS..."
+echo "================================="
 echo "Imagens de teste:"
 ls -la *.jpg *.png 2>/dev/null || echo "Nenhuma imagem encontrada"
 
 echo ""
-echo "✅ Todos os testes CSI executados!"
+echo "✅ TODOS OS TESTES CSI EXECUTADOS!"
 echo ""
 echo "📖 Consulte CAMERA_TEST_README.md para detalhes"
 echo "🧪 Execute 'python3 test_csi_continuous.py' para teste contínuo"

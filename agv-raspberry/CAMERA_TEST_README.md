@@ -99,7 +99,44 @@ python3 test_csi_continuous.py
 bash run_all_camera_tests.sh
 ```
 
-## 🔧 Solução de Problemas
+## � SE OS TESTES FALHARAM - SOLUÇÃO RÁPIDA
+
+Se você viu esta saída:
+```
+❌ libcamera preview: FALHA
+❌ libcamera capture: FALHA
+❌ OpenCV CSI: FALHA
+❌ GStreamer: FALHA
+```
+
+### 🔍 Diagnóstico Automático
+```bash
+bash diagnose_csi_camera.sh
+```
+
+### 🛠️ Correção Automática
+```bash
+bash fix_csi_camera.sh
+```
+
+### 📋 Verificação Manual
+```bash
+# 1. Verificar detecção
+vcgencmd get_camera
+
+# 2. Habilitar câmera
+sudo raspi-config  # Interfacing Options -> Camera -> Enable
+
+# 3. Reiniciar
+sudo reboot
+
+# 4. Testar novamente
+python3 test_csi_camera.py
+```
+
+**Para detalhes completos:** Ver [CSI_TROUBLESHOOTING.md](CSI_TROUBLESHOOTING.md)
+
+## �🔧 Solução de Problemas
 
 ## 🔧 Solução de Problemas
 
