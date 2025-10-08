@@ -93,12 +93,31 @@ pip3 install opencv-python opencv-contrib-python
 
 ## 🐛 Problemas Comuns e Soluções
 
-### ❌ "detected=0"
+### ❌ "detected=0" (Câmera Oficial)
 **Causa:** Cabo flat desconectado ou câmera danificada
 **Solução:**
 - Verificar conexão física do cabo flat
 - Certificar que conector azul da câmera está voltado para cabo USB
 - Testar com outra câmera CSI
+
+### ❌ "detected=0" (Câmera Chinesa) - NORMAL!
+**IMPORTANTE:** Para câmeras chinesas CSI, `vcgencmd get_camera` **SEMPRE** mostra `detected=0`
+**Isso é normal!** Câmeras chinesas não são detectadas pelo firmware da Raspberry Pi.
+
+**Verificação correta para câmeras chinesas:**
+```bash
+# Verificar dispositivos V4L2
+v4l2-ctl --list-devices
+
+# Deve mostrar algo como:
+/dev/video0
+/dev/video1
+```
+
+**Teste correto:**
+```bash
+python3 test_chinese_csi_camera.py
+```
 
 ### ❌ "libcamera não encontrado"
 **Causa:** Pacotes não instalados
@@ -121,6 +140,71 @@ sudo reboot
 ```bash
 pip3 install opencv-python
 # Verificar se câmera está habilitada
+```
+
+## 🇨🇳 CÂMERAS CSI CHINESAS - GUIA ESPECÍFICO
+
+### Detecção Normal: "detected=0"
+**IMPORTANTE:** Câmeras chinesas CSI **sempre** mostram `detected=0` no `vcgencmd get_camera`. Isso é **normal**!
+
+### Verificação Correta
+```bash
+# Verificar dispositivos V4L2
+v4l2-ctl --list-devices
+
+# Deve mostrar:
+/dev/video0
+/dev/video1
+```
+
+### Teste Específico
+```bash
+python3 test_chinese_csi_camera.py
+```
+
+### Problemas Específicos de Câmeras Chinesas
+
+#### ❌ Câmera Não Aparece em /dev/video*
+**Causa:** Falta de alimentação ou drivers
+**Solução:**
+```bash
+# Verificar alimentação (muitas câmeras chinesas precisam de 5V separado)
+# Instalar drivers V4L2
+sudo apt install v4l-utils
+
+# Verificar módulos
+lsmod | grep v4l
+```
+
+#### ❌ Câmera Detectada mas Sem Imagem
+**Causa:** Formato incorreto ou timing
+**Solução:**
+```bash
+# Verificar formatos suportados
+v4l2-ctl --list-formats-ext -d /dev/video0
+
+# Configurar formato
+v4l2-ctl --device=/dev/video0 --set-fmt-video=width=640,height=480,pixelformat=YUYV
+```
+
+#### ❌ OpenCV Não Funciona
+**Solução:**
+```python
+import cv2
+import time
+
+# Tentar diferentes índices
+for i in range(5):
+    cap = cv2.VideoCapture(i, cv2.CAP_V4L2)
+    if cap.isOpened():
+        time.sleep(2)  # Aguardar inicialização
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        ret, frame = cap.read()
+        if ret:
+            print(f"Câmera funcionando no índice {i}")
+        cap.release()
+        break
 ```
 
 ## 🧪 Testes Individuais

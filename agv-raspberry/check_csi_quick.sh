@@ -28,14 +28,19 @@ else
     echo "   💡 Execute: bash install_camera_deps.sh"
 fi
 
-# Verificar grupo video
+# Verificar dispositivos V4L2 (importante para câmeras chinesas)
 echo ""
-echo "👤 Verificando permissões..."
-if groups $USER | grep -q video; then
-    echo "✅ Usuário no grupo 'video'"
+echo "� Verificando dispositivos V4L2..."
+if command -v v4l2-ctl &> /dev/null; then
+    V4L2_DEVICES=$(v4l2-ctl --list-devices 2>/dev/null | grep -c "/dev/video" || echo "0")
+    echo "Dispositivos V4L2 encontrados: $V4L2_DEVICES"
+    if [ "$V4L2_DEVICES" -gt 0 ]; then
+        echo "✅ Dispositivos V4L2 detectados (bom para câmeras chinesas)"
+    else
+        echo "❌ Nenhum dispositivo V4L2 encontrado"
+    fi
 else
-    echo "❌ Usuário NÃO está no grupo 'video'"
-    echo "   💡 Execute: sudo usermod -a -G video \$USER && sudo reboot"
+    echo "⚠️  v4l2-ctl não instalado (necessário para câmeras chinesas)"
 fi
 
 # Verificar configuração

@@ -15,6 +15,19 @@ Este guia ajuda você a testar e configurar a câmera CSI (cabo flat) no seu Ras
 2. O conector azul da câmera deve estar voltado para o cabo USB
 3. Não force a conexão - ela deve entrar suavemente
 
+### Tipos de Câmera Suportados
+
+#### 🏷️ **Câmera Oficial Raspberry Pi**
+- Modelo: Raspberry Pi Camera Module 3
+- Compatibilidade: Total com libcamera
+- Detecção: `vcgencmd get_camera` mostra `detected=1`
+
+#### 🇨🇳 **Câmera CSI Chinesa (Genérica)**
+- Modelos: ArduCam, Waveshare, câmeras OV2710/OV2715, etc.
+- Compatibilidade: V4L2 direto (não usa libcamera)
+- Detecção: Aparece como `/dev/video0`, `/dev/video1`, etc.
+- **IMPORTANTE**: `vcgencmd get_camera` **sempre** mostra `detected=0`
+
 ### Habilitar no Sistema
 ```bash
 # Executar configuração
@@ -26,10 +39,13 @@ sudo raspi-config
 
 ### Verificar Detecção
 ```bash
-# Verificar se câmera é detectada
+# Para câmera oficial
 vcgencmd get_camera
 
 # Deve mostrar: detected=1
+
+# Para câmera chinesa - verificar V4L2
+v4l2-ctl --list-devices
 ```
 
 ## 🚀 Instalação
@@ -82,6 +98,18 @@ Este script testa especificamente a câmera CSI com:
 - ✅ libcamera (ferramentas nativas)
 - ✅ OpenCV com diferentes backends
 - ✅ GStreamer pipelines
+- ✅ Cria script de teste contínuo
+
+### Teste Específico CSI Chinesa 🇨🇳 **(PARA CÂMERAS CHINESAS)**
+```bash
+python3 test_chinese_csi_camera.py
+```
+
+Este script testa câmeras CSI chinesas que **não funcionam com libcamera**:
+- ✅ OpenCV com V4L2 direto
+- ✅ v4l2-ctl para controle direto
+- ✅ GStreamer sem libcamerasrc
+- ✅ Verificação de formatos suportados
 - ✅ Cria script de teste contínuo
 
 ### Teste de QR Codes

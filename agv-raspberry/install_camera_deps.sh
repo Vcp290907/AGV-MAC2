@@ -19,8 +19,8 @@ sudo apt update
 echo "� Instalando libcamera (essencial para CSI)..."
 sudo apt install -y python3-libcamera python3-kms++ libcamera-tools
 
-echo "🎬 Instalando GStreamer para câmera CSI..."
-sudo apt install -y gstreamer1.0-tools gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-libcamera
+echo "📹 Instalando ferramentas V4L2 (essencial para câmeras chinesas CSI)..."
+sudo apt install -y v4l-utils
 
 echo "🐍 Instalando bibliotecas Python..."
 pip3 install opencv-python opencv-contrib-python numpy pillow

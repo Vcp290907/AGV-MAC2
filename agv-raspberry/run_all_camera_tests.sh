@@ -1,6 +1,17 @@
 #!/bin/bash
 """
-Script para executar todos os testes de câmera
+Script para executar todos echo ""
+echo "5️⃣ TESTANDO QR CODES (se disponível)..."
+echo "======================================"
+if python3 -c "import pyzbar" 2>/dev/null; then
+    python3 test_qr_codes.py
+else
+    echo "⚠️  pyzbar não instalado. Execute: pip3 install pyzbar"
+fi
+
+echo ""
+echo "6️⃣ VERIFICANDO IMAGENS CRIADAS..."
+echo "=================================" câmera
 Execute: bash run_all_camera_tests.sh
 """
 
@@ -37,7 +48,12 @@ echo "====================================="
 python3 test_csi_camera.py
 
 echo ""
-echo "4️⃣ TESTANDO QR CODES (se disponível)..."
+echo "4️⃣ EXECUTANDO TESTE CSI CHINESA..."
+echo "=================================="
+python3 test_chinese_csi_camera.py
+
+echo ""
+echo "5️⃣ TESTANDO QR CODES (se disponível)..."
 echo "======================================"
 if python3 -c "import pyzbar" 2>/dev/null; then
     python3 test_qr_codes.py
