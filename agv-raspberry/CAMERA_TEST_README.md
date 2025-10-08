@@ -1,6 +1,36 @@
 # 🧪 Teste de Câmera CSI - Sistema AGV
 
-Este guia ajuda você a testar e configurar a câmera CSI (cabo flat) no seu Raspberry Pi 5 para o sistema AGV.
+Este guia ajuda você a testar e configurar a câmera CSI (cabo flat) no s### Diagnóstico Detalhado Chinesa 🔬 **(ANÁLISE PROFUNDA)**
+```bash
+bash diagnose_chinese_csi.sh
+```
+
+Script específico para diagnosticar problemas em câmeras chinesas CSI:
+- ✅ Verificação detalhada de dispositivos V4L2
+- ✅ Testes de captura com diferentes formatos/resoluções
+- ✅ Análise de drivers e módulos do kernel
+- ✅ Verificação de logs do sistema
+- ✅ Diagnóstico de problemas de hardware
+
+### Verificação Rápida de Sinal 📡 **(TESTE IMEDIATO)**
+```bash
+bash check_csi_signal.sh
+```
+
+Verificação ultra-rápida se há sinal no barramento CSI:
+- ✅ Testa conectividade CSI em tempo real
+- ✅ Mostra logs de detecção de câmera
+- ✅ Diagnóstico em segundos
+
+### Guia de Emergência 🚨 **(CÂMERA NÃO DETECTADA)**
+```bash
+# Leia: CSI_CHINESE_EMERGENCY.md
+```
+
+Guia específico para quando "csi2_ch0 node link is not enabled":
+- ✅ Diagnóstico do problema físico
+- ✅ Soluções passo a passo
+- ✅ Verificações de hardwarey Pi 5 para o sistema AGV.
 
 ## 📋 Pré-requisitos
 
