@@ -14,8 +14,9 @@ def main():
     print("📺 VISUALIZAÇÃO TEMPO REAL - CÂMERAS AGV")
     print("=========================================")
 
-    # Inicializar sistema dual
-    dual_camera = AGVDualCamera(width=640, height=480)
+    # Inicializar sistema dual com resoluções diferentes
+    # Câmera 1: 640x480 (mais rápida), Câmera 2: 1280x720 (mais detalhada)
+    dual_camera = AGVDualCamera(width1=640, height1=480, width2=1280, height2=720)
 
     try:
         dual_camera.initialize()
@@ -30,13 +31,17 @@ def main():
 
             # Preparar display
             if frame1 is not None and frame2 is not None:
+                # Redimensionar câmera 2 para combinar com câmera 1 (mesma altura)
+                height1 = frame1.shape[0]
+                frame2_resized = cv2.resize(frame2, (int(frame2.shape[1] * height1 / frame2.shape[0]), height1))
+
                 # Combinar imagens lado a lado
-                combined = np.hstack((frame1, frame2))
+                combined = np.hstack((frame1, frame2_resized))
 
                 # Adicionar labels
-                cv2.putText(combined, "Camera 1", (10, 30),
+                cv2.putText(combined, "Camera 1 (640x480)", (10, 30),
                            cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-                cv2.putText(combined, "Camera 2", (650, 30),
+                cv2.putText(combined, f"Camera 2 ({frame2.shape[1]}x{frame2.shape[0]})", (frame1.shape[1] + 10, 30),
                            cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
 
                 # Mostrar imagem combinada
@@ -74,14 +79,18 @@ def main():
                 filename = f"agv_dual_screenshot_{timestamp}.jpg"
 
                 if frame1 is not None and frame2 is not None:
-                    combined = np.hstack((frame1, frame2))
+                    # Redimensionar câmera 2 para combinar com câmera 1
+                    height1 = frame1.shape[0]
+                    frame2_resized = cv2.resize(frame2, (int(frame2.shape[1] * height1 / frame2.shape[0]), height1))
+                    combined = np.hstack((frame1, frame2_resized))
                     cv2.imwrite(filename, combined)
+                    print(f"📷 Screenshot salvo: {filename} (Camera 1: 640x480, Camera 2: {frame2.shape[1]}x{frame2.shape[0]})")
                 elif frame1 is not None:
                     cv2.imwrite(filename, frame1)
+                    print(f"📷 Screenshot salvo: {filename} (Camera 1: 640x480)")
                 elif frame2 is not None:
                     cv2.imwrite(filename, frame2)
-
-                print(f"📷 Screenshot salvo: {filename}")
+                    print(f"📷 Screenshot salvo: {filename} (Camera 2: {frame2.shape[1]}x{frame2.shape[0]})")
 
             # Pequena pausa para não sobrecarregar CPU
             time.sleep(0.01)

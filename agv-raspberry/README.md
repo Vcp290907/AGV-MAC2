@@ -167,6 +167,9 @@ Após a instalação, teste suas câmeras chinesas CSI:
 # Teste ultra simples (mais rápido)
 python3 test_quick.py
 
+# Teste de resolução das câmeras
+python3 test_resolution.py
+
 # Teste básico das câmeras (recomendado primeiro)
 python3 test_picamera2_chinese.py
 
@@ -557,9 +560,10 @@ ESP32 Pin → Função
     ```
 
 ### Câmera
+- **Câmera 1 (camera_id=0)**: 640x480 (mais rápida, visão geral)
+- **Câmera 2 (camera_id=1)**: 1280x720 (mais detalhada, maior resolução)
 - **Câmeras chinesas CSI**: Usar Picamera2 (biblioteca oficial Raspberry Pi)
 - **Câmeras USB**: OpenCV com V4L2
-- Resolução: 640x480
 - FPS: 30
 - **IMPORTANTE**: Câmeras chinesas CSI genéricas NÃO funcionam com V4L2/OpenCV. Use apenas Picamera2.
 

@@ -11,8 +11,8 @@ def main():
     print("🧪 TESTE SISTEMA DUAL CAMERA AGV")
     print("===============================")
 
-    # Inicializar sistema dual
-    dual_camera = AGVDualCamera(width=640, height=480)
+    # Inicializar sistema dual com resoluções diferentes
+    dual_camera = AGVDualCamera(width1=640, height1=480, width2=1280, height2=720)
 
     try:
         dual_camera.initialize()

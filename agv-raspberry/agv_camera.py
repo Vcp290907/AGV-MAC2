@@ -62,9 +62,9 @@ class AGVCamera:
 
 class AGVDualCamera:
     """Sistema de duas câmeras para AGV"""
-    def __init__(self, width=640, height=480):
-        self.camera1 = AGVCamera(camera_id=0, width=width, height=height)
-        self.camera2 = AGVCamera(camera_id=1, width=width, height=height)
+    def __init__(self, width1=640, height1=480, width2=1280, height2=720):
+        self.camera1 = AGVCamera(camera_id=0, width=width1, height=height1)
+        self.camera2 = AGVCamera(camera_id=1, width=width2, height=height2)
 
     def initialize(self):
         """Inicializar ambas as câmeras"""
@@ -99,8 +99,8 @@ class AGVDualCamera:
 
 # Exemplo de uso
 if __name__ == "__main__":
-    # Sistema dual de câmeras
-    dual_camera = AGVDualCamera(width=640, height=480)
+    # Sistema dual de câmeras com resoluções diferentes
+    dual_camera = AGVDualCamera(width1=640, height1=480, width2=1280, height2=720)
 
     try:
         dual_camera.initialize()
