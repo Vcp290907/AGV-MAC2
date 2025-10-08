@@ -87,7 +87,7 @@ def test_opencv_csi():
 
                         # Salvar frame de teste
                         cv2.imwrite('teste_opencv_csi.jpg', frame)
-                        print("      💾 Frame salvo: teste_opencv_csi.jpg"
+                        print("      💾 Frame salvo: teste_opencv_csi.jpg")
 
                         cap.release()
                         return True
