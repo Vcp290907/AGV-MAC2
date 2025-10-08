@@ -159,6 +159,28 @@ python3 -c "from picamera2 import Picamera2; print('✅ Picamera2 OK')"
 python3 test_picamera2_chinese.py
 ```
 
+### 🧪 Teste das Câmeras
+
+Após a instalação, teste suas câmeras chinesas CSI:
+
+```bash
+# Teste ultra simples (mais rápido)
+python3 test_quick.py
+
+# Teste básico das câmeras (recomendado primeiro)
+python3 test_picamera2_chinese.py
+
+# Teste do sistema dual camera AGV
+python3 test_agv_dual_camera.py
+
+# Visualização em tempo real (ambas as câmeras lado a lado)
+python3 agv_camera_live.py
+```
+
+**Controles da visualização em tempo real:**
+- `q` - Sair da visualização
+- `s` - Salvar screenshot das câmeras
+
 ### 📦 Instalação Rápida de Dependências
 
 Se você teve erro de "No module named 'flask_cors'", use este script:
