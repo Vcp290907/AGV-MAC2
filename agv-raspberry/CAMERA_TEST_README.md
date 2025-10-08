@@ -153,17 +153,58 @@ Este script testa especificamente a câmera CSI com:
 - ✅ GStreamer pipelines
 - ✅ Cria script de teste contínuo
 
-### Teste Específico CSI Chinesa 🇨🇳 **(PARA CÂMERAS CHINESAS)**
+### Teste Picamera2 para Chinesa � **(MÉTODO CORRETO)**
 ```bash
-python3 test_chinese_csi_camera.py
+python3 test_picamera2_chinese.py
 ```
 
-Este script testa câmeras CSI chinesas que **não funcionam com libcamera**:
-- ✅ OpenCV com V4L2 direto
-- ✅ v4l2-ctl para controle direto
-- ✅ GStreamer sem libcamerasrc
-- ✅ Verificação de formatos suportados
-- ✅ Cria script de teste contínuo
+**IMPORTANTE:** Para câmeras chinesas CSI, use Picamera2 (biblioteca oficial):
+- ✅ Funciona com câmeras chinesas CSI
+- ✅ Usa driver proprietário do Raspberry Pi
+- ✅ Melhor performance e compatibilidade
+- ✅ Cria script interativo para testes
+
+### Teste Interativo Picamera2 🖱️
+```bash
+python3 test_picamera2_interactive.py
+```
+
+Script criado pelo teste acima - permite tirar fotos clicando na imagem.
+
+## ⚠️ **IMPORTANTE: Câmeras Chinesas CSI**
+
+### ❌ **Por que V4L2/OpenCV não funciona:**
+- Câmeras chinesas genéricas não são compatíveis com V4L2
+- Driver V4L2 não reconhece o chipset da câmera chinesa
+- `vcgencmd get_camera` sempre mostra `detected=0`
+- OpenCV não consegue abrir o dispositivo
+
+### ✅ **Por que Picamera2 funciona:**
+- Usa driver proprietário do Raspberry Pi (`rp1-cfe`)
+- Compatível com qualquer câmera CSI conectada
+- Mesmo que `vcgencmd` não detecte, Picamera2 funciona
+- Biblioteca oficial para Raspberry Pi 5
+
+### 🔧 **Como usar no código AGV:**
+```python
+from picamera2 import Picamera2
+import cv2
+
+# Inicializar
+picam2 = Picamera2()
+picam2.configure(picam2.create_preview_configuration(
+    main={"format": 'XRGB8888', "size": (640, 480)}
+))
+picam2.start()
+
+# Capturar frame
+frame = picam2.capture_array()
+frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)  # Converter formato
+
+# Seu código de processamento aqui...
+
+picam2.stop()
+```
 
 ### Diagnóstico Detalhado Chinesa 🔬 **(ANÁLISE PROFUNDA)**
 ```bash

@@ -1,7 +1,18 @@
 #!/bin/bash
 """
 Script para executar todos echo ""
-echo "8️⃣ TESTANDO QR CODES (se disponível)..."
+echo "8️⃣ TESTANDO QR Cecho ""
+echo "9️⃣ TESTANDO QR CODES (se disponível)..."
+echo "======================================"
+if python3 -c "import pyzbar" 2>/dev/null; then
+    python3 test_qr_codes.py
+else
+    echo "⚠️  pyzbar não instalado. Execute: pip3 install pyzbar"
+fi
+
+echo ""
+echo "🔟 VERIFICANDO IMAGENS CRIADAS..."
+echo "================================="ponível)..."
 echo "======================================"
 if python3 -c "import pyzbar" 2>/dev/null; then
     python3 test_qr_codes.py
@@ -34,7 +45,12 @@ echo "==========================="
 python3 take_simple_photo.py
 
 echo ""
-echo "3️⃣ EXECUTANDO DIAGNÓSTICO COMPLETO..."
+echo "3️⃣ TESTE PICAMERA2 (CHINESA) 🎯..."
+echo "=================================="
+python3 test_picamera2_chinese.py
+
+echo ""
+echo "4️⃣ EXECUTANDO DIAGNÓSTICO COMPLETO..."
 echo "====================================="
 if [ -f "diagnose_csi_camera.sh" ]; then
     bash diagnose_csi_camera.sh
@@ -43,7 +59,7 @@ else
 fi
 
 echo ""
-echo "4️⃣ TENTATIVA DE CORREÇÃO AUTOMÁTICA..."
+echo "5️⃣ TENTATIVA DE CORREÇÃO AUTOMÁTICA..."
 echo "======================================"
 if [ -f "fix_csi_camera.sh" ]; then
     echo "🔧 Executando correções automáticas..."
@@ -53,22 +69,22 @@ else
 fi
 
 echo ""
-echo "5️⃣ EXECUTANDO TESTE ESPECÍFICO CSI..."
+echo "6️⃣ EXECUTANDO TESTE ESPECÍFICO CSI..."
 echo "====================================="
 python3 test_csi_camera.py
 
 echo ""
-echo "6️⃣ EXECUTANDO TESTE CSI CHINESA..."
+echo "7️⃣ EXECUTANDO TESTE CSI CHINESA..."
 echo "=================================="
 python3 test_chinese_csi_camera.py
 
 echo ""
-echo "7️⃣ DIAGNÓSTICO DETALHADO CHINÊS..."
+echo "8️⃣ DIAGNÓSTICO DETALHADO CHINÊS..."
 echo "=================================="
 bash diagnose_chinese_csi.sh
 
 echo ""
-echo "8️⃣ TESTANDO QR CODES (se disponível)..."
+echo "9️⃣ TESTANDO QR CODES (se disponível)..."
 echo "======================================"
 if python3 -c "import pyzbar" 2>/dev/null; then
     python3 test_qr_codes.py
