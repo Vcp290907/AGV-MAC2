@@ -23,8 +23,8 @@ def main():
         cam1_ok = frame1 is not None
         cam2_ok = frame2 is not None
 
-        print("
-📊 RESULTADO:"        print(f"Câmera 1: {'✅ OK' if cam1_ok else '❌ FALHA'}")
+        print("📊 RESULTADO:")
+        print(f"Câmera 1: {'✅ OK' if cam1_ok else '❌ FALHA'}")
         print(f"Câmera 2: {'✅ OK' if cam2_ok else '❌ FALHA'}")
 
         if cam1_ok or cam2_ok:
