@@ -410,6 +410,76 @@ Após confirmar que as câmeras funcionam:
    - Use multithreading
    - Implemente buffer de frames
 
+## 🎯 **INTEGRAÇÃO NO AGV**
+
+### 📦 **Módulo Pronto para AGV**
+```python
+# Importar e usar
+from agv_camera import AGVCamera
+
+# Criar instância
+camera = AGVCamera(width=640, height=480)
+camera.initialize()
+
+# Capturar frame
+frame = camera.capture_frame()
+
+# Seu código de processamento aqui...
+
+camera.release()
+```
+
+### 🔧 **Como Usar no Código Principal**
+
+#### 1. **Importar no main.py**
+```python
+from agv_camera import AGVCamera
+import cv2
+```
+
+#### 2. **Inicializar na Inicialização do AGV**
+```python
+# Na inicialização do sistema
+self.camera = AGVCamera(width=640, height=480)
+self.camera.initialize()
+```
+
+#### 3. **Capturar Frames no Loop Principal**
+```python
+def process_vision(self):
+    frame = self.camera.capture_frame()
+    if frame is not None:
+        # Seu processamento de visão aqui
+        # Detecção de QR codes, obstáculos, etc.
+        processed_frame = self.process_vision(frame)
+        return processed_frame
+    return None
+```
+
+#### 4. **Liberar na Finalização**
+```python
+def cleanup(self):
+    if hasattr(self, 'camera'):
+        self.camera.release()
+```
+
+### 📁 **Arquivos de Integração**
+- **`agv_camera.py`** - Módulo completo para câmera AGV
+- **`test_picamera2_chinese.py`** - Teste de validação
+- **`test_picamera2_interactive.py`** - Teste interativo (criado automaticamente)
+
+### ⚙️ **Configurações Recomendadas**
+```python
+# Para visão geral
+camera = AGVCamera(width=640, height=480)
+
+# Para alta resolução
+camera = AGVCamera(width=1280, height=720)
+
+# Para performance
+camera = AGVCamera(width=320, height=240)
+```
+
 ## 📚 Referências
 
 - [Documentação Oficial Raspberry Pi Camera](https://www.raspberrypi.com/documentation/computers/camera_software.html)

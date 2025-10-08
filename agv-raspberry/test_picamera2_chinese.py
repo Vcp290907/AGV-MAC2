@@ -138,7 +138,7 @@ def main():
     success = test_picamera2_basic()
 
     # Criar script interativo
-    script_created = create_picamera2_interactive()
+    script_created = create_picamera2_test_script()
 
     print("\n📊 RESUMO:")
     print(f"Teste básico: {'✅ OK' if success else '❌ FALHA'}")
