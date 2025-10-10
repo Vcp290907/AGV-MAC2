@@ -20,7 +20,19 @@ cd agv-web/frontend && npm start        # Frontend React
 
 ### Sistema Raspberry (Raspberry Pi):
 ```bash
-cd agv-raspberry && python main.py      # Sistema de controle
+cd agv-raspberry
+
+# Opção 1: Execução direta
+python main.py
+
+# Opção 2: Script de inicialização (recomendado)
+bash start_agv.sh normal
+
+# Opção 3: Sistema em background
+bash start_agv.sh background
+
+# Opção 4: Modo debug com logs detalhados
+bash start_agv.sh debug
 ```
 
 ## 🌐 Comunicação

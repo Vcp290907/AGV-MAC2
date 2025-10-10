@@ -274,6 +274,81 @@ sudo nano /etc/rc.local
 # su pi -c 'cd /home/pi/agv-raspberry && source venv/bin/activate && python main.py &'
 ```
 
+## 🚀 Execução do Sistema
+
+### Opções de Inicialização
+
+O sistema oferece múltiplas formas de execução através do script `start_agv.sh`:
+
+#### 1. **Execução Normal** (Recomendado para desenvolvimento)
+```bash
+bash start_agv.sh normal
+# ou simplesmente:
+python main.py
+```
+- ✅ Logs em tempo real no terminal
+- ✅ Fácil interrupção com Ctrl+C
+- ✅ Ideal para debugging
+
+#### 2. **Execução em Background**
+```bash
+bash start_agv.sh background
+```
+- ✅ Sistema roda em segundo plano
+- ✅ Libera o terminal para outros comandos
+- ✅ Ideal para produção
+
+#### 3. **Modo Debug**
+```bash
+bash start_agv.sh debug
+```
+- ✅ Logs detalhados (DEBUG level)
+- ✅ Informações completas de troubleshooting
+- ✅ Ideal para desenvolvimento avançado
+
+#### 4. **Testes de Componentes**
+```bash
+bash start_agv.sh test
+```
+- ✅ Verifica se todos os módulos funcionam
+- ✅ Testa comunicação e hardware
+- ✅ Executa testes automatizados
+
+#### 5. **Verificar Status**
+```bash
+bash start_agv.sh status
+```
+- ✅ Mostra se o sistema está rodando
+- ✅ Exibe logs recentes
+- ✅ Informações de processos ativos
+
+#### 6. **Parar Sistema**
+```bash
+bash start_agv.sh stop
+```
+- ✅ Para qualquer instância em execução
+- ✅ Limpeza graceful de recursos
+
+### ⚠️ Importante: Permissões no Raspberry Pi
+
+Para acesso completo ao hardware (câmeras, GPIO, etc.), execute como root:
+
+```bash
+sudo bash start_agv.sh normal
+```
+
+### 📊 Monitoramento
+
+Após iniciar o sistema, você pode monitorar através dos logs:
+
+```bash
+# Logs do sistema
+tail -f /var/log/agv_system.log
+
+# Status da API local
+curl http://localhost:8080/status
+```
+
 ## ⚙️ Configuração
 
 ### Arquivo config.py
