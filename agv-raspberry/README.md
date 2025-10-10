@@ -20,26 +20,22 @@ Sistema embarcado do AGV (Automated Guided Vehicle) que roda no Raspberry Pi, re
                                 │ ┌─────────────┐ │
                                 │ │ Controle    │ │
                                 │ │ de Motores  │ │
-             **Erro `ModuleNotFoundError: No module named 'libcamera'`:**
+             **Erro `ModuleNotFoundError: No module named 'pyzbar'` ou problemas com pyzbar:**
+```bash
+# Reinstalação completa do pyzbar
+bash reinstall_pyzbar.sh
+
+# Ou correção geral:
+bash fix_python_deps.sh
+```
+
+**Erro `ModuleNotFoundError: No module named 'libcamera'`:**
 ```bash
 # Instalar dependências do sistema para câmera
 sudo apt install -y python3-libcamera python3-picamera2 libcamera-dev
 
 # Depois executar correção completa
 bash fix_python_deps.sh
-```
-
-**Erro `ModuleNotFoundError: No module named 'pyzbar'` ou `picamera2':**
-```bash
-# Correção completa das dependências Python
-bash fix_python_deps.sh
-
-# Ou executar com ambiente virtual ativado:
-source venv/bin/activate
-python qr_code_reader.py
-
-# Ou usar o wrapper:
-./run_python.sh qr_code_reader.py
 ``` │ └─────────────┘ │
                                 │                 │
                                 │ ┌─────────────┐ │
@@ -917,6 +913,21 @@ python gerador_qr_avancado.py
 - ✅ **Testes automatizados**: Scripts de validação para ambos os ambientes
 
 #### Troubleshooting:
+
+**Diagnóstico completo do sistema:**
+```bash
+# Verificar tudo de uma vez
+bash diagnose_qr_system.sh
+```
+
+**Erro `ModuleNotFoundError: No module named 'pyzbar'` ou problemas com pyzbar:**
+```bash
+# Reinstalação completa do pyzbar
+bash reinstall_pyzbar.sh
+
+# Ou correção geral:
+bash fix_python_deps.sh
+```
 
 **Erro `libcap development headers` ao instalar picamera2:**
 ```bash
