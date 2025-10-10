@@ -668,13 +668,17 @@ ESP32 Pin → Função
     # Útil para identificar problemas de parsing JSON
     ```
 
-7. **Teste Simplificado**:
+7. **Leitor Simples de QR Codes**:
     ```bash
-    # Teste direto usando ESP32Controller (igual ao debug_serial.py)
-    python test_simple.py
+    # Leitor simples que apenas mostra o conteúdo dos QR codes
+    python qr_reader_simple.py
 
-    # Deve funcionar se o ESP32 estiver OK
-    # Se funcionar, o problema está nos outros scripts
+    # Com visualização (opcional)
+    python qr_reader_simple.py --visual
+
+    # Controles:
+    # q - sair
+    # r - resetar lista de detectados
     ```
 
 ### Câmera
@@ -974,10 +978,35 @@ vcgencmd get_camera
 raspistill -o test.jpg
 ```
 
+## 🧹 Limpeza da Pasta (Executada)
+
+A pasta `agv-raspberry/` foi limpa automaticamente, removendo **27 arquivos desnecessários** e mantendo apenas **16 arquivos essenciais**:
+
+### 📁 Arquivos Mantidos (16):
+- `main.py` - Sistema principal AGV
+- `api_local.py` - API Flask local
+- `agv_camera.py` - Módulo de câmera
+- `esp32_control.py` - Controle ESP32
+- `qr_reader_simple.py` - **NOVO**: Leitor simples de QR codes
+- `test_agv_dual_camera.py` - Teste câmera dual
+- `test_esp32_connection.py` - Teste ESP32
+- `detect_esp32.py` - Detecção ESP32
+- `esp32_motor_control.ino` - Firmware ESP32
+- `requirements.txt` - Dependências Python
+- `config.py` - Configurações
+- `config.example.json` - Exemplo de configuração
+- `install_basic.sh` - Instalação básica
+- `quick_start.sh` - Início rápido
+- `start_agv.sh` - Script de inicialização
+- `README.md` - Esta documentação
+
+### 🗑️ Arquivos Removidos (27):
+Scripts de instalação problemáticos, testes duplicados, documentação redundante e arquivos de debug temporários.
+
 ## 🎯 Próximos Passos
 
-1. **Integração ESP32** - Controle de motores
-2. **Visão Computacional** - Detecção de QR codes
+1. **Integração ESP32** ✅ - Controle de motores funcionando
+2. **Visão Computacional** ✅ - Detecção de QR codes implementada
 3. **Navegação** - Algoritmos de planejamento de caminho
 4. **Sensores** - Detecção de obstáculos
 5. **Monitoramento** - Dashboard de performance
