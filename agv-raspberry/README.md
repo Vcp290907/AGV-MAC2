@@ -203,6 +203,22 @@ python3 agv_camera_live.py
 - `q` - Sair da visualização
 - `s` - Salvar screenshot das câmeras
 
+### 📦 Instalação para Leitura de QR Codes
+
+Para usar o sistema de leitura de QR codes, instale as dependências específicas:
+
+```bash
+# Instalar dependências para QR codes (recomendado)
+bash install_qr_simple.sh
+
+# Ou instalar manualmente:
+sudo apt install -y python3-opencv
+pip install pyzbar Pillow
+
+# Para câmeras CSI no Raspberry Pi (opcional):
+pip install picamera2
+```
+
 ### 📦 Instalação Rápida de Dependências
 
 Se você teve erro de "No module named 'flask_cors'", use este script:
@@ -670,10 +686,13 @@ ESP32 Pin → Função
 
 7. **Leitor Simples de QR Codes**:
     ```bash
-    # Leitor simples que apenas mostra o conteúdo dos QR codes
-    python qr_reader_simple.py
+    # Versão USB/Webcam (mais compatível, funciona no PC também)
+    python qr_reader_simple_usb.py
 
     # Com visualização (opcional)
+    python qr_reader_simple_usb.py --visual
+
+    # Versão CSI (para câmeras chinesas no Raspberry Pi)
     python qr_reader_simple.py --visual
 
     # Controles:
