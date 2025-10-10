@@ -692,27 +692,32 @@ ESP32 Pin → Função
     # Útil para identificar problemas de parsing JSON
     ```
 
-7. **Leitor OpenCV (MAIS CONFIÁVEL - RECOMENDADO)**:
+7. **Leitor com Banco de Dados (NOVO - RECOMENDADO)**:
+    ```bash
+    # Versão integrada com banco de dados - lê QR e mostra informações
+    python qr_reader_with_database.py
+
+    # Controles:
+    # q - sair
+    ```
+
+    **Esta versão faz tudo:**
+    - ✅ **Lê QR codes** com câmera CSI (seu código melhorado)
+    - ✅ **Consulta banco** de dados automaticamente
+    - ✅ **Mostra informações** detalhadas dos itens/localizações
+    - ✅ **Interface visual** com detecções em tempo real
+    - ✅ **Use esta versão para o sistema completo!**
+
+8. **Leitor OpenCV (Backup)**:
     ```bash
     # Versão que funciona sempre - usa webcam/USB
     python qr_reader_opencv_only.py
 
     # Usar câmera específica (opcional)
     python qr_reader_opencv_only.py 1  # câmera ID 1
-
-    # Controles:
-    # q - sair
-    # r - resetar lista de detectados
     ```
 
-    **Esta versão é a mais confiável:**
-    - ✅ **Funciona sempre** - não depende do picamera2
-    - ✅ **Compatível** com qualquer webcam/USB
-    - ✅ **Simples** - apenas OpenCV + pyzbar
-    - ✅ **Testada** - funciona no PC e Raspberry Pi
-    - ✅ **Use esta versão!**
-
-8. **Outras Versões (Backup)**:
+9. **Outras Versões**:
     ```bash
     # Universal (testa CSI primeiro, depois USB)
     python qr_reader_final.py --visual
