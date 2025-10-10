@@ -692,21 +692,31 @@ ESP32 Pin → Função
     # Útil para identificar problemas de parsing JSON
     ```
 
-7. **Leitor com Banco de Dados (NOVO - RECOMENDADO)**:
+7. **Leitor com API do PC (NOVO - MAIS RECOMENDADO)**:
     ```bash
-    # Versão integrada com banco de dados - lê QR e mostra informações
-    python qr_reader_with_database.py
+    # Versão que se conecta à API do PC via HTTP
+    python qr_reader_with_api.py
+
+    # Ou especificar IP do PC:
+    python qr_reader_with_api.py 192.168.0.100 5000
 
     # Controles:
     # q - sair
     ```
 
-    **Esta versão faz tudo:**
+    **Esta versão permite comunicação em tempo real:**
     - ✅ **Lê QR codes** com câmera CSI (seu código melhorado)
-    - ✅ **Consulta banco** de dados automaticamente
-    - ✅ **Mostra informações** detalhadas dos itens/localizações
-    - ✅ **Interface visual** com detecções em tempo real
-    - ✅ **Use esta versão para o sistema completo!**
+    - ✅ **Conecta à API** do PC via HTTP (não banco local)
+    - ✅ **Consulta dados** em tempo real do sistema principal
+    - ✅ **Permite atualizações** bidirecionais PC ↔ Raspberry
+    - ✅ **Interface visual** com status da conexão
+    - ✅ **Use esta versão para o sistema distribuído!**
+
+8. **Leitor com Banco Local (Backup)**:
+    ```bash
+    # Versão que acessa banco SQLite diretamente
+    python qr_reader_with_database.py
+    ```
 
 8. **Leitor OpenCV (Backup)**:
     ```bash
