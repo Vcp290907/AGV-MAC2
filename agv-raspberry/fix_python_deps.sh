@@ -22,10 +22,11 @@ pip install pyzbar
 
 # Instalar picamera2 se no Raspberry Pi
 if grep -q "Raspberry Pi" /proc/device-tree/model 2>/dev/null; then
-    echo "📷 Instalando picamera2..."
-    pip install picamera2 || echo "⚠️ picamera2 via pip falhou, tentando via apt..."
-    # Se pip falhar, tentar instalar via apt
-    sudo apt install -y python3-picamera2
+    echo "📷 Instalando dependências do sistema para câmera..."
+    sudo apt install -y python3-libcamera python3-picamera2 libcamera-dev
+
+    echo "📷 Testando picamera2 do apt (mais confiável)..."
+    # A versão do apt já vem com libcamera integrado
 fi
 
 # Verificar instalação
@@ -45,6 +46,13 @@ try:
         print('✅ picamera2 OK')
     except ImportError as e:
         print(f'⚠️ picamera2 erro: {e}')
+    "
+    python3 -c "
+try:
+        import libcamera
+        print('✅ libcamera OK')
+    except ImportError as e:
+        print(f'⚠️ libcamera erro: {e}')
     "
 fi
 
