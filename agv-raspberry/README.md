@@ -207,16 +207,24 @@ python3 agv_camera_live.py
 
 Para usar o sistema de leitura de QR codes, instale as dependências específicas:
 
+#### **Para Câmeras CSI (Raspberry Pi):**
 ```bash
-# Instalar dependências para QR codes (recomendado)
+# Correção completa para picamera2 (recomendado)
+bash install_picamera2_fix.sh
+
+# Ou instalar manualmente (Bookworm):
+sudo apt install -y python3-picamera2 libcap-dev
+pip install picamera2 --break-system-packages
+```
+
+#### **Para Câmeras USB/Webcam:**
+```bash
+# Instalar dependências básicas
 bash install_qr_simple.sh
 
 # Ou instalar manualmente:
 sudo apt install -y python3-opencv
 pip install pyzbar Pillow
-
-# Para câmeras CSI no Raspberry Pi (opcional):
-pip install picamera2
 ```
 
 ### 📦 Instalação Rápida de Dependências
