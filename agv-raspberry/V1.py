@@ -31,20 +31,29 @@ while(True):
         data = obj.data.decode('utf-8')
         cv2.putText(frame, data, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
-        # Enviar para API se não foi detectado antes
-        if data not in detected_qrs:
-            detected_qrs.add(data)
+        # Diferenciar entre itens e localizações
+        if "Corredor" in data or "_SubCorredor" in data:
+            # Trata como localização (marcação de lugar no estoque)
+            print(f"Localização detectada: {data}")
+            # Aqui você pode adicionar lógica para navegação (ex: mover AGV para essa posição)
+            # Por exemplo, parsear corredor e sub-corredor
+            if "_SubCorredor" in data:
+                corredor, sub = data.split("_SubCorredor")
+                print(f"  Corredor: {corredor}, Sub-corredor: {sub}")
+            else:
+                print(f"  Corredor: {data}")
+        else:
+            # Trata como item
             try:
-                # Exemplo: buscar item por tag (assumindo que QR codes são tags de itens)
                 response = requests.get(f"{API_BASE_URL}/itens/tag/{data}")
                 if response.status_code == 200:
                     item = response.json()
-                    print(f"QR detectado e item encontrado: {item['nome']} - Posição: ({item['posicao_x']}, {item['posicao_y']})")
-                    # Aqui você pode adicionar lógica para navegação do AGV
+                    print(f"Item detectado: {item['nome']} - Posição: ({item['posicao_x']}, {item['posicao_y']})")
+                    # Aqui você pode adicionar lógica para pegar o item
                 else:
-                    print(f"QR detectado mas item não encontrado: {data}")
+                    print(f"QR de item detectado mas não encontrado: {data}")
             except Exception as e:
-                print(f"Erro ao conectar à API: {e}")
+                print(f"Erro ao conectar à API para item: {e}")
 
     cv2.imshow("Leitor de QR Code", frame)
 
