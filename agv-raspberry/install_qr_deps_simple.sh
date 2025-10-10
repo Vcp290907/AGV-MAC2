@@ -1,5 +1,21 @@
 #!/bin/bash
-# Script SIMPLIFICADO de instalação das dependências QR codes para Raspberry Pi
+# Script SIMPLIFICA# Criar ambiente virtual se não existir
+if [ ! -d "venv" ]; then
+    echo "🏗️ Criando ambiente virtual..."
+    python3 -m venv venv
+fi
+
+# Ativar ambiente virtual
+echo "🐍 Ativando ambiente virtual..."
+source venv/bin/activate
+
+# Instalar bibliotecas Python (no ambiente virtual)
+echo "🐍 Instalando bibliotecas Python..."
+pip install --upgrade pip
+pip install pyzbar numpy Pillow
+
+# Tentar instalar opencv-python (pode falhar, mas temos o do apt)
+pip install opencv-python || echo "⚠️ OpenCV via pip falhou, usando versão do apt (OK)" das dependências QR codes para Raspberry Pi
 # Versão confiável que evita problemas de compilação
 # Execute como: bash install_qr_deps_simple.sh
 

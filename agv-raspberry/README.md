@@ -20,7 +20,15 @@ Sistema embarcado do AGV (Automated Guided Vehicle) que roda no Raspberry Pi, re
                                 │ ┌─────────────┐ │
                                 │ │ Controle    │ │
                                 │ │ de Motores  │ │
-                                │ └─────────────┘ │
+             **Erro `ModuleNotFoundError: No module named 'pyzbar'`:**
+```bash
+# Correção rápida
+bash fix_pyzbar.sh
+
+# Ou manualmente:
+source venv/bin/activate
+pip install pyzbar
+``` │ └─────────────┘ │
                                 │                 │
                                 │ ┌─────────────┐ │
                                 │ │ Câmera +    │ │
