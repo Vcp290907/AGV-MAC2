@@ -19,26 +19,26 @@ pip uninstall picamera2 -y 2>/dev/null || echo "picamera2 não estava instalado 
 
 # Verificar se picamera2 do sistema está disponível
 echo "🧪 Testando picamera2 do sistema..."
-if python3 -c "
+python3 -c "
 try:
     import picamera2
     print('✅ picamera2 do sistema OK')
     print(f'   Localização: {picamera2.__file__}')
 except ImportError as e:
     print(f'❌ picamera2 não encontrado: {e}')
-    echo '💡 Instale com: sudo apt install -y python3-picamera2'
-    exit 1
+    print('💡 Instale com: sudo apt install -y python3-picamera2')
+    exit(1)
 "
 
 # Testar libcamera
 echo "🧪 Testando libcamera..."
-if python3 -c "
+python3 -c "
 try:
     import libcamera
     print('✅ libcamera OK')
 except ImportError as e:
     print(f'⚠️ libcamera não encontrado: {e}')
-    echo '💡 Isso é normal se estiver usando apenas picamera2 do apt'
+    print('💡 Isso é normal se estiver usando apenas picamera2 do apt')
 "
 
 echo ""
