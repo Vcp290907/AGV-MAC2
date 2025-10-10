@@ -775,10 +775,19 @@ O sistema AGV inclui detecção avançada de QR codes para navegação autônoma
 
 #### Instalação das Dependências:
 
+**Opção 1: Instalação Completa (Recomendada)**
 ```bash
 # Instalar dependências específicas do QR codes
 bash install_qr_deps.sh
 ```
+
+**Opção 2: Instalação Simplificada (Mais Confiável)**
+```bash
+# Versão que evita problemas de compilação
+bash install_qr_deps_simple.sh
+```
+
+> **Nota**: Se encontrar erro `libcap development headers`, use a opção simplificada que instala tudo via apt.
 
 #### Como Usar:
 
@@ -811,6 +820,27 @@ python gerador_qr_avancado.py
 - ✅ **Raspberry Pi**: Sistema completo com câmera CSI
 - ✅ **PC Windows**: Desenvolvimento e testes (sem câmera física)
 - ✅ **Testes automatizados**: Scripts de validação para ambos os ambientes
+
+#### Troubleshooting:
+
+**Erro `libcap development headers` ao instalar picamera2:**
+```bash
+# Script automático de correção
+bash fix_libcap_error.sh
+
+# Ou instalar manualmente:
+sudo apt install -y libcap-dev python3-prctl build-essential
+pip install picamera2
+```
+
+**Picamera2 não funciona:**
+```bash
+# Verificar se as câmeras estão conectadas
+vcgencmd get_camera
+
+# Testar câmera básica
+raspistill -o test.jpg
+```
 
 ## 🎯 Próximos Passos
 

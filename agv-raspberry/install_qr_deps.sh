@@ -19,6 +19,12 @@ sudo apt update
 echo "📦 Instalando dependências do sistema..."
 sudo apt install -y python3-opencv python3-pip python3-numpy
 
+# Instalar dependências específicas do picamera2 (se no Raspberry Pi)
+if grep -q "Raspberry Pi" /proc/device-tree/model 2>/dev/null; then
+    echo "📷 Instalando dependências do Picamera2..."
+    sudo apt install -y python3-picamera2 libcap-dev python3-prctl
+fi
+
 # Instalar bibliotecas Python
 echo "🐍 Instalando bibliotecas Python..."
 
@@ -39,7 +45,7 @@ pip install opencv-python pyzbar Pillow numpy
 if grep -q "Raspberry Pi" /proc/device-tree/model 2>/dev/null; then
     echo "📷 Instalando Picamera2 para câmera CSI..."
     sudo apt install -y python3-picamera2
-    pip install picamera2
+    pip install picamera2 || echo "⚠️ Picamera2 via pip falhou, usando versão do apt"
 fi
 
 echo ""
