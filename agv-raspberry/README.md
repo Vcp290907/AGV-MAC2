@@ -25,9 +25,12 @@ Sistema embarcado do AGV (Automated Guided Vehicle) que roda no Raspberry Pi, re
 # Correção rápida
 bash fix_pyzbar.sh
 
-# Ou manualmente:
+# Ou executar com ambiente virtual ativado:
 source venv/bin/activate
-pip install pyzbar
+python qr_code_reader.py
+
+# Ou usar o wrapper:
+./run_python.sh qr_code_reader.py
 ``` │ └─────────────┘ │
                                 │                 │
                                 │ ┌─────────────┐ │
