@@ -13,7 +13,20 @@ while(True):
     frame = picam2.capture_array()
     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-    cv2.imshow("Camera", frame)
+    decoded_objects = pyzbar.decode(frame)
+    
+    # Desenha um retângulo e exibe o texto do QR code
+    for obj in decoded_objects:
+        # Desenha o retângulo
+        (x, y, w, h) = obj.rect
+        cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+
+        # Decodifica o dado e o exibe na tela
+        data = obj.data.decode('utf-8')
+        cv2.putText(frame, data, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+    # Mostra o frame com os QR codes detectados
+    cv2.imshow("Leitor de QR Code", frame)
 
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
