@@ -43,6 +43,8 @@ python-dotenv>=1.0.0
 colorama>=0.4.6
 packaging>=23.0
 
-# Optional: Sensor libraries (uncomment if needed)
-# adafruit-circuitpython-mpu6050>=3.3.0
-# adafruit-circuitpython-hcsr04>=3.4.0
+# QR Code detection
+pyzbar>=0.1.9
+
+# Camera support for Raspberry Pi
+picamera2>=0.3.0

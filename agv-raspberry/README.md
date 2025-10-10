@@ -383,6 +383,7 @@ tail -f /var/log/agv_system.log
 - ✅ **Administração de usuários** (gerentes)
 - ✅ **Monitoramento em tempo real**
 - ✅ **Comunicação PC ↔ Raspberry Pi**
+- ✅ **Detecção de QR codes** (até 4 simultâneos)
 
 #### Monitoramento:
 ```bash
@@ -752,6 +753,64 @@ Para problemas ou dúvidas:
 - **OpenCV falha**: Instale separadamente ou pule por enquanto
 - **Conectividade WiFi**: Verifique IPs e portas
 - **ESP32 não conecta**: Verifique permissões USB
+
+## 📱 QR Codes
+
+### Sistema de Detecção de QR Codes
+
+O sistema AGV inclui detecção avançada de QR codes para navegação autônoma:
+
+#### Funcionalidades:
+- ✅ **Detecção simultânea** de até 4 QR codes
+- ✅ **Leitura em tempo real** via câmera CSI
+- ✅ **Processamento visual** com OpenCV + pyzbar
+- ✅ **Interface de teste** para validação
+
+#### Arquivos Relacionados:
+- `qr_code_reader.py` - Classe principal para detecção
+- `teste_qr_leitura.py` - Script de teste básico
+- `teste_qr_sistema.py` - Teste de compatibilidade (PC + RPi)
+- `teste_qr_raspberry.py` - Teste específico do Raspberry Pi
+- `agv_camera.py` - Integração com sistema de câmera
+
+#### Instalação das Dependências:
+
+```bash
+# Instalar dependências específicas do QR codes
+bash install_qr_deps.sh
+```
+
+#### Como Usar:
+
+```bash
+# Teste básico (funciona no PC e Raspberry Pi)
+python teste_qr_sistema.py
+
+# Teste específico do Raspberry Pi (somente no RPi)
+python teste_qr_raspberry.py
+
+# Usar em código:
+from qr_code_reader import QRCodeReader
+
+reader = QRCodeReader(camera_id=0)
+qr_codes = reader.detectar_qr_codes()
+```
+
+#### Geração de QR Codes:
+
+Para gerar QR codes compatíveis com o sistema:
+
+```bash
+cd ../qr_code_generator
+python gerador_qr_avancado.py
+```
+
+**Nota**: Use QR codes do tipo "visual sólido" para melhor compatibilidade com CAD/CAM.
+
+#### Compatibilidade:
+- ✅ **Raspberry Pi**: Sistema completo com câmera CSI
+- ✅ **PC Windows**: Desenvolvimento e testes (sem câmera física)
+- ✅ **Testes automatizados**: Scripts de validação para ambos os ambientes
 
 ## 🎯 Próximos Passos
 
