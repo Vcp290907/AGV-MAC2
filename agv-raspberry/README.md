@@ -694,14 +694,14 @@ ESP32 Pin → Função
 
 7. **Leitor Simples de QR Codes**:
     ```bash
-    # Versão USB/Webcam (mais compatível, funciona no PC também)
-    python qr_reader_simple_usb.py
+    # Versão CSI DIRETA (recomendada para suas câmeras CSI)
+    python qr_reader_csi_simple.py
 
     # Com visualização (opcional)
-    python qr_reader_simple_usb.py --visual
+    python qr_reader_csi_simple.py --visual
 
-    # Versão CSI (para câmeras chinesas no Raspberry Pi)
-    python qr_reader_simple.py --visual
+    # Versão USB/Webcam (backup, funciona no PC também)
+    python qr_reader_simple_usb.py --visual
 
     # Controles:
     # q - sair
