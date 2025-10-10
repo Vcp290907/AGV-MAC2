@@ -2,16 +2,19 @@ from picamera2 import Picamera2
 from pyzbar import pyzbar
 import cv2
 import os
-import time
 
-picam2 = Picamera2()
-picam2.configure(picam2.create_preview_configuration(main={"format": 'XRGB8888', "size": (1920, 1080)}))
-picam2.start()
+try:
+    picam2 = Picamera2(camera_num=1)  # Usar câmera 1 (a outra câmera)
+    picam2.configure(picam2.create_preview_configuration(main={"format": 'XRGB8888', "size": (1920, 1080)}))
+    picam2.start()
+    print("Câmera 1 inicializada com sucesso.")
+except Exception as e:
+    print(f"Erro ao inicializar câmera 1: {e}. Tentando câmera 0...")
+    picam2 = Picamera2(camera_num=0)
+    picam2.configure(picam2.create_preview_configuration(main={"format": 'XRGB8888', "size": (640, 480)}))
+    picam2.start()
 
 cv2.namedWindow("Camera")
-
-prev_time = time.time()
-fps = 0
 
 while(True):
     frame = picam2.capture_array()
@@ -19,8 +22,8 @@ while(True):
     # Convert to grayscale for better detection
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     
-    # Apply CLAHE for better contrast (otimizado para velocidade)
-    clahe = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(16,16))  # Menos processamento
+    # Apply CLAHE for better contrast
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
     enhanced = clahe.apply(gray)
 
     decoded_objects = pyzbar.decode(enhanced)
@@ -34,15 +37,6 @@ while(True):
         # Decodifica o dado e o exibe na tela
         data = obj.data.decode('utf-8')
         cv2.putText(frame, data, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-
-    # Calcular FPS
-    current_time = time.time()
-    if current_time - prev_time > 0:
-        fps = 1 / (current_time - prev_time)
-    prev_time = current_time
-
-    # Exibir FPS no frame
-    cv2.putText(frame, f"FPS: {fps:.2f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
 
     # Mostra o frame com os QR codes detectados
     cv2.imshow("Leitor de QR Code", frame)
