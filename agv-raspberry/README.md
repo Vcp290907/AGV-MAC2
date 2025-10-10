@@ -31,11 +31,14 @@ bash fix_python_deps.sh
 
 **Erro `ModuleNotFoundError: No module named 'libcamera'`:**
 ```bash
-# Instalar dependências do sistema para câmera
-sudo apt install -y python3-libcamera python3-picamera2 libcamera-dev
+# Corrigir conflito entre versões do picamera2
+bash fix_picamera2_conflict.sh
 
-# Depois executar correção completa
-bash fix_python_deps.sh
+# Ou instalar manualmente:
+sudo apt install -y python3-libcamera python3-picamera2 libcamera-dev
+# Depois remover do venv:
+source venv/bin/activate
+pip uninstall picamera2 -y
 ``` │ └─────────────┘ │
                                 │                 │
                                 │ ┌─────────────┐ │
