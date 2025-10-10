@@ -292,6 +292,29 @@ sudo nano /etc/rc.local
 
 ## 🚀 Execução do Sistema
 
+### ⚠️ **IMPORTANTE**: Ambiente Virtual
+
+**TODOS os scripts Python devem ser executados com o ambiente virtual ativado:**
+
+```bash
+# Ativar ambiente virtual
+source venv/bin/activate
+
+# Agora executar scripts Python
+python qr_code_reader.py
+python teste_qr_sistema.py
+```
+
+**Ou use o wrapper (ativa automaticamente):**
+```bash
+./run_python.sh qr_code_reader.py
+```
+
+**Para verificar se o ambiente virtual está funcionando:**
+```bash
+bash check_venv.sh
+```
+
 ### Opções de Inicialização
 
 O sistema oferece múltiplas formas de execução através do script `start_agv.sh`:

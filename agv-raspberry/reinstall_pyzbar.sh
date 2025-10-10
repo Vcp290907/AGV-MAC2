@@ -53,10 +53,9 @@ try:
     test_image = np.zeros((100, 100, 3), dtype=np.uint8)
     result = decode(test_image)
     print('✅ pyzbar instalado e funcionando!')
-    print(f'   Versão: {decode.__module__}')
 except ImportError as e:
     print(f'❌ Erro no import: {e}')
-    exit 1
+    exit(1)
 except Exception as e:
     print(f'⚠️ pyzbar importado mas erro no teste: {e}')
 "
