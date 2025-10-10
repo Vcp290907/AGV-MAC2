@@ -230,9 +230,8 @@ class QRReaderWithAPI:
                     cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
                     cv2.putText(frame, data, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
-                # Mostrar estatísticas na tela
-                api_status = "API: OK" if self.testar_conexao_api() else "API: OFFLINE"
-                stats_text = f"QR Codes detectados: {len(self.qr_codes_detectados)} | {api_status}"
+                # Mostrar estatísticas na tela (sem testar API a cada frame)
+                stats_text = f"QR Codes detectados: {len(self.qr_codes_detectados)}"
                 cv2.putText(frame, stats_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
 
                 # Mostrar frame
