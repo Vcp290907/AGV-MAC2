@@ -5,7 +5,7 @@ import os
 import requests  # Para conectar à API
 
 # Configurações da API
-API_BASE_URL = "http://localhost:5000"  # Ajuste se a API estiver em outro host/porta
+API_BASE_URL = "http://192.168.0.120:5000"  # Ajuste se a API estiver em outro host/porta
 
 picam2 = Picamera2(camera_num=1)  # Usando câmera 1 como no código que funcionou melhor
 picam2.configure(picam2.create_preview_configuration(main={"format": 'XRGB8888', "size": (3280, 2464)}))
