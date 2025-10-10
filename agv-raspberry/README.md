@@ -692,21 +692,24 @@ ESP32 Pin → Função
     # Útil para identificar problemas de parsing JSON
     ```
 
-7. **Leitor Simples de QR Codes**:
+7. **Leitor FINAL de QR Codes (RECOMENDADO)**:
     ```bash
-    # Versão CSI DIRETA (recomendada para suas câmeras CSI)
-    python qr_reader_csi_simple.py
+    # Versão UNIVERSAL - funciona com qualquer câmera automaticamente
+    python qr_reader_final.py
 
-    # Com visualização (opcional)
-    python qr_reader_csi_simple.py --visual
-
-    # Versão USB/Webcam (backup, funciona no PC também)
-    python qr_reader_simple_usb.py --visual
+    # Com visualização (recomendado)
+    python qr_reader_final.py --visual
 
     # Controles:
     # q - sair
     # r - resetar lista de detectados
+    # i - mostrar tipo de câmera sendo usada
     ```
+
+    **Esta versão testa automaticamente:**
+    - ✅ Câmeras CSI (picamera2) primeiro
+    - ✅ Câmeras USB/OpenCV como fallback
+    - ✅ Funciona no Raspberry Pi E no PC
 
 ### Câmera
 - **Câmera 1 (camera_id=0)**: 640x480 (mais rápida, visão geral)
