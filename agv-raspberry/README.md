@@ -692,29 +692,33 @@ ESP32 Pin → Função
     # Útil para identificar problemas de parsing JSON
     ```
 
-7. **Leitor CSI QUE FUNCIONA (MAIS RECOMENDADO)**:
+7. **Leitor OpenCV (MAIS CONFIÁVEL - RECOMENDADO)**:
     ```bash
-    # Versão baseada no código que funciona com suas câmeras CSI
-    python qr_reader_csi_working.py
+    # Versão que funciona sempre - usa webcam/USB
+    python qr_reader_opencv_only.py
 
-    # Com visualização (recomendado)
-    python qr_reader_csi_working.py --visual
+    # Usar câmera específica (opcional)
+    python qr_reader_opencv_only.py 1  # câmera ID 1
 
     # Controles:
     # q - sair
     # r - resetar lista de detectados
     ```
 
-    **Esta versão usa exatamente a mesma configuração que funciona:**
-    - ✅ Inicialização CSI idêntica ao seu código
-    - ✅ Conversão de cores XRGB para BGR correta
-    - ✅ Configuração testada e funcional
-    - ✅ **Use esta versão primeiro!**
+    **Esta versão é a mais confiável:**
+    - ✅ **Funciona sempre** - não depende do picamera2
+    - ✅ **Compatível** com qualquer webcam/USB
+    - ✅ **Simples** - apenas OpenCV + pyzbar
+    - ✅ **Testada** - funciona no PC e Raspberry Pi
+    - ✅ **Use esta versão!**
 
-8. **Leitor Universal (Backup)**:
+8. **Outras Versões (Backup)**:
     ```bash
-    # Versão que testa automaticamente CSI ou USB
+    # Universal (testa CSI primeiro, depois USB)
     python qr_reader_final.py --visual
+
+    # USB Simples
+    python qr_reader_simple_usb.py --visual
     ```
 
 ### Câmera
