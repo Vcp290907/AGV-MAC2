@@ -310,6 +310,7 @@ class LineQRDetector:
 
                     # Mostrar ROI (região de interesse) em outra janela
                     linha_horizontal = self.parametros[8]['valor']
+                    height, width = frame.shape[:2]  # Definir height e width aqui
                     roi_display = np.zeros((height, width), dtype=np.uint8)
                     roi_display[linha_horizontal:height, 0:width] = mask_linha
                     roi_resized = cv2.resize(roi_display, (320, 180))
