@@ -249,7 +249,10 @@ class MPU6050Integration:
                 if status:
                     leituras += 1
                     print(f"📈 Leitura {leituras}:")
-                    print(".2f"                    print(".2f"                    print(".2f"                    print(f"   🧭 Orientação: Pitch={status['orientacao']['pitch']:.1f}°, Roll={status['orientacao']['roll']:.1f}°, Yaw={status['orientacao']['yaw']:.1f}°")
+                    print(".2f")
+                    print(".2f")
+                    print(".2f")
+                    print(f"   🧭 Orientação: Pitch={status['orientacao']['pitch']:.1f}°, Roll={status['orientacao']['roll']:.1f}°, Yaw={status['orientacao']['yaw']:.1f}°")
                     print(f"   🔄 Movimento: {'Sim' if status['movimento_detectado'] else 'Não'}")
                     print(f"   📉 Queda: {'Sim' if status['queda_detectada'] else 'Não'}")
                     print()
