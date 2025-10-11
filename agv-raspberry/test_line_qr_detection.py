@@ -302,17 +302,17 @@ class LineQRDetector:
                 self.mostrar_status(frame, linha_detectada, centro_linha, qr_codes)
 
                 # Mostrar máscara da linha em uma janela separada (opcional)
-                        if mask_linha is not None:
-                            # Redimensionar máscara para ficar do mesmo tamanho
-                            mask_resized = cv2.resize(mask_linha, (320, 180))
-                            cv2.imshow("Mascara Linha Preta", mask_resized)
-        
-                            # Mostrar ROI (região de interesse) em outra janela
-                            roi_height = height - linha_horizontal
-                            roi_display = np.zeros((height, width), dtype=np.uint8)
-                            roi_display[linha_horizontal:height, 0:width] = mask_linha
-                            roi_resized = cv2.resize(roi_display, (320, 180))
-                            cv2.imshow("Regiao de Interesse (ROI)", roi_resized)
+                if mask_linha is not None:
+                    # Redimensionar máscara para ficar do mesmo tamanho
+                    mask_resized = cv2.resize(mask_linha, (320, 180))
+                    cv2.imshow("Mascara Linha Preta", mask_resized)
+
+                    # Mostrar ROI (região de interesse) em outra janela
+                    roi_height = height - linha_horizontal
+                    roi_display = np.zeros((height, width), dtype=np.uint8)
+                    roi_display[linha_horizontal:height, 0:width] = mask_linha
+                    roi_resized = cv2.resize(roi_display, (320, 180))
+                    cv2.imshow("Regiao de Interesse (ROI)", roi_resized)
 
                 # Mostrar frame principal
                 cv2.imshow("Teste Visual AGV: Linha + QR", frame)
