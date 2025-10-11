@@ -46,7 +46,7 @@ class LineQRDetector:
         print("📷 Inicializando câmera CSI para teste visual...")
 
         try:
-            self.picam2 = Picamera2(camera_num=0)
+            self.picam2 = Picamera2(camera_num=1)
             self.picam2.configure(self.picam2.create_preview_configuration(
                 main={"format": 'XRGB8888', "size": (1280, 720)}
             ))
