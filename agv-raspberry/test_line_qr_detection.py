@@ -73,6 +73,7 @@ class LineQRDetector:
 
         self.area_minima = self.parametros[6]['valor']
         self.kernel_size = self.parametros[7]['valor']
+        # Linha horizontal é usada diretamente nos métodos
 
     def detectar_linha_preta(self, frame):
         """Detectar linha preta na imagem com parâmetros ajustáveis"""
@@ -308,7 +309,7 @@ class LineQRDetector:
                     cv2.imshow("Mascara Linha Preta", mask_resized)
 
                     # Mostrar ROI (região de interesse) em outra janela
-                    roi_height = height - linha_horizontal
+                    linha_horizontal = self.parametros[8]['valor']
                     roi_display = np.zeros((height, width), dtype=np.uint8)
                     roi_display[linha_horizontal:height, 0:width] = mask_linha
                     roi_resized = cv2.resize(roi_display, (320, 180))
