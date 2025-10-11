@@ -207,6 +207,25 @@ class MPU6050Integration:
             'calibrado': self.calibrado
         }
 
+    def teste_buzzer(self):
+        """Teste do buzzer"""
+        print("🔊 TESTANDO BUZZER")
+        print("=" * 20)
+
+        if not self.conectar_esp32():
+            return False
+
+        print("📡 Enviando comando beep...")
+        resposta = self.enviar_comando('beep')
+
+        if resposta:
+            print("✅ Comando enviado com sucesso!")
+            print(f"📄 Resposta: {resposta}")
+            return True
+        else:
+            print("❌ Falha ao enviar comando")
+            return False
+
     def teste_sensor(self, duracao=10):
         """Teste básico do sensor"""
         print("🧪 TESTANDO MPU6050")
@@ -243,19 +262,145 @@ class MPU6050Integration:
         print(f"✅ Teste concluído! {leituras} leituras realizadas")
         return True
 
-def main():
-    """Função principal"""
-    print("🎯 INTEGRAÇÃO MPU6050 COM ESP32")
-    print("=" * 40)
+def menu_interativo():
+    """Menu interativo para testes"""
+    print("🎯 CONTROLE ESP32 - MPU6050 + BUZZER")
+    print("=" * 45)
 
     # Configurações
     port = '/dev/ttyUSB0'  # Ajuste conforme necessário
 
     # Criar integração
-    mpu = MPU6050Integration(esp32_port=port)
+    esp32 = MPU6050Integration(esp32_port=port)
 
-    # Executar teste
-    mpu.teste_sensor(duracao=10)
+    while True:
+        print("\n" + "="*50)
+        print("🎮 MENU DE TESTES ESP32")
+        print("="*50)
+        print("1. Teste básico de comunicação")
+        print("2. Teste buzzer")
+        print("3. Ler dados do MPU6050")
+        print("4. Calibrar MPU6050")
+        print("5. Teste de movimento (frente)")
+        print("6. Teste de movimento (trás)")
+        print("7. Teste de curva (esquerda)")
+        print("8. Teste de curva (direita)")
+        print("9. Parar motores")
+        print("10. Status completo")
+        print("11. Teste completo do sensor (10s)")
+        print("0. Sair")
+        print("="*50)
+
+        try:
+            opcao = input("Escolha uma opção: ").strip()
+
+            if opcao == '1':
+                # Teste básico de comunicação
+                if esp32.conectar_esp32():
+                    resposta = esp32.enviar_comando('status')
+                    if resposta:
+                        print("✅ Comunicação OK!")
+                        print(f"📄 Status: {resposta}")
+                    else:
+                        print("❌ Sem resposta")
+                else:
+                    print("❌ Falha na conexão")
+
+            elif opcao == '2':
+                # Teste buzzer
+                esp32.teste_buzzer()
+
+            elif opcao == '3':
+                # Ler dados MPU6050
+                if esp32.conectar_esp32():
+                    dados = esp32.ler_dados_calibrados()
+                    if dados:
+                        print("📊 Dados MPU6050:")
+                        print(f"   Aceleração: X={dados['aceleracao']['x']:.2f}, Y={dados['aceleracao']['y']:.2f}, Z={dados['aceleracao']['z']:.2f}")
+                        print(f"   Giroscópio: X={dados['giroscopio']['x']:.2f}, Y={dados['giroscopio']['y']:.2f}, Z={dados['giroscopio']['z']:.2f}")
+                        print(f"   Temperatura: {dados['temperatura']:.1f}°C")
+                    else:
+                        print("❌ Falha ao ler dados")
+                else:
+                    print("❌ ESP32 não conectado")
+
+            elif opcao == '4':
+                # Calibrar MPU6050
+                if esp32.conectar_esp32():
+                    esp32.calibrar_sensor()
+                else:
+                    print("❌ ESP32 não conectado")
+
+            elif opcao == '5':
+                # Movimento frente
+                if esp32.conectar_esp32():
+                    resposta = esp32.enviar_comando('mover_frente', {'velocidade': 50})
+                    print(f"📡 Comando enviado: {resposta}")
+
+            elif opcao == '6':
+                # Movimento trás
+                if esp32.conectar_esp32():
+                    resposta = esp32.enviar_comando('mover_tras', {'velocidade': 50})
+                    print(f"📡 Comando enviado: {resposta}")
+
+            elif opcao == '7':
+                # Curva esquerda
+                if esp32.conectar_esp32():
+                    resposta = esp32.enviar_comando('virar_esquerda', {'velocidade': 50})
+                    print(f"📡 Comando enviado: {resposta}")
+
+            elif opcao == '8':
+                # Curva direita
+                if esp32.conectar_esp32():
+                    resposta = esp32.enviar_comando('virar_direita', {'velocidade': 50})
+                    print(f"📡 Comando enviado: {resposta}")
+
+            elif opcao == '9':
+                # Parar motores
+                if esp32.conectar_esp32():
+                    resposta = esp32.enviar_comando('parar')
+                    print(f"📡 Comando enviado: {resposta}")
+
+            elif opcao == '10':
+                # Status completo
+                if esp32.conectar_esp32():
+                    resposta = esp32.enviar_comando('status')
+                    if resposta:
+                        try:
+                            status = json.loads(resposta)
+                            print("📊 STATUS ESP32:")
+                            print(f"   Online: {status.get('status', 'unknown')}")
+                            print(f"   MPU6050: {'Sim' if status.get('mpu6050') else 'Não'}")
+                            print(f"   Calibrado: {'Sim' if status.get('calibrado') else 'Não'}")
+                            print(f"   Buzzer PIN: {status.get('buzzer_pin', 'N/A')}")
+                            print(f"   MPU SDA/SCL: {status.get('mpu6050_sda', 'N/A')}/{status.get('mpu6050_scl', 'N/A')}")
+                            motores = status.get('motores', {})
+                            print(f"   Motores: Esq={motores.get('esquerdo', 'N/A')}, Dir={motores.get('direito', 'N/A')}")
+                        except:
+                            print(f"📄 Resposta: {resposta}")
+                    else:
+                        print("❌ Sem resposta")
+
+            elif opcao == '11':
+                # Teste completo
+                esp32.teste_sensor(duracao=10)
+
+            elif opcao == '0':
+                print("👋 Saindo...")
+                break
+
+            else:
+                print("❌ Opção inválida")
+
+        except KeyboardInterrupt:
+            print("\n🛑 Interrompido pelo usuário")
+            break
+        except Exception as e:
+            print(f"❌ Erro: {e}")
+
+def main():
+    """Função principal"""
+    menu_interativo()
 
 if __name__ == "__main__":
     main()

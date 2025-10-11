@@ -740,12 +740,19 @@ ESP32 Pin → Função
     # 5. Mostrar status do sensor
     ```
 
-10. **Integração MPU6050 (Giroscópio)**:
+10. **Integração MPU6050 + Buzzer**:
     ```bash
-    # Teste direto do giroscópio e acelerômetro
+    # Menu interativo completo para testes
     python mpu6050_integration.py
 
-    # Firmware ESP32 com MPU6050
+    # Testa:
+    # ✅ Comunicação ESP32
+    # 🔊 Buzzer (GPIO 4)
+    # 🧭 MPU6050 (SDA=10, SCL=9)
+    # 🤖 Controle de motores
+    # 📊 Status completo
+
+    # Firmware ESP32 atualizado
     # Arquivo: esp32_mpu6050_firmware.ino
     # Carregar no ESP32 via Arduino IDE
     ```

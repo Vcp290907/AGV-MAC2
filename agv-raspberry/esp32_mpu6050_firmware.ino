@@ -1,6 +1,13 @@
 /*
-Firmware ESP32 com MPU6050 para AGV
-Inclui giroscópio, acelerômetro e controle de motores
+Firmware ESP32 com MPU6050 e Buzzer para AGV
+Inclui giroscópio, acelerômetro, controle de motores e buzzer
+
+Pinos configurados:
+- Buzzer: GPIO 4
+- MPU6050 SDA: GPIO 10
+- MPU6050 SCL: GPIO 9
+- Motor Esquerdo: GPIO 1
+- Motor Direito: GPIO 3
 */
 
 #include <Wire.h>
@@ -10,7 +17,9 @@ Inclui giroscópio, acelerômetro e controle de motores
 // Configurações de pinos
 #define MOTOR_LEFT_PIN 1    // GPIO 1 - Servo Motor Esquerdo
 #define MOTOR_RIGHT_PIN 3   // GPIO 3 - Servo Motor Direito
-#define LED_STATUS_PIN 2    // GPIO 2 - LED de status
+#define BUZZER_PIN 4        // GPIO 4 - Buzzer
+#define MPU6050_SDA 10      // GPIO 10 - SDA do MPU6050
+#define MPU6050_SCL 9       // GPIO 9 - SCL do MPU6050
 
 // Configurações MPU6050
 MPU6050 mpu;
@@ -43,16 +52,16 @@ void setup() {
   // Configurar pinos
   pinMode(MOTOR_LEFT_PIN, OUTPUT);
   pinMode(MOTOR_RIGHT_PIN, OUTPUT);
-  pinMode(LED_STATUS_PIN, OUTPUT);
+  pinMode(BUZZER_PIN, OUTPUT);
 
   // Inicializar motores no estado parado
   pararMotores();
 
-  // Piscar LED para indicar inicialização
-  piscarLED(3, 200);
+  // Buzzer de inicialização
+  beepBuzzer();
 
-  // Inicializar I2C
-  Wire.begin();
+  // Inicializar I2C com pinos customizados
+  Wire.begin(MPU6050_SDA, MPU6050_SCL);
 
   // Inicializar MPU6050
   inicializarMPU6050();
@@ -60,16 +69,16 @@ void setup() {
   Serial.println("{\"status\": \"ESP32 inicializado\"}");
 }
 
+void beepBuzzer() {
+  tone(BUZZER_PIN, 1000);
+  delay(500);
+  noTone(BUZZER_PIN);
+  Serial.println("OK");
+}
+
 void loop() {
   // Processar comandos seriais
   processarComandosSeriais();
-
-  // Atualizar LED de status (piscar lentamente se funcionando)
-  static unsigned long ultimo_piscar = 0;
-  if (millis() - ultimo_piscar > 2000) {
-    digitalWrite(LED_STATUS_PIN, !digitalRead(LED_STATUS_PIN));
-    ultimo_piscar = millis();
-  }
 
   delay(10);
 }
@@ -197,6 +206,9 @@ void processarComando(String comando) {
   } else if (tipo_comando == "status") {
     enviarStatus();
 
+  } else if (tipo_comando == "beep") {
+    beepBuzzer();
+
   } else {
     Serial.println("{\"erro\": \"Comando desconhecido\"}");
   }
@@ -315,6 +327,9 @@ void enviarStatus() {
   resposta["status"] = "online";
   resposta["mpu6050"] = mpu6050_presente;
   resposta["calibrado"] = calibrado;
+  resposta["buzzer_pin"] = BUZZER_PIN;
+  resposta["mpu6050_sda"] = MPU6050_SDA;
+  resposta["mpu6050_scl"] = MPU6050_SCL;
   resposta["motores"]["esquerdo"] = velocidade_esquerda;
   resposta["motores"]["direito"] = velocidade_direita;
 
@@ -324,13 +339,4 @@ void enviarStatus() {
 
   serializeJson(resposta, Serial);
   Serial.println();
-}
-
-void piscarLED(int vezes, int intervalo) {
-  for (int i = 0; i < vezes; i++) {
-    digitalWrite(LED_STATUS_PIN, HIGH);
-    delay(intervalo);
-    digitalWrite(LED_STATUS_PIN, LOW);
-    delay(intervalo);
-  }
 }
