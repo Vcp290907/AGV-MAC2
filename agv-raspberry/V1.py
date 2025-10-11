@@ -5,17 +5,17 @@ import os
 import requests  # Para conectar  API
 import time  # Para medir FPS
 
-API_BASE_URL = "http://192.168.0.120:5000"  # Ajuste se a API estiver em outro host/porta
+API_BASE_URL = "http://192.168.0.120:5000"
 
-picam2 = Picamera2(camera_num=0)  # Usando cmera 1 como no cdigo que funcionou melhor
-picam2.configure(picam2.create_preview_configuration(main={"format": 'XRGB8888', "size": (3280, 2464)}))
+picam2 = Picamera2(camera_num=0)
+picam2.configure(picam2.create_preview_configuration(main={"format": 'XRGB8888', "size": (1480, 1480)}))
 
 picam2.start()
 
-detected_qrs = set()  # Para evitar enviar duplicatas
-active_qrs = []  # Lista de QR codes ativos com posies para manter na tela
-frame_count = 0  # Contador de frames
-process_every_n_frames = 3  # Processar a cada 2 frames para mais FPS
+detected_qrs = set()
+active_qrs = []
+frame_count = 0
+process_every_n_frames = 3
 prev_time = 0
 fps = 0
 
@@ -28,12 +28,10 @@ while(True):
     frame = picam2.capture_array()
     frame_count += 1
 
-    # Processar apenas a cada N frames para melhorar FPS
     if frame_count % process_every_n_frames == 0:
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         
-        # CLAHE otimizado para velocidade
-        clahe = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(16,16))  # Menos processamento
+        clahe = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(16,16))
         enhanced = clahe.apply(gray)
 
         decoded_objects = pyzbar.decode(enhanced)

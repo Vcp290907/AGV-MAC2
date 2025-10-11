@@ -727,7 +727,30 @@ ESP32 Pin → Função
     python qr_reader_opencv_only.py 1  # câmera ID 1
     ```
 
-9. **Outras Versões**:
+9. **Navegação Básica (Linha Reta + Curvas 90°)**:
+    ```bash
+    # Navegação usando MPU6050 para orientação
+    python navigation_basic.py
+
+    # Menu interativo com opções:
+    # 1. Teste em linha reta
+    # 2. Teste de curva 90° direita
+    # 3. Teste de curva 90° esquerda
+    # 4. Executar rota quadrada completa
+    # 5. Mostrar status do sensor
+    ```
+
+10. **Integração MPU6050 (Giroscópio)**:
+    ```bash
+    # Teste direto do giroscópio e acelerômetro
+    python mpu6050_integration.py
+
+    # Firmware ESP32 com MPU6050
+    # Arquivo: esp32_mpu6050_firmware.ino
+    # Carregar no ESP32 via Arduino IDE
+    ```
+
+11. **Outras Versões**:
     ```bash
     # Universal (testa CSI primeiro, depois USB)
     python qr_reader_final.py --visual
