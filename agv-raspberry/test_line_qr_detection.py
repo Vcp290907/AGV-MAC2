@@ -35,9 +35,10 @@ class LineQRDetector:
             {'nome': 'Sat Min', 'valor': 0, 'min': 0, 'max': 255, 'step': 10},
             {'nome': 'Sat Max', 'valor': 255, 'min': 0, 'max': 255, 'step': 10},
             {'nome': 'Val Min', 'valor': 0, 'min': 0, 'max': 255, 'step': 10},
-            {'nome': 'Val Max', 'valor': 50, 'min': 0, 'max': 255, 'step': 5},
+            {'nome': 'Val Max', 'valor': 70, 'min': 0, 'max': 255, 'step': 5},
             {'nome': 'Area Min', 'valor': 500, 'min': 100, 'max': 5000, 'step': 100},
-            {'nome': 'Kernel Size', 'valor': 5, 'min': 3, 'max': 15, 'step': 2}
+            {'nome': 'Kernel Size', 'valor': 5, 'min': 3, 'max': 15, 'step': 2},
+            {'nome': 'Linha Horizontal', 'valor': 360, 'min': 50, 'max': 670, 'step': 10}
         ]
 
     def initialize_camera(self):
@@ -80,8 +81,15 @@ class LineQRDetector:
             if self.modo_config:
                 self.atualizar_parametros()
 
+            # Obter linha horizontal de corte
+            linha_horizontal = self.parametros[8]['valor']
+            height, width = frame.shape[:2]
+
+            # Criar região de interesse (apenas abaixo da linha horizontal)
+            roi = frame[linha_horizontal:height, 0:width]
+
             # Converter para HSV para melhor detecção de cor
-            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+            hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
 
             # Criar máscara para cor preta
             mask = cv2.inRange(hsv, self.black_lower, self.black_upper)
@@ -104,15 +112,17 @@ class LineQRDetector:
                 if cv2.contourArea(maior_contorno) > self.area_minima:
                     linha_detectada = True
 
-                    # Calcular centro da linha
+                    # Calcular centro da linha (ajustar coordenadas para frame completo)
                     M = cv2.moments(maior_contorno)
                     if M["m00"] != 0:
                         cx = int(M["m10"] / M["m00"])
-                        cy = int(M["m01"] / M["m00"])
+                        cy = int(M["m01"] / M["m00"]) + linha_horizontal  # Ajustar para coordenada completa
                         centro_linha = (cx, cy)
 
-                        # Desenhar contorno e centro
-                        cv2.drawContours(frame, [maior_contorno], -1, (0, 255, 0), 3)
+                        # Desenhar contorno e centro no frame completo
+                        # Ajustar contorno para coordenadas do frame completo
+                        contorno_ajustado = maior_contorno + np.array([0, linha_horizontal])
+                        cv2.drawContours(frame, [contorno_ajustado], -1, (0, 255, 0), 3)
                         cv2.circle(frame, centro_linha, 5, (0, 0, 255), -1)
 
             return linha_detectada, centro_linha, mask
@@ -122,10 +132,17 @@ class LineQRDetector:
             return False, None, None
 
     def detectar_qr_codes(self, frame):
-        """Detectar QR codes na imagem"""
+        """Detectar QR codes na imagem (apenas abaixo da linha horizontal)"""
         try:
+            # Obter linha horizontal de corte
+            linha_horizontal = self.parametros[8]['valor']
+            height, width = frame.shape[:2]
+
+            # Criar região de interesse (apenas abaixo da linha horizontal)
+            roi = frame[linha_horizontal:height, 0:width]
+
             # Converter para escala de cinza
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
 
             # Aplicar CLAHE para melhorar contraste
             clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
@@ -137,18 +154,22 @@ class LineQRDetector:
             qr_info = []
             for obj in decoded_objects:
                 data = obj.data.decode('utf-8')
+
+                # Ajustar coordenadas do bbox para o frame completo
+                (x, y, w, h) = obj.rect
+                bbox_ajustado = (x, y + linha_horizontal, w, h)
+
                 qr_info.append({
                     'data': data,
-                    'bbox': obj.rect,
+                    'bbox': bbox_ajustado,
                     'type': obj.type
                 })
 
-                # Desenhar retângulo
-                (x, y, w, h) = obj.rect
-                cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
+                # Desenhar retângulo no frame completo
+                cv2.rectangle(frame, (x, y + linha_horizontal), (x + w, y + h + linha_horizontal), (255, 0, 0), 2)
 
                 # Mostrar texto
-                cv2.putText(frame, data, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
+                cv2.putText(frame, data, (x, y + linha_horizontal - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
 
             return qr_info
 
@@ -195,6 +216,12 @@ class LineQRDetector:
     def mostrar_status(self, frame, linha_detectada, centro_linha, qr_codes):
         """Mostrar status na tela"""
         height, width = frame.shape[:2]
+
+        # Desenhar linha horizontal ajustável
+        linha_horizontal = self.parametros[8]['valor']
+        cv2.line(frame, (0, linha_horizontal), (width, linha_horizontal), (255, 255, 0), 2)
+        cv2.putText(frame, f"Linha: {linha_horizontal}", (10, linha_horizontal - 10),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
 
         # Se estiver em modo configuração, mostrar menu
         if self.modo_config:
@@ -275,10 +302,17 @@ class LineQRDetector:
                 self.mostrar_status(frame, linha_detectada, centro_linha, qr_codes)
 
                 # Mostrar máscara da linha em uma janela separada (opcional)
-                if mask_linha is not None:
-                    # Redimensionar máscara para ficar do mesmo tamanho
-                    mask_resized = cv2.resize(mask_linha, (320, 180))
-                    cv2.imshow("Mascara Linha Preta", mask_resized)
+                        if mask_linha is not None:
+                            # Redimensionar máscara para ficar do mesmo tamanho
+                            mask_resized = cv2.resize(mask_linha, (320, 180))
+                            cv2.imshow("Mascara Linha Preta", mask_resized)
+        
+                            # Mostrar ROI (região de interesse) em outra janela
+                            roi_height = height - linha_horizontal
+                            roi_display = np.zeros((height, width), dtype=np.uint8)
+                            roi_display[linha_horizontal:height, 0:width] = mask_linha
+                            roi_resized = cv2.resize(roi_display, (320, 180))
+                            cv2.imshow("Regiao de Interesse (ROI)", roi_resized)
 
                 # Mostrar frame principal
                 cv2.imshow("Teste Visual AGV: Linha + QR", frame)
@@ -332,11 +366,15 @@ class LineQRDetector:
             # Resumo final
             print(f"\n📊 RESUMO DO TESTE:")
             print(f"   Linha preta: Sistema de detecção ativo")
+            print(f"   Linha horizontal: {self.parametros[8]['valor']} pixels")
             print(f"   QR codes únicos detectados: {len(self.qr_codes_detectados)}")
             if self.qr_codes_detectados:
                 print("   QR codes detectados:")
                 for i, qr_data in enumerate(sorted(self.qr_codes_detectados), 1):
                     print(f"   {i}. {qr_data}")
+            print(f"   Parâmetros finais:")
+            for param in self.parametros:
+                print(f"     {param['nome']}: {param['valor']}")
 
 def main():
     """Função principal"""
