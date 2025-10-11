@@ -273,7 +273,7 @@ class AGVMissionControlNoGyro:
             print(f"   {i}. {item['item']['nome']} (Subcorredor {item['subcorredor']})")
 
         print(f"\n📊 Total de itens: {len(self.itens_coletados)}")
-        print("⏰ Aguardando retirada dos itens..."
+        print("⏰ Aguardando retirada dos itens...")
         # Aqui poderia enviar notificação para o PC/dashboard
 
     def _finalizar_missao(self):
