@@ -22,9 +22,23 @@ class LineQRDetector:
         self.low_threshold = 50
         self.high_threshold = 150
 
-        # Configurações de cor para linha preta
+        # Configurações de cor para linha preta (HSV)
         self.black_lower = np.array([0, 0, 0])
         self.black_upper = np.array([180, 255, 50])
+
+        # Parâmetros ajustáveis em tempo real
+        self.modo_config = False
+        self.param_atual = 0
+        self.parametros = [
+            {'nome': 'Hue Min', 'valor': 0, 'min': 0, 'max': 180, 'step': 5},
+            {'nome': 'Hue Max', 'valor': 180, 'min': 0, 'max': 180, 'step': 5},
+            {'nome': 'Sat Min', 'valor': 0, 'min': 0, 'max': 255, 'step': 10},
+            {'nome': 'Sat Max', 'valor': 255, 'min': 0, 'max': 255, 'step': 10},
+            {'nome': 'Val Min', 'valor': 0, 'min': 0, 'max': 255, 'step': 10},
+            {'nome': 'Val Max', 'valor': 50, 'min': 0, 'max': 255, 'step': 5},
+            {'nome': 'Area Min', 'valor': 500, 'min': 100, 'max': 5000, 'step': 100},
+            {'nome': 'Kernel Size', 'valor': 5, 'min': 3, 'max': 15, 'step': 2}
+        ]
 
     def initialize_camera(self):
         """Inicializar câmera CSI"""
@@ -42,9 +56,30 @@ class LineQRDetector:
             print(f"❌ Erro ao inicializar câmera: {e}")
             return False
 
+    def atualizar_parametros(self):
+        """Atualizar parâmetros da detecção baseado nos valores ajustáveis"""
+        self.black_lower = np.array([
+            self.parametros[0]['valor'],  # Hue Min
+            self.parametros[2]['valor'],  # Sat Min
+            self.parametros[4]['valor']   # Val Min
+        ])
+
+        self.black_upper = np.array([
+            self.parametros[1]['valor'],  # Hue Max
+            self.parametros[3]['valor'],  # Sat Max
+            self.parametros[5]['valor']   # Val Max
+        ])
+
+        self.area_minima = self.parametros[6]['valor']
+        self.kernel_size = self.parametros[7]['valor']
+
     def detectar_linha_preta(self, frame):
-        """Detectar linha preta na imagem"""
+        """Detectar linha preta na imagem com parâmetros ajustáveis"""
         try:
+            # Atualizar parâmetros se estiver em modo config
+            if self.modo_config:
+                self.atualizar_parametros()
+
             # Converter para HSV para melhor detecção de cor
             hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
@@ -66,7 +101,7 @@ class LineQRDetector:
                 # Encontrar o maior contorno (provavelmente a linha)
                 maior_contorno = max(contours, key=cv2.contourArea)
 
-                if cv2.contourArea(maior_contorno) > 500:  # Área mínima
+                if cv2.contourArea(maior_contorno) > self.area_minima:
                     linha_detectada = True
 
                     # Calcular centro da linha
@@ -121,9 +156,50 @@ class LineQRDetector:
             print(f"❌ Erro na detecção de QR: {e}")
             return []
 
+    def mostrar_menu_config(self, frame):
+        """Mostrar menu de configuração na tela"""
+        height, width = frame.shape[:2]
+
+        # Fundo semi-transparente para o menu
+        overlay = frame.copy()
+        cv2.rectangle(overlay, (10, 10), (width-10, height-10), (0, 0, 0), -1)
+        cv2.addWeighted(overlay, 0.7, frame, 0.3, 0, frame)
+
+        # Título
+        cv2.putText(frame, "CONFIGURACAO DETECCAO LINHA", (50, 50),
+                   cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 2)
+
+        # Mostrar parâmetros
+        y_pos = 100
+        for i, param in enumerate(self.parametros):
+            cor = (0, 255, 0) if i == self.param_atual else (255, 255, 255)
+            indicador = ">>>" if i == self.param_atual else "   "
+
+            texto = f"{indicador} {param['nome']}: {param['valor']}"
+            cv2.putText(frame, texto, (50, y_pos), cv2.FONT_HERSHEY_SIMPLEX, 0.8, cor, 2)
+            y_pos += 40
+
+        # Instruções
+        instrucoes = [
+            "SETAS CIMA/BAIXO: Navegar parametros",
+            "SETAS ESQUERDA/DIREITA: Ajustar valores",
+            "C: Salvar e voltar ao teste",
+            "ESC: Cancelar configuracao"
+        ]
+
+        y_pos = height - 150
+        for instrucao in instrucoes:
+            cv2.putText(frame, instrucao, (50, y_pos), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1)
+            y_pos += 25
+
     def mostrar_status(self, frame, linha_detectada, centro_linha, qr_codes):
         """Mostrar status na tela"""
         height, width = frame.shape[:2]
+
+        # Se estiver em modo configuração, mostrar menu
+        if self.modo_config:
+            self.mostrar_menu_config(frame)
+            return
 
         # Status da linha
         if linha_detectada:
@@ -149,12 +225,16 @@ class LineQRDetector:
         if centro_linha:
             cv2.putText(frame, f"Centro: {centro_linha}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
 
+        # Parâmetros atuais
+        param_info = f"H:{self.parametros[0]['valor']}-{self.parametros[1]['valor']} S:{self.parametros[2]['valor']}-{self.parametros[3]['valor']} V:{self.parametros[4]['valor']}-{self.parametros[5]['valor']}"
+        cv2.putText(frame, param_info, (10, 140), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (150, 150, 150), 1)
+
         # Contador de QR únicos
-        cv2.putText(frame, f"QR únicos: {len(self.qr_codes_detectados)}", (10, height - 20),
+        cv2.putText(frame, f"QR únicos: {len(self.qr_codes_detectados)}", (10, height - 50),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
         # Instruções
-        cv2.putText(frame, "Q: Sair | R: Reset QR", (width - 250, height - 20),
+        cv2.putText(frame, "Q: Sair | R: Reset QR | T: Configurar", (10, height - 20),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1)
 
     def executar_teste(self):
@@ -162,7 +242,13 @@ class LineQRDetector:
         print("🧪 TESTE VISUAL: LINHA PRETA + QR CODES")
         print("=" * 45)
         print("Este teste mostra apenas detecção visual")
-        print("Pressione 'q' para sair, 'r' para resetar QR codes")
+        print("Controles:")
+        print("  Q: Sair")
+        print("  R: Reset QR codes")
+        print("  T: Entrar no modo configuração")
+        print("  ESC: Sair da configuração")
+        print("  C: Salvar configuração")
+        print("  Setas: Navegar e ajustar parâmetros")
         print()
 
         if not self.initialize_camera():
@@ -205,6 +291,33 @@ class LineQRDetector:
                 elif key == ord('r'):
                     self.qr_codes_detectados.clear()
                     print("🔄 Lista de QR codes resetada")
+                elif key == ord('t'):
+                    self.modo_config = True
+                    print("🔧 Entrando no modo configuração...")
+                elif key == 27:  # ESC
+                    if self.modo_config:
+                        self.modo_config = False
+                        print("❌ Configuração cancelada")
+                    else:
+                        break
+                elif key == ord('c') and self.modo_config:
+                    self.modo_config = False
+                    print("✅ Configuração salva!")
+
+                # Controles do menu de configuração
+                if self.modo_config:
+                    if key == 82:  # Seta cima
+                        self.param_atual = (self.param_atual - 1) % len(self.parametros)
+                    elif key == 84:  # Seta baixo
+                        self.param_atual = (self.param_atual + 1) % len(self.parametros)
+                    elif key == 81:  # Seta esquerda
+                        param = self.parametros[self.param_atual]
+                        param['valor'] = max(param['min'], param['valor'] - param['step'])
+                        print(f"📉 {param['nome']}: {param['valor']}")
+                    elif key == 83:  # Seta direita
+                        param = self.parametros[self.param_atual]
+                        param['valor'] = min(param['max'], param['valor'] + param['step'])
+                        print(f"📈 {param['nome']}: {param['valor']}")
 
                 time.sleep(0.05)  # Pequena pausa
 
