@@ -48,7 +48,7 @@ class LineFollowingNavigation:
 
         # Inicializar navegação básica
         if not self.basic_nav.inicializar():
-            print("❌ Falha na navegação básica")
+            print("Falha na navegacao basica")
             success = False
 
         # Inicializar detector de linha
@@ -310,7 +310,7 @@ class LineFollowingNavigation:
 
 def main():
     """Função principal para teste"""
-    print("🎯 NAVEGAÇÃO SEGUINDO LINHA PRETA")
+    print("NAVEGACAO SEGUINDO LINHA PRETA")
     print("=" * 35)
 
     # Criar navegação
