@@ -9,11 +9,14 @@ import time
 import json
 import math
 from datetime import datetime
+from config import get_esp32_port, get_esp32_baudrate
 
 class MPU6050Integration:
     """Integração MPU6050 para navegação do AGV"""
 
-    def __init__(self, esp32_port='/dev/ttyACM1', baudrate=115200):
+    def __init__(self, esp32_port=None, baudrate=None):
+        self.esp32_port = esp32_port or get_esp32_port()
+        self.baudrate = baudrate or get_esp32_baudrate()
         self.esp32_port = esp32_port
         self.baudrate = baudrate
         self.serial_conn = None
@@ -327,10 +330,10 @@ def menu_interativo():
         port = porta_detectada
         print(f"✅ Usando porta detectada: {port}")
     else:
-        # Fallback para configuração manual
-        port = '/dev/ttyACM1'  # Porta padrão
-        print(f"⚠️  Usando porta padrão: {port}")
-        print("💡 Se não funcionar, verifique a porta correta")
+        # Fallback para configuração do config.py
+        port = get_esp32_port()
+        print(f"⚠️  Usando porta do config: {port}")
+        print("💡 Para alterar, edite config.py ou passe --port")
 
     # Criar integração
     esp32 = MPU6050Integration(esp32_port=port)

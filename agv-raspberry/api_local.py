@@ -8,6 +8,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import logging
 import json
+from config import get_esp32_port
 from datetime import datetime
 import asyncio
 import threading
@@ -300,7 +301,7 @@ class RaspberryAPI:
             from esp32_control import ESP32Controller
 
             # Criar controlador com porta específica
-            esp32 = ESP32Controller(port='/dev/ttyACM1')
+            esp32 = ESP32Controller(port=get_esp32_port())
 
             # Conectar ao ESP32
             logger.info("Conectando ao ESP32...")

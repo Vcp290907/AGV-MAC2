@@ -8,11 +8,13 @@ import time
 import math
 from datetime import datetime
 from mpu6050_integration import MPU6050Integration
+from config import get_esp32_port
 
 class BasicNavigation:
     """Navegação básica: linha reta + curvas de 90°"""
 
-    def __init__(self, esp32_port='/dev/ttyACM1'):
+    def __init__(self, esp32_port=None):
+        self.mpu = MPU6050Integration(esp32_port=esp32_port or get_esp32_port())
         self.mpu = MPU6050Integration(esp32_port=esp32_port)
         self.velocidade_base = 80  # Velocidade padrão (0-100)
 
@@ -222,7 +224,7 @@ def main():
     print("=" * 25)
 
     # Configurações
-    port = '/dev/ttyACM1'  # Ajuste conforme necessário
+    port = get_esp32_port()  # Porta do config.py
 
     # Criar navegação
     nav = BasicNavigation(esp32_port=port)

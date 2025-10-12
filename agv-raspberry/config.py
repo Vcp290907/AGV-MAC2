@@ -27,7 +27,7 @@ HARDWARE_CONFIG = {
     },
     'esp32': {
         'enabled': True,
-        'port': '/dev/ttyACM1',  # Porta USB do ESP32
+        'port': '/dev/ttyACM0',  # Porta USB do ESP32 - ALTERE AQUI se necessário
         'baudrate': 115200,
         'timeout': 1
     },

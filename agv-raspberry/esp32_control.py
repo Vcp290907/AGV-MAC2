@@ -9,21 +9,26 @@ import time
 import logging
 import json
 from typing import Optional, Dict, Any
+from config import get_esp32_port, get_esp32_baudrate, get_esp32_timeout
 
 logger = logging.getLogger(__name__)
 
 class ESP32Controller:
     """Controlador para comunicação com ESP32 via serial"""
 
-    def __init__(self, port: str = None, baudrate: int = 115200, timeout: float = 2.0):
-        self.default_port = port or '/dev/ttyACM1'  # Atualizado para ACM1 baseado na detecção atual
+    def __init__(self, port: str = None, baudrate: int = None, timeout: float = None):
+        # Usar configurações do arquivo config.py se não especificadas
+        self.default_port = port or get_esp32_port()
+        self.default_baudrate = baudrate or get_esp32_baudrate()
+        self.default_timeout = timeout or get_esp32_timeout()
+        
         self.port = self.default_port
-        self.baudrate = baudrate
-        self.timeout = timeout
+        self.baudrate = self.default_baudrate
+        self.timeout = self.default_timeout
         self.serial_connection: Optional[serial.Serial] = None
         self.connected = False
 
-        logger.info(f"ESP32 Controller inicializado - Porta: {self.port}, Baudrate: {baudrate}")
+        logger.info(f"ESP32 Controller inicializado - Porta: {self.port}, Baudrate: {self.baudrate}")
 
     def _auto_detect_port(self) -> Optional[str]:
         """Tenta detectar automaticamente a porta do ESP32"""
@@ -325,10 +330,15 @@ def get_esp32_controller() -> ESP32Controller:
     return esp32_controller
 
 # Funções de conveniência para uso direto
-def connect_esp32(port: str = '/dev/ttyACM1') -> bool:
-    """Conecta ao ESP32"""
+def connect_esp32(port: str = None, baudrate: int = None, timeout: float = None) -> bool:
+    """Conecta ao ESP32 usando configurações do config.py se não especificadas"""
     controller = get_esp32_controller()
-    controller.port = port
+    if port:
+        controller.port = port
+    if baudrate:
+        controller.baudrate = baudrate
+    if timeout:
+        controller.timeout = timeout
     return controller.connect()
 
 def move_forward_esp32(duration: float = 1.0) -> Dict[str, Any]:

@@ -10,11 +10,18 @@ import requests
 from datetime import datetime
 from navigation_basic import BasicNavigation
 from qr_reader_with_api import QRReaderWithAPI
+from config import get_esp32_port
 
 class AGVMissionControl:
     """Sistema completo de controle de missões do AGV"""
 
-    def __init__(self, pc_ip="192.168.0.100", pc_port=5000, esp32_port='/dev/ttyACM1'):
+    def __init__(self, pc_ip="192.168.0.100", pc_port=5000, esp32_port=None):
+        self.pc_ip = pc_ip
+        self.pc_port = pc_port
+        self.base_url = f"http://{pc_ip}:{pc_port}"
+        
+        # Usar porta do config se não especificada
+        esp32_port = esp32_port or get_esp32_port()
         self.pc_ip = pc_ip
         self.pc_port = pc_port
         self.base_url = f"http://{pc_ip}:{pc_port}"
@@ -322,7 +329,7 @@ def main():
     # Configurações
     pc_ip = "192.168.0.100"
     pc_port = 5000
-    esp32_port = '/dev/ttyACM1'
+    esp32_port = get_esp32_port()
 
     # Criar controle de missões
     agv = AGVMissionControl(pc_ip=pc_ip, pc_port=pc_port, esp32_port=esp32_port)
