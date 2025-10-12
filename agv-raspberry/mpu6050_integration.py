@@ -38,7 +38,7 @@ class MPU6050Integration:
 
         # Filtros
         self.alpha = 0.98  # Filtro complementário
-        self.dt = 0.01     # Intervalo de tempo
+        self.dt = 0.1     # Intervalo de tempo (0.1s entre leituras)
 
     def conectar_esp32(self):
         """Conectar ao ESP32 via serial"""
@@ -46,7 +46,7 @@ class MPU6050Integration:
             self.serial_conn = serial.Serial(
                 self.esp32_port,
                 self.baudrate,
-                timeout=1
+                timeout=2
             )
             time.sleep(2)  # Aguardar inicialização
 
@@ -60,6 +60,10 @@ class MPU6050Integration:
     def enviar_comando(self, comando, dados=None):
         """Enviar comando para ESP32"""
         try:
+            # Limpar buffer de entrada
+            if self.serial_conn:
+                self.serial_conn.reset_input_buffer()
+            
             mensagem = {'comando': comando}
             if dados:
                 mensagem.update(dados)
@@ -75,139 +79,48 @@ class MPU6050Integration:
             print(f"❌ Erro ao enviar comando: {e}")
             return None
 
-    def calibrar_sensor(self, amostras=100):
-        """Calibrar MPU6050"""
-        print(f"🔧 Calibrando MPU6050 ({amostras} amostras)...")
-
-        soma_acel = {'x': 0, 'y': 0, 'z': 0}
-        soma_giro = {'x': 0, 'y': 0, 'z': 0}
-
-        for i in range(amostras):
-            dados = self.ler_dados_brutos()
-            if dados:
-                for eixo in ['x', 'y', 'z']:
-                    soma_acel[eixo] += dados['aceleracao'][eixo]
-                    soma_giro[eixo] += dados['giroscopio'][eixo]
-
-            time.sleep(0.01)
-            if (i + 1) % 20 == 0:
-                print(f"📊 Calibração: {i + 1}/{amostras}")
-
-        # Calcular offsets
-        for eixo in ['x', 'y', 'z']:
-            self.offset_acel[eixo] = soma_acel[eixo] / amostras
-            self.offset_giro[eixo] = soma_giro[eixo] / amostras
-
-        # Ajustar offset Z da aceleração (gravidade)
-        self.offset_acel['z'] -= 16384  # 1g em ±2g range
-
+    def calibrar_sensor(self, amostras=10):
+        """Calibrar MPU6050 - calibração feita no ESP32"""
+        # Calibração é feita no ESP32 com mpu.calcOffsets()
         self.calibrado = True
-        print("✅ Calibração concluída!")
         return True
 
     def ler_dados_brutos(self):
-        """Ler dados brutos do MPU6050 via ESP32"""
+        """Ler dados brutos do MPU6050 via ESP32 - ângulos"""
         resposta = self.enviar_comando('ler_mpu6050')
 
         if resposta:
             try:
                 dados = json.loads(resposta)
-                return dados
+                if 'angulos' in dados:
+                    return dados
             except json.JSONDecodeError:
                 pass
 
+        # Se não conseguiu na primeira resposta, tentar ler mais linhas
+        for _ in range(5):  # Tentar até 5 linhas adicionais
+            try:
+                linha = self.serial_conn.readline().decode().strip()
+                if linha:
+                    dados = json.loads(linha)
+                    if 'angulos' in dados:
+                        return dados
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                continue
+
         return None
 
-    def ler_dados_calibrados(self):
-        """Ler dados calibrados do MPU6050"""
-        dados_brutos = self.ler_dados_brutos()
-
-        if not dados_brutos or not self.calibrado:
-            return None
-
-        # Aplicar calibração
-        self.aceleracao = {
-            'x': dados_brutos['aceleracao']['x'] - self.offset_acel['x'],
-            'y': dados_brutos['aceleracao']['y'] - self.offset_acel['y'],
-            'z': dados_brutos['aceleracao']['z'] - self.offset_acel['z']
-        }
-
-        self.giroscopio = {
-            'x': dados_brutos['giroscopio']['x'] - self.offset_giro['x'],
-            'y': dados_brutos['giroscopio']['y'] - self.offset_giro['y'],
-            'z': dados_brutos['giroscopio']['z'] - self.offset_giro['z']
-        }
-
-        self.temperatura = dados_brutos.get('temperatura', 0)
-
-        return {
-            'aceleracao': self.aceleracao,
-            'giroscopio': self.giroscopio,
-            'temperatura': self.temperatura
-        }
-
-    def calcular_orientacao(self):
-        """Calcular orientação usando filtro complementário"""
-        if not self.calibrado:
-            return None
-
-        # Converter aceleração para ângulos (pitch e roll)
-        accel_x = self.aceleracao['x'] / 16384.0  # ±2g range
-        accel_y = self.aceleracao['y'] / 16384.0
-        accel_z = self.aceleracao['z'] / 16384.0
-
-        # Calcular ângulos da aceleração
-        accel_pitch = math.atan2(accel_y, math.sqrt(accel_x**2 + accel_z**2)) * 180 / math.pi
-        accel_roll = math.atan2(-accel_x, accel_z) * 180 / math.pi
-
-        # Integrar giroscópio
-        gyro_x = self.giroscopio['x'] / 131.0  # ±250°/s range
-        gyro_y = self.giroscopio['y'] / 131.0
-        gyro_z = self.giroscopio['z'] / 131.0
-
-        # Filtro complementário
-        self.angulo_x = self.alpha * (self.angulo_x + gyro_x * self.dt) + (1 - self.alpha) * accel_pitch
-        self.angulo_y = self.alpha * (self.angulo_y + gyro_y * self.dt) + (1 - self.alpha) * accel_roll
-        self.angulo_z += gyro_z * self.dt
-
-        return {
-            'pitch': self.angulo_x,
-            'roll': self.angulo_y,
-            'yaw': self.angulo_z,
-            'temperatura': self.temperatura
-        }
-
-    def detectar_movimento(self, threshold=500):
-        """Detectar movimento baseado na aceleração"""
-        total_acel = math.sqrt(
-            self.aceleracao['x']**2 +
-            self.aceleracao['y']**2 +
-            self.aceleracao['z']**2
-        )
-
-        return total_acel > threshold
-
-    def detectar_queda(self, threshold=30000):
-        """Detectar possível queda do robô"""
-        # Se aceleração Z for muito baixa, pode ter caído
-        return abs(self.aceleracao['z']) < threshold
-
     def obter_status_completo(self):
-        """Obter status completo do sensor"""
-        dados = self.ler_dados_calibrados()
-        orientacao = self.calcular_orientacao()
+        """Obter status completo do sensor - ângulos diretos"""
+        dados = self.ler_dados_brutos()
 
-        if not dados or not orientacao:
+        if not dados:
             return None
 
         return {
             'timestamp': datetime.now().isoformat(),
-            'aceleracao': dados['aceleracao'],
-            'giroscopio': dados['giroscopio'],
-            'orientacao': orientacao,
-            'movimento_detectado': self.detectar_movimento(),
-            'queda_detectada': self.detectar_queda(),
-            'calibrado': self.calibrado
+            'orientacao': dados['angulos'],
+            'calibrado': dados.get('calibrado', False)
         }
 
     def teste_buzzer(self):
@@ -256,8 +169,6 @@ class MPU6050Integration:
                     print(".2f")
                     print(".2f")
                     print(f"   🧭 Orientação: Pitch={status['orientacao']['pitch']:.1f}°, Roll={status['orientacao']['roll']:.1f}°, Yaw={status['orientacao']['yaw']:.1f}°")
-                    print(f"   🔄 Movimento: {'Sim' if status['movimento_detectado'] else 'Não'}")
-                    print(f"   📉 Queda: {'Sim' if status['queda_detectada'] else 'Não'}")
                     print()
 
                 time.sleep(1)
@@ -380,12 +291,11 @@ def menu_interativo():
             elif opcao == '3':
                 # Ler dados MPU6050
                 if esp32.conectar_esp32():
-                    dados = esp32.ler_dados_calibrados()
+                    dados = esp32.ler_dados_brutos()
                     if dados:
                         print("📊 Dados MPU6050:")
-                        print(f"   Aceleração: X={dados['aceleracao']['x']:.2f}, Y={dados['aceleracao']['y']:.2f}, Z={dados['aceleracao']['z']:.2f}")
-                        print(f"   Giroscópio: X={dados['giroscopio']['x']:.2f}, Y={dados['giroscopio']['y']:.2f}, Z={dados['giroscopio']['z']:.2f}")
-                        print(f"   Temperatura: {dados['temperatura']:.1f}°C")
+                        angulos = dados['angulos']
+                        print(f"   Ângulos: Pitch={angulos['pitch']:.1f}°, Roll={angulos['roll']:.1f}°, Yaw={angulos['yaw']:.1f}°")
                     else:
                         print("❌ Falha ao ler dados")
                 else:

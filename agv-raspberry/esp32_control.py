@@ -191,10 +191,21 @@ class ESP32Controller:
 
             logger.debug(f"📤 Comando enviado: {command}")
 
-            # Aguardar resposta
-            response_line = self.serial_connection.readline().decode('utf-8').strip()
+            # Ler múltiplas respostas possíveis (ESP32 pode enviar debug + status)
+            responses = []
+            for _ in range(3):  # Máximo 3 respostas
+                try:
+                    response_line = self.serial_connection.readline().decode('utf-8').strip()
+                    if response_line:
+                        responses.append(response_line)
+                    else:
+                        break
+                except:
+                    break
+                time.sleep(0.05)  # Pequena pausa entre leituras
 
-            if response_line:
+            # Processar respostas
+            for response_line in responses:
                 # Aceitar tanto JSON quanto resposta simples
                 if response_line.strip() in ['OK', 'ok', 'success']:
                     logger.debug(f"📥 Resposta simples recebida: {response_line}")
@@ -202,15 +213,21 @@ class ESP32Controller:
                 
                 try:
                     response = json.loads(response_line)
-                    logger.debug(f"📥 Resposta recebida: {response}")
-                    return response
+                    logger.debug(f"📥 Resposta JSON recebida: {response}")
+                    # Aceitar qualquer resposta JSON com status de sucesso
+                    if response.get('status') in ['success', 'ok']:
+                        return response
+                    # Ou resposta com informações dos motores (debug)
+                    if 'motores' in response:
+                        return response
                 except json.JSONDecodeError as e:
                     logger.warning(f"Resposta simples do ESP32: {response_line} - {e}")
                     # Retornar resposta simples como sucesso
                     return {'status': 'ok', 'resposta': response_line.strip()}
-            else:
-                logger.warning("Nenhuma resposta recebida do ESP32")
-                return None
+
+            # Se chegou aqui, não encontrou resposta válida
+            logger.warning("Nenhuma resposta válida recebida do ESP32")
+            return None
 
         except serial.SerialTimeoutException:
             logger.error("Timeout na comunicação serial")

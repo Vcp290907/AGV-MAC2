@@ -45,6 +45,11 @@ float temperature;
 // Calibração MPU6050_light (automática pela biblioteca)
 bool calibrado = false;
 
+// Offsets para ângulos (para reset após calibração)
+float angulo_offset_x = 0;
+float angulo_offset_y = 0;
+float angulo_offset_z = 0;
+
 // Controle de motores com Servo
 Servo servoEsquerdo;
 Servo servoDireito;
@@ -143,8 +148,14 @@ void calibrarMPU6050()
   // Aguardar calibração completar
   delay(1000);
 
+  // Atualizar MPU e capturar ângulos atuais como offsets
+  mpu.update();
+  angulo_offset_x = mpu.getAngleX();
+  angulo_offset_y = mpu.getAngleY();
+  angulo_offset_z = mpu.getAngleZ();
+
   calibrado = true;
-  Serial.println("{\"status\": \"MPU6050_light calibrado automaticamente\"}");
+  Serial.println("{\"status\": \"MPU6050_light calibrado e offsets definidos\"}");
 }
 
 void processarComandosSeriais()
@@ -174,7 +185,7 @@ void processarComandosSeriais()
 void processarComando(String comando)
 {
   // Buzzer curto para indicar comando recebido
-  beepBuzzer();
+  // beepBuzzer();  // Desabilitado para evitar beeps constantes
 
   // Parse do JSON
   DynamicJsonDocument doc(1024);
@@ -204,12 +215,12 @@ void processarComando(String comando)
   }
   else if (tipo_comando == "virar_esquerda")
   {
-    int velocidade = doc["velocidade"] | 50;
+    int velocidade = doc["velocidade"] | 25; // Velocidade padrão ainda mais reduzida para precisão
     virarEsquerda(velocidade);
   }
   else if (tipo_comando == "virar_direita")
   {
-    int velocidade = doc["velocidade"] | 50;
+    int velocidade = doc["velocidade"] | 25; // Velocidade padrão ainda mais reduzida para precisão
     virarDireita(velocidade);
   }
   else if (tipo_comando == "parar")
@@ -265,35 +276,33 @@ void lerDadosMPU6050()
   }
 
   // Aguardar estabilização
-  delay(100);
+  delay(10);
 
-  // MPU6050_light: update e leitura simplificada
+  // MPU6050_light: update e leitura dos ângulos
   mpu.update();
 
-  // Verificar se update foi bem-sucedido (opcional, mas pode ajudar)
-  if (mpu.getAccError() != 0)
-  {
-    Serial.println("{\"erro\": \"Erro na leitura do acelerômetro\"}");
-    return;
-  }
+  float angX = mpu.getAngleX() - angulo_offset_x; // Pitch
+  float angY = mpu.getAngleY() - angulo_offset_y; // Roll
+  float angZ = mpu.getAngleZ() - angulo_offset_z; // Yaw
 
-  ax = mpu.getAccX(); // m/s²
-  ay = mpu.getAccY();
-  az = mpu.getAccZ();
-  gx = mpu.getGyroX(); // °/s
-  gy = mpu.getGyroY();
-  gz = mpu.getGyroZ();
-  temperature = mpu.getTemp(); // °C
+  // Normalizar ângulos para 0-360°
+  angX = fmod(angX, 360.0);
+  if (angX < 0)
+    angX += 360.0;
 
-  // JSON resposta
-  DynamicJsonDocument resposta(512);
-  resposta["aceleracao"]["x"] = ax;
-  resposta["aceleracao"]["y"] = ay;
-  resposta["aceleracao"]["z"] = az;
-  resposta["giroscopio"]["x"] = gx;
-  resposta["giroscopio"]["y"] = gy;
-  resposta["giroscopio"]["z"] = gz;
-  resposta["temperatura"] = temperature;
+  angY = fmod(angY, 360.0);
+  if (angY < 0)
+    angY += 360.0;
+
+  angZ = fmod(angZ, 360.0);
+  if (angZ < 0)
+    angZ += 360.0;
+
+  // JSON resposta com ângulos
+  DynamicJsonDocument resposta(256);
+  resposta["angulos"]["pitch"] = angX;
+  resposta["angulos"]["roll"] = angY;
+  resposta["angulos"]["yaw"] = angZ;
   resposta["calibrado"] = calibrado;
   resposta["biblioteca"] = "MPU6050_light";
 
@@ -303,7 +312,7 @@ void lerDadosMPU6050()
 
 void moverFrente(int velocidade)
 {
-  // Para frente: Esquerda 180, Direita 0 (invertido)
+  // Para frente: Esquerda 180, Direita 0 (invertido novamente)
   velocidade_esquerda = map(velocidade, 0, 100, 90, 180);
   velocidade_direita = map(velocidade, 0, 100, 90, 0);
 
@@ -318,7 +327,7 @@ void moverFrente(int velocidade)
 
 void moverTras(int velocidade)
 {
-  // Para trás: Esquerda 0, Direita 180 (invertido)
+  // Para trás: Esquerda 0, Direita 180 (invertido novamente)
   velocidade_esquerda = map(velocidade, 0, 100, 90, 0);
   velocidade_direita = map(velocidade, 0, 100, 90, 180);
 
@@ -333,9 +342,9 @@ void moverTras(int velocidade)
 
 void virarEsquerda(int velocidade)
 {
-  // Virar esquerda: Esquerda 180, Direita 180
-  velocidade_esquerda = map(velocidade, 0, 100, 90, 180);
-  velocidade_direita = map(velocidade, 0, 100, 90, 180);
+  // Virar esquerda: Esquerda para trás (0), Direita para frente (0) para rotação anti-horária
+  velocidade_esquerda = map(velocidade, 0, 100, 90, 0); // Esquerda: trás
+  velocidade_direita = map(velocidade, 0, 100, 90, 0);  // Direita: frente
 
   aplicarVelocidadeMotores();
 
@@ -348,9 +357,9 @@ void virarEsquerda(int velocidade)
 
 void virarDireita(int velocidade)
 {
-  // Virar direita: Esquerda 0, Direita 0
-  velocidade_esquerda = map(velocidade, 0, 100, 90, 0);
-  velocidade_direita = map(velocidade, 0, 100, 90, 0);
+  // Virar direita: Esquerda para frente (180), Direita para trás (180) para rotação horária
+  velocidade_esquerda = map(velocidade, 0, 100, 90, 180); // Esquerda: frente
+  velocidade_direita = map(velocidade, 0, 100, 90, 180);  // Direita: trás
 
   aplicarVelocidadeMotores();
 

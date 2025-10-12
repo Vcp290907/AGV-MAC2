@@ -29,7 +29,7 @@ HARDWARE_CONFIG = {
         'enabled': True,
         'port': '/dev/ttyACM0',  # Porta USB do ESP32 - ALTERE AQUI se necessário
         'baudrate': 115200,
-        'timeout': 1
+        'timeout': 2
     },
     'motors': {
         'max_speed': 100,  # Velocidade máxima (%)
@@ -166,15 +166,15 @@ def get_esp32_config() -> Dict[str, Any]:
 
 def get_esp32_port() -> str:
     """Retorna apenas a porta do ESP32"""
-    return HARDWARE_CONFIG['esp32']['port']
+    return HARDWARE_CONFIG['esp32'].get('port', '/dev/ttyACM0')
 
 def get_esp32_baudrate() -> int:
     """Retorna baudrate do ESP32"""
-    return HARDWARE_CONFIG['esp32']['baudrate']
+    return HARDWARE_CONFIG['esp32'].get('baudrate', 115200)
 
 def get_esp32_timeout() -> float:
     """Retorna timeout do ESP32"""
-    return HARDWARE_CONFIG['esp32']['timeout']
+    return HARDWARE_CONFIG['esp32'].get('timeout', 1)
 
 def auto_detect_esp32_port() -> str:
     """Detecta automaticamente a porta do ESP32 e atualiza o config"""

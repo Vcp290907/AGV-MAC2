@@ -178,22 +178,50 @@ class AGVMissionControl:
             return False
 
     def _navegar_ate_subcorredor(self, subcorredor_destino):
-        """Navegar até o QR code do subcorredor"""
+        """Navegar até o QR code do subcorredor usando câmera e QR detection"""
         print(f"🧭 Navegando até subcorredor: {subcorredor_destino}")
 
-        # Seguir linha preta até encontrar QR code
-        # Por enquanto, simulação baseada em tempo
-        print("🔍 Procurando QR code do subcorredor...")
+        # QR code esperado baseado no subcorredor
+        qr_esperado = f"Corredor01_{subcorredor_destino}"
+        print(f"🔍 Procurando QR code: {qr_esperado}")
 
-        # Simular navegação até encontrar QR
-        if not self.navigation.mover_em_linha_reta(100, 'frente'):  # 100cm
+        # Usar câmera para detectar QR code enquanto navega
+        qr_detectado = None
+        tentativas = 0
+        max_tentativas = 10
+
+        while qr_detectado != qr_esperado and tentativas < max_tentativas:
+            # Mover um pouco para frente
+            if not self.navigation.mover_em_linha_reta(20, 'frente'):  # 20cm por vez
+                print("❌ Falha no movimento durante busca")
+                return False
+
+            # Verificar QR code com câmera
+            try:
+                qr_resultado = self.qr_reader.detectar_qr_code()
+                if qr_resultado and qr_resultado['detectado']:
+                    qr_detectado = qr_resultado['codigo']
+                    print(f"📷 QR code detectado: {qr_detectado}")
+
+                    if qr_detectado == qr_esperado:
+                        print("✅ QR code correto encontrado!")
+                        break
+                    else:
+                        print(f"⚠️ QR code errado detectado: {qr_detectado} (esperado: {qr_esperado})")
+                        # Continuar procurando
+                else:
+                    print("📷 Nenhum QR code detectado, continuando...")
+
+            except Exception as e:
+                print(f"⚠️ Erro na detecção de QR: {e}")
+
+            tentativas += 1
+
+        if qr_detectado != qr_esperado:
+            print(f"❌ QR code {qr_esperado} não encontrado após {max_tentativas} tentativas")
             return False
 
-        # Simular detecção de QR code
-        qr_esperado = f"Corredor01_{subcorredor_destino}"
-        print(f"🎯 QR code detectado: {qr_esperado}")
-
-        # Fazer curva de 90° para o lado do QR
+        # QR encontrado! Fazer curva de 90° para acessar prateleira
         print("🔄 Fazendo curva de 90° para acessar prateleira")
         if not self.navigation.virar_90_graus('direita'):
             return False
