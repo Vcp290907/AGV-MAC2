@@ -17,8 +17,6 @@ class MPU6050Integration:
     def __init__(self, esp32_port=None, baudrate=None):
         self.esp32_port = esp32_port or get_esp32_port()
         self.baudrate = baudrate or get_esp32_baudrate()
-        self.esp32_port = esp32_port
-        self.baudrate = baudrate
         self.serial_conn = None
         self.calibrado = False
 
