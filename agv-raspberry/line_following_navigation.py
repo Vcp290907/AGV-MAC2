@@ -24,9 +24,9 @@ class LineFollowingNavigation:
 
         # Estado da navegação
         self.following_line = False
-        self.speed_base = 50  # Velocidade base reduzida para melhor controle
-        self.speed_min = 20   # Velocidade mínima
-        self.speed_max = 70   # Velocidade máxima
+        self.speed_base = 55  # Velocidade base ajustada para correção gradual
+        self.speed_min = 25   # Velocidade mínima
+        self.speed_max = 75   # Velocidade máxima
 
         # Controle PID para direção (removido - usando o do LineDetector)
         # self.kp = 0.5
@@ -82,7 +82,7 @@ class LineFollowingNavigation:
         return int(left_speed), int(right_speed)
 
     def follow_line_step(self):
-        """Executar um passo de seguimento de linha"""
+        """Executar um passo de seguimento de linha com correção gradual"""
         try:
             # Detectar linha
             line_info = self.line_detector.process_frame()
@@ -92,29 +92,41 @@ class LineFollowingNavigation:
                 self.basic_nav.parar()
                 return False
 
-            # Obter correção de direção calculada pelo detector (já inclui PID)
+            # Obter correção de direção calculada pelo detector
             steering_correction = line_info['steering_correction']
             error_pixels = line_info['center'] - (self.line_detector.width // 2)
 
             print(f"📏 Centro linha: {line_info['center']}, Erro: {error_pixels}px, Correção: {steering_correction:.3f}")
 
-            # Aplicar movimento baseado na correção
-            if abs(steering_correction) < 0.1:
-                # Movimento reto
+            # Correção gradual: pequenas correções intercaladas com movimento para frente
+            base_speed = self.speed_base
+
+            if abs(steering_correction) < 0.05:
+                # Movimento reto normal - manter por mais tempo
                 print("➡️ Movimento reto")
-                self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': self.speed_base})
+                self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': base_speed})
+            elif abs(steering_correction) < 0.3:
+                # Correção leve - movimento para frente com velocidade reduzida
+                reduced_speed = max(self.speed_min, base_speed - int(abs(steering_correction) * 10))
+                print(f"🔄 Correção leve ({steering_correction:.3f}) - velocidade reduzida: {reduced_speed}")
+                self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': reduced_speed})
             else:
-                # Movimento curvo - usar comandos de virada com velocidade proporcional
-                turn_speed = max(10, int(abs(steering_correction) * 30))  # Velocidade de 10-30
+                # Correção necessária - impulso de correção muito suave seguido de movimento para frente
+                # INVERTER A DIREÇÃO: steering_correction > 0 significa linha à direita, então virar para ESQUERDA
+                correction_speed = max(3, min(8, int(abs(steering_correction) * 6)))  # Velocidade ainda menor
 
                 if steering_correction > 0:
-                    # Virar à direita
-                    print(f"↩️ Virando direita (velocidade: {turn_speed})")
-                    self.basic_nav.mpu.enviar_comando('virar_direita', {'velocidade': turn_speed})
+                    # Linha à direita - virar para ESQUERDA (invertido)
+                    print(f"↪️ Correção esquerda suave (impulso: {correction_speed})")
+                    self.basic_nav.mpu.enviar_comando('virar_esquerda', {'velocidade': correction_speed})
                 else:
-                    # Virar à esquerda
-                    print(f"↪️ Virando esquerda (velocidade: {turn_speed})")
-                    self.basic_nav.mpu.enviar_comando('virar_esquerda', {'velocidade': turn_speed})
+                    # Linha à esquerda - virar para DIREITA (invertido)
+                    print(f"↩️ Correção direita suave (impulso: {correction_speed})")
+                    self.basic_nav.mpu.enviar_comando('virar_direita', {'velocidade': correction_speed})
+
+                # Imediatamente voltar ao movimento para frente
+                time.sleep(0.03)  # Tempo ainda menor para correção mais suave
+                self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': base_speed})
 
             return True
 
@@ -287,15 +299,17 @@ class LineFollowingNavigation:
         print("⏹️ Seguimento de linha parado")
 
     def _line_following_loop(self):
-        """Loop principal de seguimento de linha"""
+        """Loop principal de seguimento de linha com timing adaptativo"""
         print("🔄 Iniciando loop de seguimento de linha")
 
         while not self.stop_event.is_set():
             try:
-                if self.follow_line_step():
-                    time.sleep(0.2)  # Aumentado para 5Hz - dar tempo para o movimento
+                success = self.follow_line_step()
+                if success:
+                    # Timing adaptativo baseado no sucesso
+                    time.sleep(0.15)  # 6-7Hz - equilíbrio entre resposta e estabilidade
                 else:
-                    time.sleep(0.5)  # Pausa maior se não detectar linha
+                    time.sleep(0.3)  # Pausa maior se não detectar linha
 
             except Exception as e:
                 print(f"Erro no loop de seguimento: {e}")
