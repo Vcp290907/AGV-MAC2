@@ -71,9 +71,13 @@ class ESP32Controller:
             test_serial.close()
 
             if response:
+                # Aceitar tanto JSON quanto resposta simples
+                if response.strip() in ['OK', 'ok', 'success', 'pong']:
+                    return True
+                
                 try:
                     response_data = json.loads(response)
-                    if response_data.get('status') in ['ok', 'success']:
+                    if response_data.get('status') in ['ok', 'success'] or response_data.get('resposta') == 'pong':
                         return True
                 except json.JSONDecodeError:
                     pass
@@ -154,6 +158,10 @@ class ESP32Controller:
             response_line = self.serial_connection.readline().decode('utf-8').strip()
 
             if response_line:
+                # Aceitar tanto JSON quanto resposta simples
+                if response_line.strip() in ['OK', 'ok', 'success', 'pong']:
+                    return True
+                
                 try:
                     response = json.loads(response_line)
                     if response.get('status') == 'ok':
