@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
 """
-Detector de Linha Preta para AGV
+Detector de Linha Preta para AGV - Versão Picamera2
 Sistema de visão computacional para detectar e seguir linha preta no chão
 """
 
+from picamera2 import Picamera2
 import cv2
 import numpy as np
 import time
 import sys
 
 class LineDetector:
-    """Detector de linha preta usando câmera inferior"""
+    """Detector de linha preta usando Picamera2"""
 
-    def __init__(self, camera_id=1, width=640, height=480):
-        self.camera_id = camera_id
+    def __init__(self, width=640, height=480):
         self.width = width
         self.height = height
-        self.cap = None
+        self.picam2 = None
 
         # Configurações de processamento de imagem
         self.lower_black = np.array([0, 0, 0])
@@ -45,47 +45,36 @@ class LineDetector:
         self.line_confidence = 0
 
     def initialize(self):
-        """Inicializar câmera para detecção de linha"""
-        print(f"Inicializando câmera para detecção de linha (ID: {self.camera_id})...")
+        """Inicializar Picamera2 para detecção de linha"""
+        print("Inicializando Picamera2 para detecção de linha...")
 
-        # Tentar diferentes backends
-        backends = [cv2.CAP_V4L2, cv2.CAP_GSTREAMER, cv2.CAP_ANY]
-
-        for backend in backends:
-            try:
-                print(f"Tentando backend: {backend}")
-                self.cap = cv2.VideoCapture(self.camera_id, backend)
-
-                if self.cap.isOpened():
-                    print(f"Backend {backend} funcionou!")
-                    break
-                else:
-                    self.cap.release()
-            except Exception as e:
-                print(f"Erro com backend {backend}: {e}")
-                continue
-
-        if not self.cap or not self.cap.isOpened():
-            print(f"❌ Não foi possível abrir câmera {self.camera_id}")
-            return False
-
-        # Configurar resolução
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
-
-        # Testar captura
-        ret, frame = self.cap.read()
-        if ret and frame is not None:
-            print("✅ Câmera para detecção de linha inicializada!")
-            return True
-        else:
-            print("❌ Falha ao capturar frame de teste")
-            self.cap.release()
+        try:
+            self.picam2 = Picamera2()
+            config = self.picam2.create_preview_configuration(
+                main={"format": 'XRGB8888', "size": (self.width, self.height)}
+            )
+            self.picam2.configure(config)
+            self.picam2.start()
+            
+            # Testar captura
+            frame = self.picam2.capture_array()
+            if frame is not None:
+                print("✅ Picamera2 inicializada para detecção de linha!")
+                return True
+            else:
+                print("❌ Falha ao capturar frame de teste")
+                return False
+                
+        except Exception as e:
+            print(f"❌ Erro ao inicializar Picamera2: {e}")
             return False
 
     def preprocess_image(self, frame):
         """Pré-processar imagem para detecção de linha"""
         try:
+            # Converter de XRGB para BGR
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            
             # Recortar ROI (apenas área inferior)
             roi = frame[self.roi_y_start:self.roi_y_start + self.roi_height, :]
 
@@ -186,13 +175,11 @@ class LineDetector:
     def process_frame(self, frame=None):
         """Processar um frame completo"""
         try:
+            if frame is None and self.picam2:
+                frame = self.picam2.capture_array()
+            
             if frame is None:
-                if not self.cap or not self.cap.isOpened():
-                    return None
-
-                ret, frame = self.cap.read()
-                if not ret or frame is None:
-                    return None
+                return None
 
             # Pré-processar
             mask, roi = self.preprocess_image(frame)
@@ -234,11 +221,11 @@ class LineDetector:
 
                 # Mostrar informações
                 text_lines = [
-                    f"Linha: {'Detectada' if info['detected'] else 'Não detectada'}",
+                    f"Linha: {'Detectada' if info['detected'] else 'Nao detectada'}",
                     f"Centro: {info['center']}",
                     f"Largura: {info['width']}",
-                    ".2f",
-                    ".2f"
+                    f"Conf: {info['confidence']:.2f}",
+                    f"Correcao: {info['steering_correction']:.2f}"
                 ]
 
                 for i, text in enumerate(text_lines):
@@ -248,22 +235,22 @@ class LineDetector:
             return frame
 
         except Exception as e:
-            print(f"Erro na visualização: {e}")
+            print(f"Erro na visualizacao: {e}")
             return frame
 
     def cleanup(self):
         """Limpar recursos"""
-        if self.cap:
-            self.cap.release()
-            print("🛑 Câmera de detecção de linha liberada")
+        if self.picam2:
+            self.picam2.stop()
+            print("🛑 Picamera2 liberada")
 
 def main():
     """Função principal para teste"""
-    print("🎯 TESTE DO DETECTOR DE LINHA PRETA")
-    print("=" * 40)
+    print("🎯 TESTE DO DETECTOR DE LINHA PRETA - PICAMERA2")
+    print("=" * 50)
 
     # Criar detector
-    detector = LineDetector(camera_id=0)
+    detector = LineDetector()
 
     # Inicializar
     if not detector.initialize():
@@ -271,7 +258,7 @@ def main():
 
     try:
         print("Pressione 'q' para sair, 'r' para resetar PID")
-        print("A câmera inferior deve estar apontada para o chão")
+        print("A câmera CSI deve estar apontada para o chão")
 
         while True:
             # Processar frame
@@ -296,10 +283,11 @@ def main():
                 vis_frame = detector.visualize_detection(vis_frame, info)
 
                 # Mostrar frame
-                cv2.imshow("Detector de Linha Preta", vis_frame)
+                cv2.imshow("Detector de Linha Preta - Picamera2", vis_frame)
 
             # Verificar teclas
             key = cv2.waitKey(1) & 0xFF
+
             if key == ord('q'):
                 break
             elif key == ord('r'):
@@ -318,7 +306,7 @@ def main():
 
         # Resumo final
         print("\n📊 RESUMO FINAL:")
-        print(f"   Sistema de detecção de linha testado")
+        print("   Sistema de detecção de linha testado com Picamera2")
 
 if __name__ == "__main__":
     main()
