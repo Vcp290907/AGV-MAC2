@@ -41,7 +41,7 @@ class ESP32Controller:
                 test_serial = serial.Serial(port, self.baudrate, timeout=1)
 
                 # Enviar ping
-                ping_cmd = {'command': 'ping', 'timestamp': time.time()}
+                ping_cmd = {'comando': 'ping', 'timestamp': time.time()}
                 test_serial.write((json.dumps(ping_cmd) + '\n').encode('utf-8'))
                 test_serial.flush()
 
@@ -143,7 +143,7 @@ class ESP32Controller:
             time.sleep(2)
 
             # Enviar comando de teste simples (igual ao debug_serial.py)
-            test_command = {'command': 'ping'}
+            test_command = {'comando': 'ping'}
             command_json = json.dumps(test_command) + '\n'
 
             # Enviar comando
@@ -208,7 +208,7 @@ class ESP32Controller:
     def move_forward(self, duration: float = 1.0) -> Dict[str, Any]:
         """Move o AGV para frente por determinado tempo"""
         command = {
-            'command': 'move',
+            'comando': 'move',
             'direction': 'forward',
             'duration': duration,
             'timestamp': time.time()
@@ -239,7 +239,7 @@ class ESP32Controller:
     def move_backward(self, duration: float = 1.0) -> Dict[str, Any]:
         """Move o AGV para trás por determinado tempo"""
         command = {
-            'command': 'move',
+            'comando': 'move',
             'direction': 'backward',
             'duration': duration,
             'timestamp': time.time()
@@ -270,7 +270,7 @@ class ESP32Controller:
     def stop(self) -> Dict[str, Any]:
         """Para imediatamente o movimento do AGV"""
         command = {
-            'command': 'stop',
+            'comando': 'stop',
             'timestamp': time.time()
         }
 
@@ -295,7 +295,7 @@ class ESP32Controller:
     def get_status(self) -> Dict[str, Any]:
         """Obtém status do ESP32"""
         command = {
-            'command': 'status',
+            'comando': 'status',
             'timestamp': time.time()
         }
 

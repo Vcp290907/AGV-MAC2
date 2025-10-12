@@ -1,69 +1,76 @@
 /*
-Firmware ESP32 com MPU6050 e Buzzer para AGV
+Firmware ESP32 com MPU6050_light e Servo para AGV
 Inclui giroscópio, acelerômetro, controle de motores e buzzer
+
+BIBLIOTECAS UTILIZADAS:
+- MPU6050_light: Leitura simplificada do giroscópio/acelerômetro
+- ESP32Servo: Controle dos motores para ESP32
+- ArduinoJson: Comunicação JSON
+- Wire: Comunicação I2C
 
 Pinos configurados:
 - Buzzer: GPIO 4
 - MPU6050 SDA: GPIO 10
 - MPU6050 SCL: GPIO 9
-- Motor Esquerdo: GPIO 1 (PWM LEDC canal 0)
-- Motor Direito: GPIO 3 (PWM LEDC canal 1)
+- Motor Esquerdo: GPIO 1 (Servo)
+- Motor Direito: GPIO 3 (Servo)
 
 IMPORTANTE:
-- Verificar conexões I2C se MPU6050 não for detectado
-- Motores agora usam PWM real (LEDC) ao invés de simulação
+- Motores usam Servo para controle direto
+- MPU6050_light tem calibração automática
 - Buzzer dá feedback sonoro para cada comando
+- Comunicação JSON via serial
 */
 
 #include <Wire.h>
-#include <MPU6050.h>
+#include <MPU6050_light.h>
+#include <ESP32Servo.h>
 #include <ArduinoJson.h>
 
 // Configurações de pinos
-#define MOTOR_LEFT_PIN 1    // GPIO 1 - Servo Motor Esquerdo
-#define MOTOR_RIGHT_PIN 3   // GPIO 3 - Servo Motor Direito
-#define BUZZER_PIN 4        // GPIO 4 - Buzzer
-#define MPU6050_SDA 10      // GPIO 10 - SDA do MPU6050
-#define MPU6050_SCL 9       // GPIO 9 - SCL do MPU6050
+#define MOTOR_LEFT_PIN 1  // GPIO 1 - Servo Motor Esquerdo
+#define MOTOR_RIGHT_PIN 3 // GPIO 3 - Servo Motor Direito
+#define BUZZER_PIN 4      // GPIO 4 - Buzzer
+#define MPU6050_SDA 10    // GPIO 10 - SDA do MPU6050
+#define MPU6050_SCL 9     // GPIO 9 - SCL do MPU6050
 
-// Configurações MPU6050
-MPU6050 mpu;
+// Configurações MPU6050_light
+MPU6050 mpu(Wire);
 bool mpu6050_presente = false;
 
-// Variáveis para MPU6050
-int16_t ax, ay, az, gx, gy, gz;
+// Variáveis para MPU6050_light (dados em unidades SI)
+float ax, ay, az, gx, gy, gz;
 float temperature;
 
-// Calibração MPU6050
-int16_t offset_ax = 0, offset_ay = 0, offset_az = 0;
-int16_t offset_gx = 0, offset_gy = 0, offset_gz = 0;
+// Calibração MPU6050_light (automática pela biblioteca)
 bool calibrado = false;
 
-// Controle de motores
-int velocidade_esquerda = 90;  // 90 = parado
-int velocidade_direita = 90;   // 90 = parado
+// Controle de motores com Servo
+Servo servoEsquerdo;
+Servo servoDireito;
+
+int velocidade_esquerda = 90; // 90 = parado
+int velocidade_direita = 90;  // 90 = parado
 
 // Comunicação serial
 String comando_recebido = "";
 bool comando_completo = false;
 
-void setup() {
+void setup()
+{
   // Inicializar serial
   Serial.begin(115200);
-  while (!Serial) {
+  while (!Serial)
+  {
     delay(10);
   }
 
   // Configurar pinos
-  pinMode(MOTOR_LEFT_PIN, OUTPUT);
-  pinMode(MOTOR_RIGHT_PIN, OUTPUT);
   pinMode(BUZZER_PIN, OUTPUT);
 
-  // Configurar PWM para motores (canais 0 e 1)
-  ledcSetup(0, 50, 8);  // Canal 0, 50Hz, 8-bit resolution
-  ledcSetup(1, 50, 8);  // Canal 1, 50Hz, 8-bit resolution
-  ledcAttachPin(MOTOR_LEFT_PIN, 0);
-  ledcAttachPin(MOTOR_RIGHT_PIN, 1);
+  // Inicializar servos
+  servoEsquerdo.attach(MOTOR_LEFT_PIN);
+  servoDireito.attach(MOTOR_RIGHT_PIN);
 
   // Inicializar motores no estado parado
   pararMotores();
@@ -80,106 +87,92 @@ void setup() {
   Serial.println("{\"status\": \"ESP32 inicializado\"}");
 }
 
-void beepBuzzer() {
+void beepBuzzer()
+{
   tone(BUZZER_PIN, 1000);
-  delay(200);  // Beep mais curto para feedback
+  delay(200); // Beep mais curto para feedback
   noTone(BUZZER_PIN);
   Serial.println("OK");
 }
 
-void loop() {
+void loop()
+{
   // Processar comandos seriais
   processarComandosSeriais();
 
   delay(10);
 }
 
-void inicializarMPU6050() {
-  Serial.println("{\"status\": \"Inicializando MPU6050...\"}");
+void inicializarMPU6050()
+{
+  Serial.println("{\"status\": \"Inicializando MPU6050_light...\"}");
 
   // Aguardar I2C estabilizar
   delay(500);
 
-  mpu.initialize();
+  // MPU6050_light: inicialização e teste de conexão simplificados
+  byte status = mpu.begin();
   delay(100);
 
-  if (mpu.testConnection()) {
+  if (status == 0)
+  {
     mpu6050_presente = true;
-
-    // Configurar MPU6050
-    mpu.setFullScaleAccelRange(MPU6050_ACCEL_FS_2);  // ±2g
-    mpu.setFullScaleGyroRange(MPU6050_GYRO_FS_250);  // ±250°/s
-
-    Serial.println("{\"status\": \"MPU6050 conectado e configurado\"}");
+    Serial.println("{\"status\": \"MPU6050_light conectado\"}");
 
     // Aguardar estabilização
     delay(500);
 
-    // Auto-calibração
+    // Auto-calibração da biblioteca
     calibrarMPU6050();
-
-  } else {
+  }
+  else
+  {
     mpu6050_presente = false;
-    Serial.println("{\"status\": \"MPU6050 não encontrado - verificar conexões I2C\"}");
+    Serial.printf("{\"status\": \"MPU6050_light erro: %d - verificar conexões I2C\"}\n", status);
     Serial.println("{\"status\": \"SDA=GPIO10, SCL=GPIO9\"}");
   }
 }
 
-void calibrarMPU6050() {
-  Serial.println("{\"status\": \"Calibrando MPU6050...\"}");
+void calibrarMPU6050()
+{
+  Serial.println("{\"status\": \"Calibrando MPU6050_light...\"}");
 
-  const int amostras = 100;
-  long soma_ax = 0, soma_ay = 0, soma_az = 0;
-  long soma_gx = 0, soma_gy = 0, soma_gz = 0;
+  // Calibração automática da MPU6050_light
+  mpu.calcOffsets(true, true); // Calibra acel (true) e giro (true)
 
-  for (int i = 0; i < amostras; i++) {
-    mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
-
-    soma_ax += ax;
-    soma_ay += ay;
-    soma_az += az;
-    soma_gx += gx;
-    soma_gy += gy;
-    soma_gz += gz;
-
-    delay(10);
-
-    if ((i + 1) % 20 == 0) {
-      Serial.printf("{\"calibracao\": {\"progresso\": %d, \"total\": %d}}\n", i + 1, amostras);
-    }
-  }
-
-  // Calcular offsets
-  offset_ax = soma_ax / amostras;
-  offset_ay = soma_ay / amostras;
-  offset_az = soma_az / amostras - 16384;  // Remover 1g da gravidade
-  offset_gx = soma_gx / amostras;
-  offset_gy = soma_gy / amostras;
-  offset_gz = soma_gz / amostras;
+  // Aguardar calibração completar
+  delay(1000);
 
   calibrado = true;
-  Serial.println("{\"status\": \"MPU6050 calibrado\"}");
+  Serial.println("{\"status\": \"MPU6050_light calibrado automaticamente\"}");
 }
 
-void processarComandosSeriais() {
-  while (Serial.available()) {
+void processarComandosSeriais()
+{
+  while (Serial.available())
+  {
     char caractere = Serial.read();
 
-    if (caractere == '\n') {
+    if (caractere == '\n')
+    {
       comando_completo = true;
-    } else {
+    }
+    else
+    {
       comando_recebido += caractere;
     }
   }
 
-  if (comando_completo) {
+  if (comando_completo)
+  {
     processarComando(comando_recebido);
     comando_recebido = "";
     comando_completo = false;
   }
 }
 
-void processarComando(String comando) {
+void processarComando(String comando)
+{
   // Buzzer curto para indicar comando recebido
   beepBuzzer();
 
@@ -187,70 +180,102 @@ void processarComando(String comando) {
   DynamicJsonDocument doc(1024);
   DeserializationError error = deserializeJson(doc, comando);
 
-  if (error) {
+  if (error)
+  {
     Serial.println("{\"erro\": \"JSON inválido\"}");
     return;
   }
 
   String tipo_comando = doc["comando"];
 
-  if (tipo_comando == "ler_mpu6050") {
+  if (tipo_comando == "ler_mpu6050")
+  {
     lerDadosMPU6050();
-
-  } else if (tipo_comando == "mover_frente") {
-    int velocidade = doc["velocidade"] | 50;  // Velocidade padrão menor
+  }
+  else if (tipo_comando == "mover_frente")
+  {
+    int velocidade = doc["velocidade"] | 50; // Velocidade padrão menor
     moverFrente(velocidade);
-
-  } else if (tipo_comando == "mover_tras") {
+  }
+  else if (tipo_comando == "mover_tras")
+  {
     int velocidade = doc["velocidade"] | 50;
     moverTras(velocidade);
-
-  } else if (tipo_comando == "virar_esquerda") {
+  }
+  else if (tipo_comando == "virar_esquerda")
+  {
     int velocidade = doc["velocidade"] | 50;
     virarEsquerda(velocidade);
-
-  } else if (tipo_comando == "virar_direita") {
+  }
+  else if (tipo_comando == "virar_direita")
+  {
     int velocidade = doc["velocidade"] | 50;
     virarDireita(velocidade);
-
-  } else if (tipo_comando == "parar") {
+  }
+  else if (tipo_comando == "parar")
+  {
     pararMotores();
-
-  } else if (tipo_comando == "calibrar_mpu6050") {
+  }
+  else if (tipo_comando == "calibrar_mpu6050")
+  {
     calibrarMPU6050();
-
-  } else if (tipo_comando == "status") {
+  }
+  else if (tipo_comando == "status")
+  {
     enviarStatus();
-
-  } else if (tipo_comando == "beep") {
+  }
+  else if (tipo_comando == "beep")
+  {
     beepBuzzer();
-
-  } else {
+  }
+  else if (tipo_comando == "move")
+  {
+    String direction = doc["direction"];
+    int velocidade = doc["velocidade"] | 50;
+    if (direction == "forward")
+    {
+      moverFrente(velocidade);
+    }
+    else if (direction == "backward")
+    {
+      moverTras(velocidade);
+    }
+  }
+  else if (tipo_comando == "stop")
+  {
+    pararMotores();
+    Serial.println("{\"status\": \"success\"}");
+  }
+  else if (tipo_comando == "ping")
+  {
+    Serial.println("{\"status\": \"ok\"}");
+  }
+  else
+  {
     Serial.println("{\"erro\": \"Comando desconhecido\"}");
   }
 }
 
-void lerDadosMPU6050() {
-  if (!mpu6050_presente) {
+void lerDadosMPU6050()
+{
+  if (!mpu6050_presente)
+  {
     Serial.println("{\"erro\": \"MPU6050 não disponível\"}");
     return;
   }
 
-  // Ler dados
-  mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
-  temperature = mpu.getTemperature() / 340.0 + 36.53;
+  // MPU6050_light: update e leitura simplificada
+  mpu.update();
 
-  // Aplicar calibração se disponível
-  if (calibrado) {
-    ax -= offset_ax;
-    ay -= offset_ay;
-    az -= offset_az;
-    gx -= offset_gx;
-    gy -= offset_gy;
-    gz -= offset_gz;
-  }
+  ax = mpu.getAccX(); // m/s²
+  ay = mpu.getAccY();
+  az = mpu.getAccZ();
+  gx = mpu.getGyroX(); // °/s
+  gy = mpu.getGyroY();
+  gz = mpu.getGyroZ();
+  temperature = mpu.getTemp(); // °C
 
-  // Criar resposta JSON
+  // JSON resposta
   DynamicJsonDocument resposta(512);
   resposta["aceleracao"]["x"] = ax;
   resposta["aceleracao"]["y"] = ay;
@@ -260,91 +285,94 @@ void lerDadosMPU6050() {
   resposta["giroscopio"]["z"] = gz;
   resposta["temperatura"] = temperature;
   resposta["calibrado"] = calibrado;
+  resposta["biblioteca"] = "MPU6050_light";
 
   serializeJson(resposta, Serial);
   Serial.println();
 }
 
-void moverFrente(int velocidade) {
-  // Converter velocidade 0-100 para ângulo do servo
-  // 90 = parado, 0 = velocidade máxima para frente
+void moverFrente(int velocidade)
+{
+  // Para frente: Esquerda 0, Direita 180
   velocidade_esquerda = map(velocidade, 0, 100, 90, 0);
   velocidade_direita = map(velocidade, 0, 100, 90, 180);
 
   aplicarVelocidadeMotores();
 
   DynamicJsonDocument resposta(128);
-  resposta["status"] = "movendo_frente";
+  resposta["status"] = "success";
   resposta["velocidade"] = velocidade;
   serializeJson(resposta, Serial);
   Serial.println();
 }
 
-void moverTras(int velocidade) {
-  // 90 = parado, 180 = velocidade máxima para trás
+void moverTras(int velocidade)
+{
+  // Para trás: Esquerda 180, Direita 0
   velocidade_esquerda = map(velocidade, 0, 100, 90, 180);
   velocidade_direita = map(velocidade, 0, 100, 90, 0);
 
   aplicarVelocidadeMotores();
 
   DynamicJsonDocument resposta(128);
-  resposta["status"] = "movendo_tras";
+  resposta["status"] = "success";
   resposta["velocidade"] = velocidade;
   serializeJson(resposta, Serial);
   Serial.println();
 }
 
-void virarEsquerda(int velocidade) {
-  velocidade_esquerda = map(velocidade, 0, 100, 90, 180);  // Trás
-  velocidade_direita = map(velocidade, 0, 100, 90, 180);   // Frente
+void virarEsquerda(int velocidade)
+{
+  // Virar esquerda: Esquerda 180, Direita 180
+  velocidade_esquerda = map(velocidade, 0, 100, 90, 180);
+  velocidade_direita = map(velocidade, 0, 100, 90, 180);
 
   aplicarVelocidadeMotores();
 
   DynamicJsonDocument resposta(128);
-  resposta["status"] = "virando_esquerda";
+  resposta["status"] = "success";
   resposta["velocidade"] = velocidade;
   serializeJson(resposta, Serial);
   Serial.println();
 }
 
-void virarDireita(int velocidade) {
-  velocidade_esquerda = map(velocidade, 0, 100, 90, 0);    // Frente
-  velocidade_direita = map(velocidade, 0, 100, 90, 0);     // Trás
+void virarDireita(int velocidade)
+{
+  // Virar direita: Esquerda 0, Direita 0
+  velocidade_esquerda = map(velocidade, 0, 100, 90, 0);
+  velocidade_direita = map(velocidade, 0, 100, 90, 0);
 
   aplicarVelocidadeMotores();
 
   DynamicJsonDocument resposta(128);
-  resposta["status"] = "virando_direita";
+  resposta["status"] = "success";
   resposta["velocidade"] = velocidade;
   serializeJson(resposta, Serial);
   Serial.println();
 }
 
-void pararMotores() {
+void pararMotores()
+{
   velocidade_esquerda = 90;
   velocidade_direita = 90;
   aplicarVelocidadeMotores();
 
-  Serial.println("{\"status\": \"parado\"}");
+  Serial.println("{\"status\": \"success\"}");
 }
 
-void aplicarVelocidadeMotores() {
-  // Aplicar PWM nos servos usando LEDC (ESP32 PWM)
-  // Converter ângulo do servo (0-180) para duty cycle (0-255)
-
-  int pwm_esquerdo = map(velocidade_esquerda, 0, 180, 0, 255);
-  int pwm_direito = map(velocidade_direita, 0, 180, 0, 255);
-
-  // Aplicar PWM usando LEDC
-  ledcWrite(0, pwm_esquerdo);  // Canal 0 - Motor esquerdo
-  ledcWrite(1, pwm_direito);   // Canal 1 - Motor direito
+void aplicarVelocidadeMotores()
+{
+  // Aplicar velocidade diretamente
+  servoEsquerdo.write(velocidade_esquerda);
+  servoDireito.write(velocidade_direita);
 
   // Debug: mostrar valores aplicados
-  Serial.printf("{\"motores\": {\"esquerdo\": %d, \"direito\": %d, \"pwm_esq\": %d, \"pwm_dir\": %d}}\n",
-                velocidade_esquerda, velocidade_direita, pwm_esquerdo, pwm_direito);
+  Serial.printf("{\"motores\": {\"esquerdo\": %d, \"direito\": %d}}\n",
+                velocidade_esquerda, velocidade_direita);
 }
 
-void enviarStatus() {
+void enviarStatus()
+{
   DynamicJsonDocument resposta(256);
   resposta["status"] = "online";
   resposta["mpu6050"] = mpu6050_presente;
@@ -355,7 +383,8 @@ void enviarStatus() {
   resposta["motores"]["esquerdo"] = velocidade_esquerda;
   resposta["motores"]["direito"] = velocidade_direita;
 
-  if (mpu6050_presente) {
+  if (mpu6050_presente)
+  {
     resposta["sensores"]["temperatura"] = temperature;
   }
 
