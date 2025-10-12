@@ -264,8 +264,18 @@ void lerDadosMPU6050()
     return;
   }
 
+  // Aguardar estabilização
+  delay(100);
+
   // MPU6050_light: update e leitura simplificada
   mpu.update();
+
+  // Verificar se update foi bem-sucedido (opcional, mas pode ajudar)
+  if (mpu.getAccError() != 0)
+  {
+    Serial.println("{\"erro\": \"Erro na leitura do acelerômetro\"}");
+    return;
+  }
 
   ax = mpu.getAccX(); // m/s²
   ay = mpu.getAccY();
@@ -293,9 +303,9 @@ void lerDadosMPU6050()
 
 void moverFrente(int velocidade)
 {
-  // Para frente: Esquerda 0, Direita 180
-  velocidade_esquerda = map(velocidade, 0, 100, 90, 0);
-  velocidade_direita = map(velocidade, 0, 100, 90, 180);
+  // Para frente: Esquerda 180, Direita 0 (invertido)
+  velocidade_esquerda = map(velocidade, 0, 100, 90, 180);
+  velocidade_direita = map(velocidade, 0, 100, 90, 0);
 
   aplicarVelocidadeMotores();
 
@@ -308,9 +318,9 @@ void moverFrente(int velocidade)
 
 void moverTras(int velocidade)
 {
-  // Para trás: Esquerda 180, Direita 0
-  velocidade_esquerda = map(velocidade, 0, 100, 90, 180);
-  velocidade_direita = map(velocidade, 0, 100, 90, 0);
+  // Para trás: Esquerda 0, Direita 180 (invertido)
+  velocidade_esquerda = map(velocidade, 0, 100, 90, 0);
+  velocidade_direita = map(velocidade, 0, 100, 90, 180);
 
   aplicarVelocidadeMotores();
 
