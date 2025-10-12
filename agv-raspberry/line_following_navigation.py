@@ -18,7 +18,7 @@ class LineFollowingNavigation:
         self.esp32_port = esp32_port or get_esp32_port()
 
         # Componentes
-        self.line_detector = LineDetector(camera_id=line_camera_id)
+        self.line_detector = LineDetector()  # Picamera2 não usa camera_id
         self.basic_nav = BasicNavigation(esp32_port=self.esp32_port)
         self.qr_detector = OpenCVOnlyQRReader(camera_id=qr_camera_id)
 

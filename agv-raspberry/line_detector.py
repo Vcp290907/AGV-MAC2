@@ -4,7 +4,13 @@ Detector de Linha Preta para AGV - Versão Picamera2
 Sistema de visão computacional para detectar e seguir linha preta no chão
 """
 
-from picamera2 import Picamera2
+try:
+    from picamera2 import Picamera2
+    PICAMERA2_AVAILABLE = True
+except ImportError:
+    PICAMERA2_AVAILABLE = False
+    print("Picamera2 nao disponivel - usando simulacao")
+
 import cv2
 import numpy as np
 import time
@@ -28,7 +34,7 @@ class LineDetector:
         self.line_center_offset = 0  # Offset do centro da linha
 
         # ROI (Region of Interest) - área inferior da imagem
-        self.roi_y_start = int(height * 0.6)  # 60% inferior da imagem
+        self.roi_y_start = int(height * 0.5)  # 60% inferior da imagem
         self.roi_height = height - self.roi_y_start
 
         # PID para controle de direção
@@ -48,26 +54,31 @@ class LineDetector:
         """Inicializar Picamera2 para detecção de linha"""
         print("Inicializando Picamera2 para detecção de linha...")
 
-        try:
-            self.picam2 = Picamera2()
-            config = self.picam2.create_preview_configuration(
-                main={"format": 'XRGB8888', "size": (self.width, self.height), "camera": 1}
-            )
-            self.picam2.configure(config)
-            self.picam2.start()
-            
-            # Testar captura
-            frame = self.picam2.capture_array()
-            if frame is not None:
-                print("✅ Picamera2 inicializada para detecção de linha!")
-                return True
-            else:
-                print("❌ Falha ao capturar frame de teste")
+        if PICAMERA2_AVAILABLE:
+            try:
+                self.picam2 = Picamera2(camera_num=1)  # Câmera inferior
+                config = self.picam2.create_preview_configuration(
+                    main={"format": 'XRGB8888', "size": (self.width, self.height)}
+                )
+                self.picam2.configure(config)
+                self.picam2.start()
+
+                # Testar captura
+                frame = self.picam2.capture_array()
+                if frame is not None:
+                    print("✅ Picamera2 inicializada para detecção de linha!")
+                    return True
+                else:
+                    print("❌ Falha ao capturar frame de teste")
+                    return False
+
+            except Exception as e:
+                print(f"❌ Erro ao inicializar Picamera2: {e}")
                 return False
-                
-        except Exception as e:
-            print(f"❌ Erro ao inicializar Picamera2: {e}")
-            return False
+        else:
+            print("⚠️ Picamera2 não disponível - modo simulação ativado")
+            print("✅ Detector de linha inicializado (simulação)")
+            return True
 
     def preprocess_image(self, frame):
         """Pré-processar imagem para detecção de linha"""
