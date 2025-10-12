@@ -161,7 +161,7 @@ class BasicNavigation:
                 # Reduzir velocidade quando se aproximando do ponto de parada
                 if abs(diff) < 10 and not slowed_down:
                     print("  🐌 Reduzindo velocidade ...")
-                    self.mpu.enviar_comando(comando, {'velocidade': 10})  # Velocidade ainda mais reduzida
+                    self.mpu.enviar_comando(comando, {'velocidade': 5})  # Velocidade ainda mais reduzida
                     slowed_down = True
 
                 # Verificar se chegou no ponto de parada
