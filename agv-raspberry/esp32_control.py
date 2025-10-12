@@ -16,7 +16,7 @@ class ESP32Controller:
     """Controlador para comunicação com ESP32 via serial"""
 
     def __init__(self, port: str = None, baudrate: int = 115200, timeout: float = 2.0):
-        self.default_port = port or '/dev/ttyACM0'  # Mudado para ttyACM0 baseado na detecção
+        self.default_port = port or '/dev/ttyACM1'  # Atualizado para ACM1 baseado na detecção atual
         self.port = self.default_port
         self.baudrate = baudrate
         self.timeout = timeout
@@ -330,7 +330,7 @@ def get_esp32_controller() -> ESP32Controller:
     return esp32_controller
 
 # Funções de conveniência para uso direto
-def connect_esp32(port: str = '/dev/ttyACM0') -> bool:
+def connect_esp32(port: str = '/dev/ttyACM1') -> bool:
     """Conecta ao ESP32"""
     controller = get_esp32_controller()
     controller.port = port

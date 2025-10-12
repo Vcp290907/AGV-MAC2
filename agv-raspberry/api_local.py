@@ -300,7 +300,7 @@ class RaspberryAPI:
             from esp32_control import ESP32Controller
 
             # Criar controlador com porta específica
-            esp32 = ESP32Controller(port='/dev/ttyACM0')
+            esp32 = ESP32Controller(port='/dev/ttyACM1')
 
             # Conectar ao ESP32
             logger.info("Conectando ao ESP32...")

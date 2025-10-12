@@ -14,7 +14,7 @@ from qr_reader_with_api import QRReaderWithAPI
 class AGVMissionControl:
     """Sistema completo de controle de missões do AGV"""
 
-    def __init__(self, pc_ip="192.168.0.100", pc_port=5000, esp32_port='/dev/ttyACM0'):
+    def __init__(self, pc_ip="192.168.0.100", pc_port=5000, esp32_port='/dev/ttyACM1'):
         self.pc_ip = pc_ip
         self.pc_port = pc_port
         self.base_url = f"http://{pc_ip}:{pc_port}"
@@ -322,7 +322,7 @@ def main():
     # Configurações
     pc_ip = "192.168.0.100"
     pc_port = 5000
-    esp32_port = '/dev/ttyACM0'
+    esp32_port = '/dev/ttyACM1'
 
     # Criar controle de missões
     agv = AGVMissionControl(pc_ip=pc_ip, pc_port=pc_port, esp32_port=esp32_port)
