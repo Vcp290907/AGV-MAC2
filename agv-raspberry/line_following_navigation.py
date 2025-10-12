@@ -10,11 +10,12 @@ from line_detector import LineDetector
 from navigation_basic import BasicNavigation
 from qr_reader_opencv_only import OpenCVOnlyQRReader
 from config import get_esp32_port
+import cv2
 
 class LineFollowingNavigation:
     """Navegação que segue linha preta com detecção de QR codes"""
 
-    def __init__(self, esp32_port=None, qr_camera_id=0):
+    def __init__(self, esp32_port=None, qr_camera_id=0, visual_feedback=False):
         self.esp32_port = esp32_port or get_esp32_port()
 
         # Componentes
@@ -27,6 +28,100 @@ class LineFollowingNavigation:
         self.speed_base = 55  # Velocidade base ajustada para correção gradual
         self.speed_min = 25   # Velocidade mínima
         self.speed_max = 75   # Velocidade máxima
+
+        # Detecção de QR codes
+        self.qr_detected_recently = False
+
+        # Feedback visual opcional
+        self.visual_feedback = visual_feedback
+        self.visual_window_name = "AGV - Seguimento de Linha"
+        self.current_frame = None
+        self.status_info = {
+            'velocidade': 0,
+            'direcao': 'parado',
+            'erro_pixels': 0,
+            'correcao': 0.0,
+            'qr_detectado': False,
+            'linha_detectada': False,
+            'confianca': 0.0
+        }
+
+    def enable_visual_feedback(self):
+        """Ativar feedback visual"""
+        self.visual_feedback = True
+        print("👁️ Feedback visual ativado")
+
+    def disable_visual_feedback(self):
+        """Desativar feedback visual"""
+        self.visual_feedback = False
+        try:
+            cv2.destroyWindow(self.visual_window_name)
+        except:
+            pass
+        print("👁️ Feedback visual desativado")
+
+    def update_visual_frame(self, frame, line_info=None):
+        """Atualizar frame para display visual"""
+        if not self.visual_feedback or frame is None:
+            return
+
+        self.current_frame = frame.copy()
+
+        # Desenhar informações na imagem
+        height, width = self.current_frame.shape[:2]
+
+        # Desenhar linha central da imagem
+        cv2.line(self.current_frame, (width//2, 0), (width//2, height), (255, 255, 255), 1)
+
+        # Desenhar ROI (área de detecção)
+        roi_y_start = int(height * 0.4)
+        cv2.rectangle(self.current_frame, (0, roi_y_start), (width, height), (0, 255, 0), 2)
+
+        # Desenhar linha detectada
+        if line_info and line_info.get('detected', False):
+            center = line_info.get('center', width//2)
+            width_line = line_info.get('width', 0)
+
+            # Linha central detectada
+            cv2.circle(self.current_frame, (center, height//2), 5, (0, 255, 0), -1)
+
+            # Bounding box da linha
+            if 'x' in line_info and 'w' in line_info:
+                x, y, w, h = line_info['x'], line_info['y'], line_info['w'], line_info['h']
+                cv2.rectangle(self.current_frame, (x, y), (x+w, y+h), (255, 0, 0), 2)
+
+        # Adicionar texto de status
+        self._draw_status_text()
+
+        # Mostrar imagem
+        cv2.imshow(self.visual_window_name, self.current_frame)
+        cv2.waitKey(1)  # Necessário para atualizar a janela
+
+    def _draw_status_text(self):
+        """Desenhar texto de status na imagem"""
+        if self.current_frame is None:
+            return
+
+        # Informações de status
+        status_lines = [
+            f"Velocidade: {self.status_info['velocidade']}",
+            f"Direcao: {self.status_info['direcao']}",
+            f"Erro: {self.status_info['erro_pixels']}px",
+            f"Correcao: {self.status_info['correcao']:.3f}",
+            f"Linha: {'Sim' if self.status_info['linha_detectada'] else 'Nao'}",
+            f"QR: {'Sim' if self.status_info['qr_detectado'] else 'Nao'}",
+            f"Confiança: {self.status_info['confianca']:.2f}"
+        ]
+
+        # Desenhar fundo semi-transparente
+        overlay = self.current_frame.copy()
+        cv2.rectangle(overlay, (10, 10), (300, 25*len(status_lines)+10), (0, 0, 0), -1)
+        cv2.addWeighted(overlay, 0.7, self.current_frame, 0.3, 0, self.current_frame)
+
+        # Desenhar texto
+        for i, line in enumerate(status_lines):
+            cv2.putText(self.current_frame, line, (20, 35 + i*25),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
 
         # Controle PID para direção (removido - usando o do LineDetector)
         # self.kp = 0.5
@@ -82,13 +177,20 @@ class LineFollowingNavigation:
         return int(left_speed), int(right_speed)
 
     def follow_line_step(self):
-        """Executar um passo de seguimento de linha com correção gradual"""
+        """Executar um passo de seguimento de linha com detecção de QR codes"""
         try:
             # Detectar linha
             line_info = self.line_detector.process_frame()
 
             if not line_info or not line_info['detected']:
                 print("⚠️ Linha não detectada - parando")
+                self.status_info.update({
+                    'velocidade': 0,
+                    'direcao': 'parado',
+                    'linha_detectada': False,
+                    'qr_detectado': False
+                })
+                self.update_visual_frame(None, line_info)
                 self.basic_nav.parar()
                 return False
 
@@ -98,40 +200,88 @@ class LineFollowingNavigation:
 
             print(f"📏 Centro linha: {line_info['center']}, Erro: {error_pixels}px, Correção: {steering_correction:.3f}")
 
-            # Correção gradual: pequenas correções intercaladas com movimento para frente
-            base_speed = self.speed_base
+            # Verificar se pode ser um QR code (linha muito larga)
+            is_qr_detection = line_info['width'] > self.line_detector.max_qr_width
 
-            if abs(steering_correction) < 0.05:
-                # Movimento reto normal - manter por mais tempo
-                print("➡️ Movimento reto")
-                self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': base_speed})
-            elif abs(steering_correction) < 0.3:
-                # Correção leve - movimento para frente com velocidade reduzida
-                reduced_speed = max(self.speed_min, base_speed - int(abs(steering_correction) * 10))
-                print(f"🔄 Correção leve ({steering_correction:.3f}) - velocidade reduzida: {reduced_speed}")
-                self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': reduced_speed})
+            # Atualizar status
+            direcao = 'frente'
+            velocidade = self.speed_base
+
+            if is_qr_detection:
+                print("🔳 Detectado possível QR code - reduzindo velocidade para leitura")
+                # Reduzir velocidade quando detecta possível QR code
+                velocidade = max(20, self.speed_base // 2)
+                direcao = 'frente_lento'
+                self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': velocidade})
+                # Definir flag para loop mais lento
+                self.qr_detected_recently = True
             else:
-                # Correção necessária - impulso de correção muito suave seguido de movimento para frente
-                # INVERTER A DIREÇÃO: steering_correction > 0 significa linha à direita, então virar para ESQUERDA
-                correction_speed = max(3, min(8, int(abs(steering_correction) * 6)))  # Velocidade ainda menor
+                self.qr_detected_recently = False
 
-                if steering_correction > 0:
-                    # Linha à direita - virar para ESQUERDA (invertido)
-                    print(f"↪️ Correção esquerda suave (impulso: {correction_speed})")
-                    self.basic_nav.mpu.enviar_comando('virar_esquerda', {'velocidade': correction_speed})
+                # Correção gradual: pequenas correções intercaladas com movimento para frente
+                base_speed = self.speed_base
+
+                if abs(steering_correction) < 0.05:
+                    # Movimento reto normal - manter por mais tempo
+                    print("➡️ Movimento reto")
+                    direcao = 'frente'
+                    velocidade = base_speed
+                    self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': base_speed})
+                elif abs(steering_correction) < 0.3:
+                    # Correção leve - movimento para frente com velocidade reduzida
+                    reduced_speed = max(self.speed_min, base_speed - int(abs(steering_correction) * 10))
+                    print(f"🔄 Correção leve ({steering_correction:.3f}) - velocidade reduzida: {reduced_speed}")
+                    direcao = 'frente_corrigido'
+                    velocidade = reduced_speed
+                    self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': reduced_speed})
                 else:
-                    # Linha à esquerda - virar para DIREITA (invertido)
-                    print(f"↩️ Correção direita suave (impulso: {correction_speed})")
-                    self.basic_nav.mpu.enviar_comando('virar_direita', {'velocidade': correction_speed})
+                    # Correção necessária - impulso de correção muito suave seguido de movimento para frente
+                    # INVERTER A DIREÇÃO: steering_correction > 0 significa linha à direita, então virar para ESQUERDA
+                    correction_speed = max(3, min(8, int(abs(steering_correction) * 6)))  # Velocidade ainda menor
 
-                # Imediatamente voltar ao movimento para frente
-                time.sleep(0.03)  # Tempo ainda menor para correção mais suave
-                self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': base_speed})
+                    if steering_correction > 0:
+                        # Linha à direita - virar para ESQUERDA (invertido)
+                        print(f"↪️ Correção esquerda suave (impulso: {correction_speed})")
+                        direcao = 'corrigindo_esquerda'
+                        velocidade = correction_speed
+                        self.basic_nav.mpu.enviar_comando('virar_esquerda', {'velocidade': correction_speed})
+                    else:
+                        # Linha à esquerda - virar para DIREITA (invertido)
+                        print(f"↩️ Correção direita suave (impulso: {correction_speed})")
+                        direcao = 'corrigindo_direita'
+                        velocidade = correction_speed
+                        self.basic_nav.mpu.enviar_comando('virar_direita', {'velocidade': correction_speed})
+
+                    # Imediatamente voltar ao movimento para frente
+                    time.sleep(0.03)  # Tempo ainda menor para correção mais suave
+                    self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': base_speed})
+                    direcao = 'frente_apos_correcao'
+                    velocidade = base_speed
+
+            # Atualizar informações de status
+            self.status_info.update({
+                'velocidade': velocidade,
+                'direcao': direcao,
+                'erro_pixels': error_pixels,
+                'correcao': steering_correction,
+                'qr_detectado': is_qr_detection,
+                'linha_detectada': True,
+                'confianca': line_info.get('confidence', 0.0)
+            })
+
+            # Atualizar display visual
+            self.update_visual_frame(line_info.get('roi'), line_info)
 
             return True
 
         except Exception as e:
             print(f"❌ Erro no seguimento de linha: {e}")
+            self.status_info.update({
+                'velocidade': 0,
+                'direcao': 'erro',
+                'linha_detectada': False
+            })
+            self.update_visual_frame(None)
             self.basic_nav.parar()
             return False
 
@@ -296,6 +446,14 @@ class LineFollowingNavigation:
             self.navigation_thread.join(timeout=2)
 
         self.basic_nav.parar()
+
+        # Fechar janela visual se estiver aberta
+        if self.visual_feedback:
+            try:
+                cv2.destroyWindow(self.visual_window_name)
+            except:
+                pass
+
         print("⏹️ Seguimento de linha parado")
 
     def _line_following_loop(self):
@@ -306,8 +464,11 @@ class LineFollowingNavigation:
             try:
                 success = self.follow_line_step()
                 if success:
-                    # Timing adaptativo baseado no sucesso
-                    time.sleep(0.15)  # 6-7Hz - equilíbrio entre resposta e estabilidade
+                    # Timing adaptativo baseado na detecção de QR
+                    if self.qr_detected_recently:
+                        time.sleep(0.5)  # Mais lento quando detecta QR recentemente
+                    else:
+                        time.sleep(0.15)  # Normal
                 else:
                     time.sleep(0.3)  # Pausa maior se não detectar linha
 
@@ -358,6 +519,8 @@ def main():
         print("5. Ir para ponto de entrega")
         print("6. Mostrar status")
         print("7. Parar motores")
+        print("8. Ativar feedback visual")
+        print("9. Desativar feedback visual")
         print("0. Sair")
         print("="*50)
 
@@ -379,6 +542,10 @@ def main():
             elif opcao == '7':
                 nav.basic_nav.parar()
                 print("🛑 Motores parados")
+            elif opcao == '8':
+                nav.enable_visual_feedback()
+            elif opcao == '9':
+                nav.disable_visual_feedback()
             elif opcao == '0':
                 nav.cleanup()
                 print("👋 Saindo...")

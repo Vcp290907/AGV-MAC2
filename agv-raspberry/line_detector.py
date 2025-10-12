@@ -28,9 +28,10 @@ class LineDetector:
         self.lower_black = np.array([0, 0, 0])
         self.upper_black = np.array([180, 255, 120])  # Mais tolerante
 
-        # Configurações de detecção de linha
-        self.min_line_width = 5   # Menor largura mínima
-        self.max_line_width = 400 # Maior largura máxima (para interseções em T)
+        # Configurações de detecção de linha - MAIS TOLERANTE PARA QR CODES
+        self.min_line_width = 3   # Menor largura mínima
+        self.max_line_width = 600 # Maior largura máxima (para QR codes grandes)
+        self.max_qr_width = 500  # Largura máxima provável para QR codes
         self.line_center_offset = 0  # Offset do centro da linha
 
         # ROI (Region of Interest) - área inferior da imagem
@@ -129,24 +130,33 @@ class LineDetector:
             x, y, w, h = cv2.boundingRect(largest_contour)
             print(f"Debug: Bounding box = ({x}, {y}, {w}, {h})")
 
-            # Verificar se é uma linha válida - MAIS TOLERANTE
+            # Verificar se é uma linha válida - MAIS TOLERANTE PARA QR CODES
             if w < self.min_line_width:
                 print(f"Debug: Linha muito fina (w={w} < {self.min_line_width})")
                 self.line_detected = False
                 return False
 
-            if w > self.max_line_width:
-                print(f"Debug: Linha muito larga (w={w} > {self.max_line_width})")
+            # Verificar se pode ser um QR code (muito largo)
+            aspect_ratio = w / h if h > 0 else 10
+            is_probably_qr = w > self.max_qr_width and aspect_ratio < 2.0  # QR codes são mais quadrados
+
+            if w > self.max_line_width and not is_probably_qr:
+                print(f"Debug: Linha muito larga (w={w} > {self.max_line_width}) e não parece QR")
                 self.line_detected = False
                 return False
 
-            # Calcular centro da linha
-            line_center = x + w // 2
-            line_width = w
-
-            # Calcular confiança baseada na área e proporção
-            expected_area = w * h
-            confidence = min(area / expected_area, 1.0) if expected_area > 0 else 0
+            if is_probably_qr:
+                print(f"Debug: Detectado possível QR code (w={w}, h={h}, ratio={aspect_ratio:.2f}) - usando centro da imagem")
+                # Para QR codes, usar o centro da imagem como referência
+                line_center = self.width // 2
+                line_width = min(w, self.max_line_width)  # Limitar largura
+                confidence = 0.5  # Confiança reduzida para QR codes
+            else:
+                # Cálculo normal para linhas
+                line_center = x + w // 2
+                line_width = w
+                expected_area = w * h
+                confidence = min(area / expected_area, 1.0) if expected_area > 0 else 0
 
             print(f"Debug: Linha detectada - Centro: {line_center}, Largura: {line_width}, Confiança: {confidence:.2f}")
 
