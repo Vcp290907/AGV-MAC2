@@ -8,7 +8,7 @@ from typing import Dict, Any
 
 # Configurações de rede
 NETWORK_CONFIG = {
-    'pc_ip': os.getenv('PC_IP', '192.168.0.100'),  # IP do PC principal
+    'pc_ip': os.getenv('PC_IP', '192.168.0.120'),  # IP do PC principal
     'pc_port': int(os.getenv('PC_PORT', '5000')),  # Porta do PC
     'local_port': int(os.getenv('LOCAL_PORT', '8080')),  # Porta local do Raspberry
     'wifi_ssid': os.getenv('WIFI_SSID', 'AGV_NETWORK'),
