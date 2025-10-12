@@ -6,8 +6,13 @@ Pinos configurados:
 - Buzzer: GPIO 4
 - MPU6050 SDA: GPIO 10
 - MPU6050 SCL: GPIO 9
-- Motor Esquerdo: GPIO 1
-- Motor Direito: GPIO 3
+- Motor Esquerdo: GPIO 1 (PWM LEDC canal 0)
+- Motor Direito: GPIO 3 (PWM LEDC canal 1)
+
+IMPORTANTE:
+- Verificar conexões I2C se MPU6050 não for detectado
+- Motores agora usam PWM real (LEDC) ao invés de simulação
+- Buzzer dá feedback sonoro para cada comando
 */
 
 #include <Wire.h>
@@ -54,6 +59,12 @@ void setup() {
   pinMode(MOTOR_RIGHT_PIN, OUTPUT);
   pinMode(BUZZER_PIN, OUTPUT);
 
+  // Configurar PWM para motores (canais 0 e 1)
+  ledcSetup(0, 50, 8);  // Canal 0, 50Hz, 8-bit resolution
+  ledcSetup(1, 50, 8);  // Canal 1, 50Hz, 8-bit resolution
+  ledcAttachPin(MOTOR_LEFT_PIN, 0);
+  ledcAttachPin(MOTOR_RIGHT_PIN, 1);
+
   // Inicializar motores no estado parado
   pararMotores();
 
@@ -71,7 +82,7 @@ void setup() {
 
 void beepBuzzer() {
   tone(BUZZER_PIN, 1000);
-  delay(500);
+  delay(200);  // Beep mais curto para feedback
   noTone(BUZZER_PIN);
   Serial.println("OK");
 }
@@ -86,7 +97,11 @@ void loop() {
 void inicializarMPU6050() {
   Serial.println("{\"status\": \"Inicializando MPU6050...\"}");
 
+  // Aguardar I2C estabilizar
+  delay(500);
+
   mpu.initialize();
+  delay(100);
 
   if (mpu.testConnection()) {
     mpu6050_presente = true;
@@ -98,14 +113,15 @@ void inicializarMPU6050() {
     Serial.println("{\"status\": \"MPU6050 conectado e configurado\"}");
 
     // Aguardar estabilização
-    delay(100);
+    delay(500);
 
     // Auto-calibração
     calibrarMPU6050();
 
   } else {
     mpu6050_presente = false;
-    Serial.println("{\"status\": \"MPU6050 não encontrado\"}");
+    Serial.println("{\"status\": \"MPU6050 não encontrado - verificar conexões I2C\"}");
+    Serial.println("{\"status\": \"SDA=GPIO10, SCL=GPIO9\"}");
   }
 }
 
@@ -164,8 +180,8 @@ void processarComandosSeriais() {
 }
 
 void processarComando(String comando) {
-  // Piscar LED para indicar comando recebido
-  piscarLED(1, 50);
+  // Buzzer curto para indicar comando recebido
+  beepBuzzer();
 
   // Parse do JSON
   DynamicJsonDocument doc(1024);
@@ -182,19 +198,19 @@ void processarComando(String comando) {
     lerDadosMPU6050();
 
   } else if (tipo_comando == "mover_frente") {
-    int velocidade = doc["velocidade"] | 100;
+    int velocidade = doc["velocidade"] | 50;  // Velocidade padrão menor
     moverFrente(velocidade);
 
   } else if (tipo_comando == "mover_tras") {
-    int velocidade = doc["velocidade"] | 100;
+    int velocidade = doc["velocidade"] | 50;
     moverTras(velocidade);
 
   } else if (tipo_comando == "virar_esquerda") {
-    int velocidade = doc["velocidade"] | 100;
+    int velocidade = doc["velocidade"] | 50;
     virarEsquerda(velocidade);
 
   } else if (tipo_comando == "virar_direita") {
-    int velocidade = doc["velocidade"] | 100;
+    int velocidade = doc["velocidade"] | 50;
     virarDireita(velocidade);
 
   } else if (tipo_comando == "parar") {
@@ -313,13 +329,19 @@ void pararMotores() {
 }
 
 void aplicarVelocidadeMotores() {
-  // Aplicar PWM nos servos
-  // Nota: Em um ESP32 real, você usaria servo.write() ou PWM
-  // Aqui é uma simulação básica
+  // Aplicar PWM nos servos usando LEDC (ESP32 PWM)
+  // Converter ângulo do servo (0-180) para duty cycle (0-255)
 
-  // Simular controle dos motores
-  Serial.printf("{\"motores\": {\"esquerdo\": %d, \"direito\": %d}}\n",
-                velocidade_esquerda, velocidade_direita);
+  int pwm_esquerdo = map(velocidade_esquerda, 0, 180, 0, 255);
+  int pwm_direito = map(velocidade_direita, 0, 180, 0, 255);
+
+  // Aplicar PWM usando LEDC
+  ledcWrite(0, pwm_esquerdo);  // Canal 0 - Motor esquerdo
+  ledcWrite(1, pwm_direito);   // Canal 1 - Motor direito
+
+  // Debug: mostrar valores aplicados
+  Serial.printf("{\"motores\": {\"esquerdo\": %d, \"direito\": %d, \"pwm_esq\": %d, \"pwm_dir\": %d}}\n",
+                velocidade_esquerda, velocidade_direita, pwm_esquerdo, pwm_direito);
 }
 
 void enviarStatus() {
