@@ -12,7 +12,7 @@ import sys
 class LineDetector:
     """Detector de linha preta usando câmera inferior"""
 
-    def __init__(self, camera_id=0, width=640, height=480):
+    def __init__(self, camera_id=1, width=640, height=480):
         self.camera_id = camera_id
         self.width = width
         self.height = height
