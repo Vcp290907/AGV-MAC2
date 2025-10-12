@@ -269,6 +269,7 @@ def detectar_porta_esp32():
     """Detectar automaticamente a porta do ESP32"""
     import glob
     import platform
+    import serial
 
     system = platform.system().lower()
 
