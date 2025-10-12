@@ -24,12 +24,16 @@ class LineFollowingNavigation:
 
         # Estado da navegação
         self.following_line = False
-        self.speed_base = 60  # Velocidade base (0-100)
-        self.speed_min = 30   # Velocidade mínima
-        self.speed_max = 80   # Velocidade máxima
+        self.speed_base = 50  # Velocidade base reduzida para melhor controle
+        self.speed_min = 20   # Velocidade mínima
+        self.speed_max = 70   # Velocidade máxima
 
-        # Controle PID para direção
-        self.steering_sensitivity = 0.3  # Sensibilidade da direção
+        # Controle PID para direção (removido - usando o do LineDetector)
+        # self.kp = 0.5
+        # self.ki = 0.0
+        # self.kd = 0.1
+        # self.previous_error = 0
+        # self.integral = 0
 
         # Detecção de interseções
         self.intersection_detected = False
@@ -68,25 +72,18 @@ class LineFollowingNavigation:
         return success
 
     def calculate_motor_speeds(self, steering_correction):
-        """Calcular velocidades dos motores baseado na correção de direção"""
-        # Correção de direção: -1 (esquerda) a +1 (direita)
+        """Calcular velocidades dos motores baseado na correção de direção (LEGACY - não usado)"""
+        # Este método não é mais usado pois o controle é feito via comandos do ESP32
         correction = steering_correction * self.steering_sensitivity
-
-        # Calcular velocidades esquerda/direita
         left_speed = self.speed_base - (correction * (self.speed_base - self.speed_min))
         right_speed = self.speed_base + (correction * (self.speed_base - self.speed_min))
-
-        # Limitar velocidades
         left_speed = max(self.speed_min, min(self.speed_max, left_speed))
         right_speed = max(self.speed_min, min(self.speed_max, right_speed))
-
         return int(left_speed), int(right_speed)
 
     def follow_line_step(self):
         """Executar um passo de seguimento de linha"""
         try:
-            print("🔄 Iniciando passo de seguimento...")
-
             # Detectar linha
             line_info = self.line_detector.process_frame()
 
@@ -95,39 +92,29 @@ class LineFollowingNavigation:
                 self.basic_nav.parar()
                 return False
 
-            # Calcular correção de direção
+            # Obter correção de direção calculada pelo detector (já inclui PID)
             steering_correction = line_info['steering_correction']
-            print(f"📏 Correção calculada: {steering_correction:.3f}")
+            error_pixels = line_info['center'] - (self.line_detector.width // 2)
 
-            # Calcular velocidades dos motores
-            left_speed, right_speed = self.calculate_motor_speeds(steering_correction)
-            print(f"⚙️ Velocidades: L{left_speed}/R{right_speed}")
+            print(f"📏 Centro linha: {line_info['center']}, Erro: {error_pixels}px, Correção: {steering_correction:.3f}")
 
-            # Enviar comando para motores (PWM: 0-89 horário, 90 parado, 91-180 anti-horário)
+            # Aplicar movimento baseado na correção
             if abs(steering_correction) < 0.1:
-                print("➡️ Movendo para frente normal")
-                # Configuração correta para frente
-                result = self.basic_nav.mpu.enviar_comando('mover_frente_diferencial', {
-                    'velocidade_esquerda': 60,   # Motor esquerdo horário (frente)
-                    'velocidade_direita': 120    # Motor direito horário (frente)
-                })
-                print(f"📡 Comando frente enviado: {result}")
+                # Movimento reto
+                print("➡️ Movimento reto")
+                self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': self.speed_base})
             else:
-                print("🔄 Aplicando correção de direção")
+                # Movimento curvo - usar comandos de virada com velocidade proporcional
+                turn_speed = max(10, int(abs(steering_correction) * 30))  # Velocidade de 10-30
+
                 if steering_correction > 0:
-                    # Virar à direita: motor direito mais lento
-                    result = self.basic_nav.mpu.enviar_comando('virar_direita', {
-                        'velocidade_esquerda': 60,  # Esquerdo normal
-                        'velocidade_direita': 90    # Direito mais lento (quase parado)
-                    })
-                    print(f"📡 Comando virar_direita enviado: {result}")
+                    # Virar à direita
+                    print(f"↩️ Virando direita (velocidade: {turn_speed})")
+                    self.basic_nav.mpu.enviar_comando('virar_direita', {'velocidade': turn_speed})
                 else:
-                    # Virar à esquerda: motor esquerdo mais lento
-                    result = self.basic_nav.mpu.enviar_comando('virar_esquerda', {
-                        'velocidade_esquerda': 90,  # Esquerdo mais lento (quase parado)
-                        'velocidade_direita': 120   # Direito normal
-                    })
-                    print(f"📡 Comando virar_esquerda enviado: {result}")
+                    # Virar à esquerda
+                    print(f"↪️ Virando esquerda (velocidade: {turn_speed})")
+                    self.basic_nav.mpu.enviar_comando('virar_esquerda', {'velocidade': turn_speed})
 
             return True
 
@@ -305,8 +292,10 @@ class LineFollowingNavigation:
 
         while not self.stop_event.is_set():
             try:
-                self.follow_line_step()
-                time.sleep(0.1)  # 10Hz
+                if self.follow_line_step():
+                    time.sleep(0.2)  # Aumentado para 5Hz - dar tempo para o movimento
+                else:
+                    time.sleep(0.5)  # Pausa maior se não detectar linha
 
             except Exception as e:
                 print(f"Erro no loop de seguimento: {e}")
