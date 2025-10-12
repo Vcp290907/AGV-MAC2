@@ -99,12 +99,16 @@ class LineFollowingNavigation:
             # Calcular velocidades dos motores
             left_speed, right_speed = self.calculate_motor_speeds(steering_correction)
 
-            # Enviar comando para motores (simulação por enquanto)
-            # TODO: Implementar comando específico para velocidades diferentes
-            print(f"📏 Seguindo linha - Correção: {steering_correction:.2f}, Motores: L{left_speed}/R{right_speed}")
-
-            # Por enquanto, apenas mover para frente
-            # self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': self.speed_base})
+            # Enviar comando para motores baseado na correção
+            if abs(steering_correction) < 0.1:  # Linha centralizada
+                # Mover para frente em velocidade normal
+                self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': self.speed_base})
+                print(f"📏 Seguindo linha central - Velocidade: {self.speed_base}")
+            else:
+                # Ajustar direção com velocidades diferentes
+                self.basic_nav.mpu.enviar_comando('mover_frente_diferencial',
+                    {'velocidade_esquerda': left_speed, 'velocidade_direita': right_speed})
+                print(f"📏 Corrigindo direção - Correção: {steering_correction:.2f}, Motores: L{left_speed}/R{right_speed}")
 
             return True
 

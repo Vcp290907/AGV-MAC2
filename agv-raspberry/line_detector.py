@@ -30,7 +30,7 @@ class LineDetector:
 
         # Configurações de detecção de linha
         self.min_line_width = 5   # Menor largura mínima
-        self.max_line_width = 150 # Maior largura máxima
+        self.max_line_width = 400 # Maior largura máxima (para interseções em T)
         self.line_center_offset = 0  # Offset do centro da linha
 
         # ROI (Region of Interest) - área inferior da imagem
