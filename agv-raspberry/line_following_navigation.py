@@ -47,6 +47,10 @@ class LineFollowingNavigation:
             'confianca': 0.0
         }
 
+        # Threading
+        self.navigation_thread = None
+        self.stop_event = threading.Event()
+
     def enable_visual_feedback(self):
         """Ativar feedback visual"""
         self.visual_feedback = True
@@ -63,7 +67,18 @@ class LineFollowingNavigation:
 
     def update_visual_frame(self, frame, line_info=None):
         """Atualizar frame para display visual"""
-        if not self.visual_feedback or frame is None:
+        if not self.visual_feedback:
+            return
+
+        # Verificar se há display disponível
+        import os
+        if os.environ.get('DISPLAY') is None:
+            if frame is not None:  # Só mostrar uma vez
+                print("⚠️ Display não disponível - feedback visual desativado automaticamente")
+                self.visual_feedback = False
+            return
+
+        if frame is None:
             return
 
         self.current_frame = frame.copy()
@@ -134,10 +149,6 @@ class LineFollowingNavigation:
         # Detecção de interseções
         self.intersection_detected = False
         self.intersection_timeout = 3.0  # Tempo para confirmar interseção
-
-        # Threading
-        self.navigation_thread = None
-        self.stop_event = threading.Event()
 
     def initialize(self):
         """Inicializar todos os componentes"""
