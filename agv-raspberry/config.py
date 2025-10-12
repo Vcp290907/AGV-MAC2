@@ -159,6 +159,65 @@ def update_config(section: str, key: str, value: Any):
     elif section == 'battery':
         BATTERY_CONFIG[key] = value
 
+# Funções específicas para ESP32
+def get_esp32_config() -> Dict[str, Any]:
+    """Retorna configuração completa do ESP32"""
+    return HARDWARE_CONFIG['esp32'].copy()
+
+def get_esp32_port() -> str:
+    """Retorna apenas a porta do ESP32"""
+    return HARDWARE_CONFIG['esp32']['port']
+
+def get_esp32_baudrate() -> int:
+    """Retorna baudrate do ESP32"""
+    return HARDWARE_CONFIG['esp32']['baudrate']
+
+def get_esp32_timeout() -> float:
+    """Retorna timeout do ESP32"""
+    return HARDWARE_CONFIG['esp32']['timeout']
+
+def auto_detect_esp32_port() -> str:
+    """Detecta automaticamente a porta do ESP32 e atualiza o config"""
+    import serial.tools.list_ports
+    import serial
+    
+    ports = serial.tools.list_ports.comports()
+    usb_ports = [p.device for p in ports if 'USB' in p.device or 'ACM' in p.device]
+    
+    for port in usb_ports:
+        try:
+            ser = serial.Serial(port, 115200, timeout=1)
+            ser.write(b'{"comando": "ping"}\n')
+            response = ser.readline().decode().strip()
+            ser.close()
+            
+            if response and '"status": "ok"' in response:
+                # Atualizar config
+                HARDWARE_CONFIG['esp32']['port'] = port
+                print(f"✅ Porta ESP32 detectada e atualizada: {port}")
+                return port
+        except:
+            pass
+    
+    print("❌ ESP32 não encontrado automaticamente")
+    return HARDWARE_CONFIG['esp32']['port']
+
+if __name__ == "__main__":
+    # Script para testar e atualizar configuração
+    print("🔧 Teste de Configuração AGV")
+    print("=" * 40)
+    
+    print(f"📡 Porta ESP32 atual: {get_esp32_port()}")
+    
+    # Tentar detectar automaticamente
+    detected_port = auto_detect_esp32_port()
+    if detected_port != get_esp32_port():
+        print(f"✅ Porta atualizada para: {detected_port}")
+    else:
+        print("ℹ️  Porta já está correta")
+    
+    print(f"🔧 Configuração final: {get_esp32_config()}")
+
 def save_config_to_file(filepath: str = '/home/pi/agv_config.json'):
     """Salva configurações em arquivo"""
     try:
