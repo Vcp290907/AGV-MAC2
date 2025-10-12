@@ -106,7 +106,7 @@ class LineFollowingNavigation:
             # Enviar comando para motores (configuração específica do AGV)
             if abs(steering_correction) < 0.1:
                 print("➡️ Movendo para frente normal")
-                # Esquerdo: 180 (frente), Direito: 0 (frente)
+                # Ambos motores em velocidade oposta para frente
                 result = self.basic_nav.mpu.enviar_comando('mover_frente_diferencial', {
                     'velocidade_esquerda': 180,
                     'velocidade_direita': 0
@@ -115,11 +115,11 @@ class LineFollowingNavigation:
             else:
                 print("🔄 Aplicando correção de direção")
                 if steering_correction > 0:
-                    # Virar à direita: Esquerdo 180 (frente), Direito 180 (trás)
+                    # Virar à direita: motores em sentidos opostos
                     result = self.basic_nav.mpu.enviar_comando('virar_direita', {'velocidade': 180})
                     print(f"📡 Comando virar_direita enviado: {result}")
                 else:
-                    # Virar à esquerda: Esquerdo 0 (trás), Direito 0 (frente)
+                    # Virar à esquerda: motores em sentidos opostos
                     result = self.basic_nav.mpu.enviar_comando('virar_esquerda', {'velocidade': 0})
                     print(f"📡 Comando virar_esquerda enviado: {result}")
 
