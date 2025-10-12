@@ -316,7 +316,7 @@ class LineFollowingNavigation:
         """Limpar recursos"""
         self.stop_line_following()
         self.line_detector.cleanup()
-        self.qr_detector.cleanup()
+        # QR detector não tem cleanup
         print("🧹 Recursos de navegação liberados")
 
 def main():
