@@ -24,17 +24,17 @@ class LineDetector:
         self.height = height
         self.picam2 = None
 
-        # Configurações de processamento de imagem
+        # Configurações de processamento de imagem - MAIS TOLERANTE
         self.lower_black = np.array([0, 0, 0])
-        self.upper_black = np.array([180, 255, 50])
+        self.upper_black = np.array([180, 255, 120])  # Mais tolerante
 
         # Configurações de detecção de linha
-        self.min_line_width = 10
-        self.max_line_width = 100
+        self.min_line_width = 5   # Menor largura mínima
+        self.max_line_width = 150 # Maior largura máxima
         self.line_center_offset = 0  # Offset do centro da linha
 
         # ROI (Region of Interest) - área inferior da imagem
-        self.roi_y_start = int(height * 0.5)  # 60% inferior da imagem
+        self.roi_y_start = int(height * 0.4)  # 40% inferior (mais área)
         self.roi_height = height - self.roi_y_start
 
         # PID para controle de direção
@@ -113,17 +113,30 @@ class LineDetector:
             contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
             if not contours:
+                print(f"Debug: Nenhum contorno encontrado")
                 self.line_detected = False
                 return False
 
+            # DEBUG: Mostrar número de contornos
+            print(f"Debug: {len(contours)} contornos encontrados")
+
             # Encontrar maior contorno (provavelmente a linha)
             largest_contour = max(contours, key=cv2.contourArea)
+            area = cv2.contourArea(largest_contour)
+            print(f"Debug: Maior contorno area = {area}")
 
             # Calcular bounding box
             x, y, w, h = cv2.boundingRect(largest_contour)
+            print(f"Debug: Bounding box = ({x}, {y}, {w}, {h})")
 
-            # Verificar se é uma linha válida
-            if w < self.min_line_width or w > self.max_line_width:
+            # Verificar se é uma linha válida - MAIS TOLERANTE
+            if w < self.min_line_width:
+                print(f"Debug: Linha muito fina (w={w} < {self.min_line_width})")
+                self.line_detected = False
+                return False
+
+            if w > self.max_line_width:
+                print(f"Debug: Linha muito larga (w={w} > {self.max_line_width})")
                 self.line_detected = False
                 return False
 
@@ -132,9 +145,10 @@ class LineDetector:
             line_width = w
 
             # Calcular confiança baseada na área e proporção
-            area = cv2.contourArea(largest_contour)
             expected_area = w * h
             confidence = min(area / expected_area, 1.0) if expected_area > 0 else 0
+
+            print(f"Debug: Linha detectada - Centro: {line_center}, Largura: {line_width}, Confiança: {confidence:.2f}")
 
             # Atualizar estado
             self.line_detected = True
@@ -188,7 +202,7 @@ class LineDetector:
         try:
             if frame is None and self.picam2:
                 frame = self.picam2.capture_array()
-            
+
             if frame is None:
                 return None
 
@@ -197,6 +211,12 @@ class LineDetector:
             if mask is None:
                 return None
 
+            # DEBUG: Contar pixels pretos
+            black_pixels = cv2.countNonZero(mask)
+            total_pixels = mask.size
+            black_ratio = black_pixels / total_pixels
+            print(f"Debug: Pixels pretos: {black_pixels}/{total_pixels} ({black_ratio:.2%})")
+
             # Detectar linha
             line_found = self.detect_line(mask)
 
@@ -204,6 +224,7 @@ class LineDetector:
             info = self.get_line_info()
             info['mask'] = mask
             info['roi'] = roi
+            info['debug_black_ratio'] = black_ratio
 
             return info
 
