@@ -103,24 +103,24 @@ class LineFollowingNavigation:
             left_speed, right_speed = self.calculate_motor_speeds(steering_correction)
             print(f"⚙️ Velocidades: L{left_speed}/R{right_speed}")
 
-            # Enviar comando para motores (configuração específica do AGV)
+            # Enviar comando para motores (configuração específica do AGV - motores invertidos)
             if abs(steering_correction) < 0.1:
                 print("➡️ Movendo para frente normal")
-                # Ambos motores em velocidade oposta para frente
+                # Motores em sentidos contrários para frente
                 result = self.basic_nav.mpu.enviar_comando('mover_frente_diferencial', {
-                    'velocidade_esquerda': 180,
-                    'velocidade_direita': 0
+                    'velocidade_esquerda': 0,   # Motor esquerdo para frente
+                    'velocidade_direita': 180   # Motor direito para frente (invertido)
                 })
                 print(f"📡 Comando frente enviado: {result}")
             else:
                 print("🔄 Aplicando correção de direção")
                 if steering_correction > 0:
-                    # Virar à direita: motores em sentidos opostos
-                    result = self.basic_nav.mpu.enviar_comando('virar_direita', {'velocidade': 180})
+                    # Virar à direita: motores em sentidos opostos para curva
+                    result = self.basic_nav.mpu.enviar_comando('virar_direita', {'velocidade': 0})
                     print(f"📡 Comando virar_direita enviado: {result}")
                 else:
-                    # Virar à esquerda: motores em sentidos opostos
-                    result = self.basic_nav.mpu.enviar_comando('virar_esquerda', {'velocidade': 0})
+                    # Virar à esquerda: motores em sentidos opostos para curva
+                    result = self.basic_nav.mpu.enviar_comando('virar_esquerda', {'velocidade': 180})
                     print(f"📡 Comando virar_esquerda enviado: {result}")
 
             return True
