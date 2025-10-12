@@ -51,7 +51,7 @@ class LineDetector:
         try:
             self.picam2 = Picamera2()
             config = self.picam2.create_preview_configuration(
-                main={"format": 'XRGB8888', "size": (self.width, self.height)}
+                main={"format": 'XRGB8888', "size": (self.width, self.height), "camera": 1}
             )
             self.picam2.configure(config)
             self.picam2.start()
