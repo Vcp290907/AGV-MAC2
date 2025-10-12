@@ -54,7 +54,7 @@ class MPU6050Integration:
             return True
 
         except Exception as e:
-            print(f"❌ Erro ao conectar ESP32: {e}")
+            print(f"Erro ao conectar ESP32: {e}")
             return False
 
     def enviar_comando(self, comando, dados=None):

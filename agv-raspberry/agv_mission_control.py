@@ -9,7 +9,8 @@ import json
 import requests
 from datetime import datetime
 from navigation_basic import BasicNavigation
-from qr_reader_with_api import QRReaderWithAPI
+# from qr_reader_with_api import QRReaderWithAPI  # Desabilitado - usa picamera2
+from qr_reader_opencv_only import OpenCVOnlyQRReader
 from config import get_esp32_port
 
 class AGVMissionControl:
@@ -28,7 +29,8 @@ class AGVMissionControl:
 
         # Componentes do sistema
         self.navigation = BasicNavigation(esp32_port=esp32_port)
-        self.qr_reader = QRReaderWithAPI(pc_ip=pc_ip, pc_port=pc_port)
+        # self.qr_reader = QRReaderWithAPI(pc_ip=pc_ip, pc_port=pc_port)  # Desabilitado
+        self.qr_detector = OpenCVOnlyQRReader()  # Detector direto para navegação
 
         # Estado da missão
         self.missao_ativa = None
@@ -41,7 +43,7 @@ class AGVMissionControl:
 
     def inicializar_sistema(self):
         """Inicializar todos os componentes"""
-        print("🚀 INICIALIZANDO SISTEMA AGV MISSION CONTROL")
+        print("INICIALIZANDO SISTEMA AGV MISSION CONTROL")
         print("=" * 50)
 
         # Inicializar navegação
@@ -49,10 +51,21 @@ class AGVMissionControl:
             print("❌ Falha na inicialização da navegação")
             return False
 
-        # Testar conexão com PC
-        if not self.qr_reader.testar_conexao_api():
-            print("❌ Falha na conexão com PC")
+        # Inicializar detector QR
+        if not self.qr_detector.initialize():
+            print("❌ Falha na inicialização do detector QR")
             return False
+
+        # Testar conexão com PC (opcional)
+        try:
+            import requests
+            response = requests.get(f"{self.base_url}/status", timeout=5)
+            if response.status_code == 200:
+                print("✅ Conexão com PC estabelecida!")
+            else:
+                print("⚠️ PC não respondeu corretamente, mas continuando...")
+        except:
+            print("⚠️ Não foi possível conectar ao PC, mas continuando...")
 
         print("✅ Sistema AGV inicializado com sucesso!")
         return True
@@ -234,7 +247,7 @@ class AGVMissionControl:
         return True
 
     def _coletar_itens_subcorredor(self, subcorredor):
-        """Coletar todos os itens do subcorredor"""
+        """Coletar todos os itens do subcorredor usando QR codes"""
         print(f"🤖 Iniciando coleta no subcorredor: {subcorredor}")
 
         itens_subcorredor = self.missao_ativa['itens_por_subcorredor'].get(subcorredor, [])
@@ -242,15 +255,44 @@ class AGVMissionControl:
         for item in itens_subcorredor:
             print(f"📦 Procurando item: {item['nome']}")
 
-            # Simular busca com câmera superior
-            print("📷 Ativando câmera superior...")
-            time.sleep(1)  # Simular processamento
+            # Usar câmera superior para detectar QR do item
+            qr_item_esperado = f"TAG{item['nome'].replace(' ', '')[:4].upper()}"
+            print(f"🔍 Procurando QR code do item: {qr_item_esperado}")
 
-            # Simular detecção do item
-            qr_item = f"TAG{item['nome'].replace(' ', '')[:4].upper()}"
-            print(f"✅ Item encontrado: {qr_item}")
+            qr_detectado = None
+            tentativas_item = 0
+            max_tentativas_item = 5
 
-            # Simular coleta (usuário remove manualmente)
+            while qr_detectado != qr_item_esperado and tentativas_item < max_tentativas_item:
+                try:
+                    qr_resultado = self.qr_detector.detectar_qr_code()
+                    if qr_resultado and qr_resultado['detectado']:
+                        qr_detectado = qr_resultado['codigo']
+                        print(f"📷 QR code detectado: {qr_detectado}")
+
+                        if qr_detectado == qr_item_esperado:
+                            print("✅ Item encontrado!")
+                            break
+                        else:
+                            print(f"⚠️ QR code errado: {qr_detectado} (esperado: {qr_item_esperado})")
+                    else:
+                        print("📷 Nenhum QR code detectado, ajustando posição...")
+
+                        # Pequeno movimento para procurar melhor
+                        if not self.navigation.mover_em_linha_reta(5, 'frente'):
+                            break
+
+                except Exception as e:
+                    print(f"⚠️ Erro na detecção: {e}")
+
+                tentativas_item += 1
+                time.sleep(0.5)
+
+            if qr_detectado != qr_item_esperado:
+                print(f"❌ Item {item['nome']} não encontrado após {max_tentativas_item} tentativas")
+                continue  # Pular para próximo item
+
+            # Item encontrado! Simular coleta
             print(f"🤲 Coletando item: {item['nome']}")
             print("⏳ Aguardando remoção manual do item...")
             time.sleep(self.tempo_busca_item)
@@ -264,7 +306,7 @@ class AGVMissionControl:
 
             print(f"✅ Item coletado: {item['nome']}")
 
-        # Dar ré e voltar
+        # Dar ré e voltar à linha principal
         print("⬅️ Dando ré para voltar à linha principal")
         if not self.navigation.mover_em_linha_reta(self.distancia_ate_prateleira, 'tras'):
             return False
@@ -277,20 +319,49 @@ class AGVMissionControl:
         return True
 
     def _ir_ate_entrega(self):
-        """Ir até o ponto de entrega"""
+        """Ir até o ponto de entrega usando QR code"""
         print("📦 Indo para ponto de entrega")
 
-        # Seguir linha até encontrar "Entrega"
-        print("🔍 Procurando QR code de Entrega...")
+        # QR code esperado para entrega
+        qr_entrega = "Entrega"
+        print(f"🔍 Procurando QR code: {qr_entrega}")
 
-        # Simular navegação
-        if not self.navigation.mover_em_linha_reta(150, 'frente'):  # 150cm
+        # Navegar procurando QR code de entrega
+        qr_detectado = None
+        tentativas = 0
+        max_tentativas = 15
+
+        while qr_detectado != qr_entrega and tentativas < max_tentativas:
+            # Mover um pouco para frente
+            if not self.navigation.mover_em_linha_reta(30, 'frente'):  # 30cm por vez
+                print("❌ Falha no movimento durante busca de entrega")
+                return False
+
+            # Verificar QR code com câmera
+            try:
+                qr_resultado = self.qr_detector.detectar_qr_code()
+                if qr_resultado and qr_resultado['detectado']:
+                    qr_detectado = qr_resultado['codigo']
+                    print(f"📷 QR code detectado: {qr_detectado}")
+
+                    if qr_detectado == qr_entrega:
+                        print("✅ Ponto de entrega encontrado!")
+                        break
+                    else:
+                        print(f"⚠️ QR code errado: {qr_detectado} (esperado: {qr_entrega})")
+                else:
+                    print("📷 Nenhum QR code detectado, continuando...")
+
+            except Exception as e:
+                print(f"⚠️ Erro na detecção de QR: {e}")
+
+            tentativas += 1
+
+        if qr_detectado != qr_entrega:
+            print(f"❌ Ponto de entrega não encontrado após {max_tentativas} tentativas")
             return False
 
-        # Simular detecção
-        print("🎯 QR code detectado: Entrega")
-
-        # Avisar que chegou
+        # Chegou ao ponto de entrega!
         self._notificar_entrega()
         return True
 
@@ -351,7 +422,7 @@ class AGVMissionControl:
 
 def main():
     """Função principal"""
-    print("🎯 AGV MISSION CONTROL")
+    print("AGV MISSION CONTROL")
     print("=" * 25)
 
     # Configurações

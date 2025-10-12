@@ -162,6 +162,33 @@ class QRReaderWithAPI:
         print(f"🕒 Detectado em: {datetime.now().strftime('%H:%M:%S')}")
         print("=" * 50)
 
+    def detectar_qr_code(self):
+        """Detectar QR code usando câmera OpenCV"""
+        try:
+            # Usar implementação real do QR reader
+            from qr_reader_opencv_only import QRReaderOpenCV
+            qr_reader = QRReaderOpenCV()
+            resultado = qr_reader.detectar_qr_code()
+
+            # Adicionar timestamp
+            resultado['timestamp'] = datetime.now().isoformat()
+
+            if resultado['detectado']:
+                print(f"🎯 QR Code detectado: {resultado['codigo']}")
+            else:
+                print("📷 Nenhum QR code detectado")
+
+            return resultado
+
+        except Exception as e:
+            print(f"❌ Erro na detecção de QR code: {e}")
+            return {
+                'detectado': False,
+                'codigo': None,
+                'erro': str(e),
+                'timestamp': datetime.now().isoformat()
+            }
+
     def initialize_camera(self):
         """Inicializar câmera CSI"""
         print("📷 Inicializando câmera CSI...")

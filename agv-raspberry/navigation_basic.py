@@ -28,7 +28,7 @@ class BasicNavigation:
 
     def inicializar(self):
         """Inicializar navegação"""
-        print("🚀 INICIALIZANDO NAVEGAÇÃO BÁSICA")
+        print("INICIALIZANDO NAVEGACAO BASICA")
         print("=" * 40)
 
         if not self.mpu.conectar_esp32():

@@ -12,6 +12,55 @@ import sys
 class OpenCVOnlyQRReader:
     """Leitor que usa apenas OpenCV - funciona sempre"""
 
+    def detectar_qr_code(self):
+        """Detectar um único QR code para navegação"""
+        try:
+            if not self.cap or not self.cap.isOpened():
+                if not self.initialize():
+                    return {
+                        'detectado': False,
+                        'codigo': None,
+                        'erro': 'Câmera não inicializada',
+                        'timestamp': time.time()
+                    }
+
+            # Capturar frame
+            ret, frame = self.cap.read()
+            if not ret or frame is None:
+                return {
+                    'detectado': False,
+                    'codigo': None,
+                    'erro': 'Falha ao capturar frame',
+                    'timestamp': time.time()
+                }
+
+            # Detectar QR codes
+            qr_codes = self.detectar_qr_codes(frame)
+
+            if qr_codes:
+                # Retornar o primeiro QR code detectado
+                qr = qr_codes[0]
+                return {
+                    'detectado': True,
+                    'codigo': qr['data'],
+                    'bbox': qr['bbox'],
+                    'timestamp': time.time()
+                }
+            else:
+                return {
+                    'detectado': False,
+                    'codigo': None,
+                    'timestamp': time.time()
+                }
+
+        except Exception as e:
+            return {
+                'detectado': False,
+                'codigo': None,
+                'erro': str(e),
+                'timestamp': time.time()
+            }
+
     def __init__(self, camera_id=0):
         self.camera_id = camera_id
         self.cap = None
