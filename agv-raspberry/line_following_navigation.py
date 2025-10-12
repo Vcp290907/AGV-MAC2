@@ -85,6 +85,8 @@ class LineFollowingNavigation:
     def follow_line_step(self):
         """Executar um passo de seguimento de linha"""
         try:
+            print("🔄 Iniciando passo de seguimento...")
+
             # Detectar linha
             line_info = self.line_detector.process_frame()
 
@@ -95,20 +97,25 @@ class LineFollowingNavigation:
 
             # Calcular correção de direção
             steering_correction = line_info['steering_correction']
+            print(f"📏 Correção calculada: {steering_correction:.3f}")
 
             # Calcular velocidades dos motores
             left_speed, right_speed = self.calculate_motor_speeds(steering_correction)
+            print(f"⚙️ Velocidades: L{left_speed}/R{right_speed}")
 
-            # Enviar comando para motores baseado na correção
-            if abs(steering_correction) < 0.1:  # Linha centralizada
-                # Mover para frente em velocidade normal
-                self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': self.speed_base})
-                print(f"📏 Seguindo linha central - Velocidade: {self.speed_base}")
+            # Enviar comando para motores
+            if abs(steering_correction) < 0.1:
+                print("➡️ Movendo para frente normal")
+                result = self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': self.speed_base})
+                print(f"📡 Comando enviado: {result}")
             else:
-                # Ajustar direção com velocidades diferentes
-                self.basic_nav.mpu.enviar_comando('mover_frente_diferencial',
-                    {'velocidade_esquerda': left_speed, 'velocidade_direita': right_speed})
-                print(f"📏 Corrigindo direção - Correção: {steering_correction:.2f}, Motores: L{left_speed}/R{right_speed}")
+                print("🔄 Aplicando correção de direção")
+                if steering_correction > 0:
+                    result = self.basic_nav.mpu.enviar_comando('virar_direita', {'velocidade': 30})
+                    print(f"📡 Comando virar_direita enviado: {result}")
+                else:
+                    result = self.basic_nav.mpu.enviar_comando('virar_esquerda', {'velocidade': 30})
+                    print(f"📡 Comando virar_esquerda enviado: {result}")
 
             return True
 
