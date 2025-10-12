@@ -106,26 +106,26 @@ class LineFollowingNavigation:
             # Enviar comando para motores (PWM: 0-89 horário, 90 parado, 91-180 anti-horário)
             if abs(steering_correction) < 0.1:
                 print("➡️ Movendo para frente normal")
-                # Ambos motores em velocidade baixa para frente (sentido horário)
+                # Configuração correta para frente
                 result = self.basic_nav.mpu.enviar_comando('mover_frente_diferencial', {
                     'velocidade_esquerda': 60,   # Motor esquerdo horário (frente)
-                    'velocidade_direita': 60     # Motor direito horário (frente)
+                    'velocidade_direita': 120    # Motor direito horário (frente)
                 })
                 print(f"📡 Comando frente enviado: {result}")
             else:
                 print("🔄 Aplicando correção de direção")
                 if steering_correction > 0:
-                    # Virar à direita: motor direito mais lento ou parado
+                    # Virar à direita: motor direito mais lento
                     result = self.basic_nav.mpu.enviar_comando('virar_direita', {
                         'velocidade_esquerda': 60,  # Esquerdo normal
-                        'velocidade_direita': 30    # Direito mais lento
+                        'velocidade_direita': 90    # Direito mais lento (quase parado)
                     })
                     print(f"📡 Comando virar_direita enviado: {result}")
                 else:
-                    # Virar à esquerda: motor esquerdo mais lento ou parado
+                    # Virar à esquerda: motor esquerdo mais lento
                     result = self.basic_nav.mpu.enviar_comando('virar_esquerda', {
-                        'velocidade_esquerda': 30,  # Esquerdo mais lento
-                        'velocidade_direita': 60    # Direito normal
+                        'velocidade_esquerda': 90,  # Esquerdo mais lento (quase parado)
+                        'velocidade_direita': 120   # Direito normal
                     })
                     print(f"📡 Comando virar_esquerda enviado: {result}")
 
