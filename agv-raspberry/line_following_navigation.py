@@ -103,24 +103,30 @@ class LineFollowingNavigation:
             left_speed, right_speed = self.calculate_motor_speeds(steering_correction)
             print(f"⚙️ Velocidades: L{left_speed}/R{right_speed}")
 
-            # Enviar comando para motores (configuração específica do AGV - motores invertidos)
+            # Enviar comando para motores (PWM: 0-89 horário, 90 parado, 91-180 anti-horário)
             if abs(steering_correction) < 0.1:
                 print("➡️ Movendo para frente normal")
-                # Motores em sentidos contrários para frente
+                # Ambos motores em velocidade baixa para frente (sentido horário)
                 result = self.basic_nav.mpu.enviar_comando('mover_frente_diferencial', {
-                    'velocidade_esquerda': 0,   # Motor esquerdo para frente
-                    'velocidade_direita': 180   # Motor direito para frente (invertido)
+                    'velocidade_esquerda': 60,   # Motor esquerdo horário (frente)
+                    'velocidade_direita': 60     # Motor direito horário (frente)
                 })
                 print(f"📡 Comando frente enviado: {result}")
             else:
                 print("🔄 Aplicando correção de direção")
                 if steering_correction > 0:
-                    # Virar à direita: motores em sentidos opostos para curva
-                    result = self.basic_nav.mpu.enviar_comando('virar_direita', {'velocidade': 0})
+                    # Virar à direita: motor direito mais lento ou parado
+                    result = self.basic_nav.mpu.enviar_comando('virar_direita', {
+                        'velocidade_esquerda': 60,  # Esquerdo normal
+                        'velocidade_direita': 30    # Direito mais lento
+                    })
                     print(f"📡 Comando virar_direita enviado: {result}")
                 else:
-                    # Virar à esquerda: motores em sentidos opostos para curva
-                    result = self.basic_nav.mpu.enviar_comando('virar_esquerda', {'velocidade': 180})
+                    # Virar à esquerda: motor esquerdo mais lento ou parado
+                    result = self.basic_nav.mpu.enviar_comando('virar_esquerda', {
+                        'velocidade_esquerda': 30,  # Esquerdo mais lento
+                        'velocidade_direita': 60    # Direito normal
+                    })
                     print(f"📡 Comando virar_esquerda enviado: {result}")
 
             return True
