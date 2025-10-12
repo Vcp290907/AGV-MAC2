@@ -50,7 +50,7 @@ class AGVMissionControl:
 
         # Inicializar navegação básica
         if not self.navigation.inicializar():
-            print("❌ Falha na inicialização da navegação básica")
+            print("Falha na inicializacao da navegacao basica")
             return False
 
         # Inicializar navegação por linha

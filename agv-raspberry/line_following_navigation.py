@@ -14,7 +14,7 @@ from config import get_esp32_port
 class LineFollowingNavigation:
     """Navegação que segue linha preta com detecção de QR codes"""
 
-    def __init__(self, esp32_port=None, line_camera_id=0, qr_camera_id=1):
+    def __init__(self, esp32_port=None, qr_camera_id=0):
         self.esp32_port = esp32_port or get_esp32_port()
 
         # Componentes
