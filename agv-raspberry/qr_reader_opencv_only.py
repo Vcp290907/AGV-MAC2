@@ -70,12 +70,24 @@ class OpenCVOnlyQRReader:
         """Inicializar câmera OpenCV"""
         print(f"Inicializando camera OpenCV {self.camera_id}...")
 
-        # Tentar diferentes backends para Raspberry Pi
-        backends = [
-            cv2.CAP_V4L2,    # Video4Linux2 (Raspberry Pi)
-            cv2.CAP_GSTREAMER,  # GStreamer
-            cv2.CAP_ANY      # Qualquer backend
-        ]
+        # Tentar diferentes backends dependendo do sistema operacional
+        import platform
+        system = platform.system().lower()
+        
+        if system == 'windows':
+            # Backends para Windows
+            backends = [
+                cv2.CAP_DSHOW,   # DirectShow (Windows)
+                cv2.CAP_MSMF,    # Media Foundation (Windows)
+                cv2.CAP_ANY      # Qualquer backend
+            ]
+        else:
+            # Backends para Raspberry Pi/Linux
+            backends = [
+                cv2.CAP_V4L2,    # Video4Linux2 (Raspberry Pi)
+                cv2.CAP_GSTREAMER,  # GStreamer
+                cv2.CAP_ANY      # Qualquer backend
+            ]
 
         for backend in backends:
             try:

@@ -6,6 +6,44 @@ Sistema embarcado do AGV (Automated Guided Vehicle) que roda no Raspberry Pi, re
 - Processamento de visão computacional
 - Navegação autônoma
 
+## 💻 Desenvolvimento no Windows
+
+O sistema pode ser desenvolvido e testado no Windows, embora alguns componentes específicos do Raspberry Pi não estejam disponíveis:
+
+### Funcionalidades Disponíveis no Windows:
+- ✅ **Visão Computacional**: Detecção de linha e QR codes usando webcam
+- ✅ **Feedback Visual**: Display em tempo real com overlays
+- ✅ **Simulação**: Navegação simulada sem hardware físico
+- ❌ **Controle de Motores**: Requer ESP32 (modo simulação apenas)
+
+### Configuração para Windows:
+
+1. **Instalar dependências Python:**
+```bash
+pip install opencv-python pyzbar numpy
+```
+
+2. **Teste básico:**
+```bash
+python test_windows.py
+```
+
+3. **Demonstração visual:**
+```bash
+python demo_visual.py
+```
+
+4. **Menu completo:**
+```bash
+python line_following_navigation.py
+```
+
+### Limitações no Windows:
+- Sem comunicação real com ESP32
+- Usa webcam padrão em vez de Picamera2
+- Motores não funcionam (simulação apenas)
+- Alguns backends de câmera podem não funcionar
+
 ## 🏗️ Arquitetura
 
 ```

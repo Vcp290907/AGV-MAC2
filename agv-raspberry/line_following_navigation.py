@@ -6,6 +6,7 @@ Integra detecção de linha com controle de motores e QR codes
 
 import time
 import threading
+import platform
 from line_detector import LineDetector
 from navigation_basic import BasicNavigation
 from qr_reader_opencv_only import OpenCVOnlyQRReader
@@ -144,11 +145,16 @@ class LineFollowingNavigation:
         print("=" * 45)
 
         success = True
+        system = platform.system().lower()
 
-        # Inicializar navegação básica
+        # Inicializar navegação básica (pode falhar no Windows sem ESP32)
         if not self.basic_nav.inicializar():
-            print("Falha na navegacao basica")
-            success = False
+            if system == 'windows':
+                print("⚠️ ESP32 não disponível no Windows - modo simulação ativado")
+                print("✅ Navegação básica em modo simulação")
+            else:
+                print("Falha na navegacao basica")
+                success = False
 
         # Inicializar detector de linha
         if not self.line_detector.initialize():
@@ -161,6 +167,8 @@ class LineFollowingNavigation:
 
         if success:
             print("✅ Navegação seguindo linha inicializada!")
+            if system == 'windows':
+                print("💡 Modo Windows: Use para testes visuais e simulação")
         else:
             print("❌ Falha na inicialização")
 
@@ -191,7 +199,10 @@ class LineFollowingNavigation:
                     'qr_detectado': False
                 })
                 self.update_visual_frame(None, line_info)
-                self.basic_nav.parar()
+                
+                # Só parar motores se ESP32 estiver disponível
+                if hasattr(self.basic_nav, 'mpu') and self.basic_nav.mpu.serial_conn:
+                    self.basic_nav.parar()
                 return False
 
             # Obter correção de direção calculada pelo detector
@@ -207,12 +218,16 @@ class LineFollowingNavigation:
             direcao = 'frente'
             velocidade = self.speed_base
 
+            # Só enviar comandos se ESP32 estiver disponível
+            esp32_available = hasattr(self.basic_nav, 'mpu') and self.basic_nav.mpu.serial_conn is not None
+
             if is_qr_detection:
                 print("🔳 Detectado possível QR code - reduzindo velocidade para leitura")
                 # Reduzir velocidade quando detecta possível QR code
                 velocidade = max(20, self.speed_base // 2)
                 direcao = 'frente_lento'
-                self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': velocidade})
+                if esp32_available:
+                    self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': velocidade})
                 # Definir flag para loop mais lento
                 self.qr_detected_recently = True
             else:
@@ -226,14 +241,16 @@ class LineFollowingNavigation:
                     print("➡️ Movimento reto")
                     direcao = 'frente'
                     velocidade = base_speed
-                    self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': base_speed})
+                    if esp32_available:
+                        self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': base_speed})
                 elif abs(steering_correction) < 0.3:
                     # Correção leve - movimento para frente com velocidade reduzida
                     reduced_speed = max(self.speed_min, base_speed - int(abs(steering_correction) * 10))
                     print(f"🔄 Correção leve ({steering_correction:.3f}) - velocidade reduzida: {reduced_speed}")
                     direcao = 'frente_corrigido'
                     velocidade = reduced_speed
-                    self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': reduced_speed})
+                    if esp32_available:
+                        self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': reduced_speed})
                 else:
                     # Correção necessária - impulso de correção muito suave seguido de movimento para frente
                     # INVERTER A DIREÇÃO: steering_correction > 0 significa linha à direita, então virar para ESQUERDA
@@ -244,17 +261,20 @@ class LineFollowingNavigation:
                         print(f"↪️ Correção esquerda suave (impulso: {correction_speed})")
                         direcao = 'corrigindo_esquerda'
                         velocidade = correction_speed
-                        self.basic_nav.mpu.enviar_comando('virar_esquerda', {'velocidade': correction_speed})
+                        if esp32_available:
+                            self.basic_nav.mpu.enviar_comando('virar_esquerda', {'velocidade': correction_speed})
                     else:
                         # Linha à esquerda - virar para DIREITA (invertido)
                         print(f"↩️ Correção direita suave (impulso: {correction_speed})")
                         direcao = 'corrigindo_direita'
                         velocidade = correction_speed
-                        self.basic_nav.mpu.enviar_comando('virar_direita', {'velocidade': correction_speed})
+                        if esp32_available:
+                            self.basic_nav.mpu.enviar_comando('virar_direita', {'velocidade': correction_speed})
 
                     # Imediatamente voltar ao movimento para frente
-                    time.sleep(0.03)  # Tempo ainda menor para correção mais suave
-                    self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': base_speed})
+                    if esp32_available:
+                        time.sleep(0.03)  # Tempo ainda menor para correção mais suave
+                        self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': base_speed})
                     direcao = 'frente_apos_correcao'
                     velocidade = base_speed
 
