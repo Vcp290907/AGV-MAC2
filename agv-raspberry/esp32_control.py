@@ -195,13 +195,19 @@ class ESP32Controller:
             response_line = self.serial_connection.readline().decode('utf-8').strip()
 
             if response_line:
+                # Aceitar tanto JSON quanto resposta simples
+                if response_line.strip() in ['OK', 'ok', 'success']:
+                    logger.debug(f"📥 Resposta simples recebida: {response_line}")
+                    return {'status': 'ok', 'resposta': response_line.strip()}
+                
                 try:
                     response = json.loads(response_line)
                     logger.debug(f"📥 Resposta recebida: {response}")
                     return response
                 except json.JSONDecodeError as e:
-                    logger.warning(f"Resposta inválida do ESP32: {response_line} - {e}")
-                    return None
+                    logger.warning(f"Resposta simples do ESP32: {response_line} - {e}")
+                    # Retornar resposta simples como sucesso
+                    return {'status': 'ok', 'resposta': response_line.strip()}
             else:
                 logger.warning("Nenhuma resposta recebida do ESP32")
                 return None
@@ -224,16 +230,32 @@ class ESP32Controller:
 
         logger.info(f"🚗 Movendo para frente por {duration}s")
 
+        # Enviar comando de movimento
         response = self._send_command(command)
 
-        if response and response.get('status') == 'success':
-            logger.info("✅ Movimento para frente concluído")
-            return {
-                'success': True,
-                'message': f'Movimento para frente executado por {duration} segundos',
-                'direction': 'forward',
-                'duration': duration
-            }
+        if response and response.get('status') in ['success', 'ok']:
+            # Aguardar a duração especificada
+            time.sleep(duration)
+            
+            # Parar os motores após a duração
+            stop_response = self._send_command({'comando': 'stop', 'timestamp': time.time()})
+            
+            if stop_response and (stop_response.get('status') in ['success', 'ok'] or 'motores' in stop_response):
+                logger.info("✅ Movimento para frente concluído e parado")
+                return {
+                    'success': True,
+                    'message': f'Movimento para frente executado por {duration} segundos',
+                    'direction': 'forward',
+                    'duration': duration
+                }
+            else:
+                logger.warning("Movimento executado mas falha ao parar")
+                return {
+                    'success': True,  # Movimento foi executado mesmo sem parar corretamente
+                    'message': f'Movimento para frente executado por {duration} segundos (aviso: pode não ter parado)',
+                    'direction': 'forward',
+                    'duration': duration
+                }
         else:
             error_msg = response.get('error', 'Erro desconhecido') if response else 'Sem resposta'
             logger.error(f"❌ Falha no movimento para frente: {error_msg}")
@@ -255,16 +277,32 @@ class ESP32Controller:
 
         logger.info(f"🚗 Movendo para trás por {duration}s")
 
+        # Enviar comando de movimento
         response = self._send_command(command)
 
-        if response and response.get('status') == 'success':
-            logger.info("✅ Movimento para trás concluído")
-            return {
-                'success': True,
-                'message': f'Movimento para trás executado por {duration} segundos',
-                'direction': 'backward',
-                'duration': duration
-            }
+        if response and response.get('status') in ['success', 'ok']:
+            # Aguardar a duração especificada
+            time.sleep(duration)
+            
+            # Parar os motores após a duração
+            stop_response = self._send_command({'comando': 'stop', 'timestamp': time.time()})
+            
+            if stop_response and (stop_response.get('status') in ['success', 'ok'] or 'motores' in stop_response):
+                logger.info("✅ Movimento para trás concluído e parado")
+                return {
+                    'success': True,
+                    'message': f'Movimento para trás executado por {duration} segundos',
+                    'direction': 'backward',
+                    'duration': duration
+                }
+            else:
+                logger.warning("Movimento executado mas falha ao parar")
+                return {
+                    'success': True,  # Movimento foi executado mesmo sem parar corretamente
+                    'message': f'Movimento para trás executado por {duration} segundos (aviso: pode não ter parado)',
+                    'direction': 'backward',
+                    'duration': duration
+                }
         else:
             error_msg = response.get('error', 'Erro desconhecido') if response else 'Sem resposta'
             logger.error(f"❌ Falha no movimento para trás: {error_msg}")
@@ -286,7 +324,7 @@ class ESP32Controller:
 
         response = self._send_command(command)
 
-        if response and response.get('status') == 'success':
+        if response and response.get('status') in ['success', 'ok']:
             logger.info("✅ Movimento parado")
             return {
                 'success': True,
