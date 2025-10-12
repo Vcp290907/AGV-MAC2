@@ -12,7 +12,7 @@ from mpu6050_integration import MPU6050Integration
 class BasicNavigation:
     """Navegação básica: linha reta + curvas de 90°"""
 
-    def __init__(self, esp32_port='/dev/ttyUSB0'):
+    def __init__(self, esp32_port='/dev/ttyACM0'):
         self.mpu = MPU6050Integration(esp32_port=esp32_port)
         self.velocidade_base = 80  # Velocidade padrão (0-100)
 
@@ -222,7 +222,7 @@ def main():
     print("=" * 25)
 
     # Configurações
-    port = '/dev/ttyUSB0'  # Ajuste conforme necessário
+    port = '/dev/ttyACM0'  # Ajuste conforme necessário
 
     # Criar navegação
     nav = BasicNavigation(esp32_port=port)

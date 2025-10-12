@@ -11,7 +11,7 @@ from datetime import datetime
 class BasicNavigationWithoutGyro:
     """Navegação básica sem giroscópio - usa apenas temporização"""
 
-    def __init__(self, esp32_port='/dev/ttyUSB0'):
+    def __init__(self, esp32_port='/dev/ttyACM0'):
         # Simular conexão ESP32 (sem giroscópio real)
         self.esp32_port = esp32_port
         self.velocidade_base = 80  # Velocidade padrão (0-100)
@@ -190,7 +190,7 @@ def main():
     print("=" * 40)
 
     # Configurações
-    port = '/dev/ttyUSB0'  # Mesmo que com giroscópio
+    port = '/dev/ttyACM0'  # Mesmo que com giroscópio
 
     # Criar navegação sem giroscópio
     nav = BasicNavigationWithoutGyro(esp32_port=port)

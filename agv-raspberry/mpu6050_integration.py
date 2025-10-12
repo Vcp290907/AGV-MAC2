@@ -13,7 +13,7 @@ from datetime import datetime
 class MPU6050Integration:
     """Integração MPU6050 para navegação do AGV"""
 
-    def __init__(self, esp32_port='/dev/ttyUSB0', baudrate=115200):
+    def __init__(self, esp32_port='/dev/ttyACM0', baudrate=115200):
         self.esp32_port = esp32_port
         self.baudrate = baudrate
         self.serial_conn = None
@@ -265,13 +265,71 @@ class MPU6050Integration:
         print(f"✅ Teste concluído! {leituras} leituras realizadas")
         return True
 
+def detectar_porta_esp32():
+    """Detectar automaticamente a porta do ESP32"""
+    import glob
+    import platform
+
+    system = platform.system().lower()
+
+    if system == 'linux':
+        # Procurar por portas ACM (ESP32) ou USB (Arduino)
+        portas = glob.glob('/dev/ttyACM*') + glob.glob('/dev/ttyUSB*')
+    elif system == 'darwin':  # macOS
+        portas = glob.glob('/dev/tty.usb*') + glob.glob('/dev/tty.wchusb*')
+    elif system == 'windows':
+        import serial.tools.list_ports
+        portas = [p.device for p in serial.tools.list_ports.comports()]
+    else:
+        portas = []
+
+    print("🔍 Procurando portas seriais disponíveis...")
+    for porta in portas:
+        print(f"   📡 Porta encontrada: {porta}")
+
+    # Tentar conectar a cada porta para ver se é ESP32
+    for porta in portas:
+        try:
+            print(f"🧪 Testando porta: {porta}")
+            ser = serial.Serial(porta, 115200, timeout=2)
+            time.sleep(2)  # Aguardar inicialização
+
+            # Enviar comando de status
+            ser.write(b'{"comando": "status"}\n')
+            resposta = ser.readline().decode().strip()
+
+            if resposta and ('status' in resposta or 'online' in resposta):
+                print(f"✅ ESP32 encontrado na porta: {porta}")
+                ser.close()
+                return porta
+            else:
+                print(f"❌ Porta {porta} não é ESP32")
+                ser.close()
+
+        except Exception as e:
+            print(f"❌ Erro ao testar porta {porta}: {e}")
+            continue
+
+    print("❌ Nenhum ESP32 encontrado automaticamente")
+    return None
+
 def menu_interativo():
     """Menu interativo para testes"""
     print("🎯 CONTROLE ESP32 - MPU6050 + BUZZER")
     print("=" * 45)
 
-    # Configurações
-    port = '/dev/ttyUSB0'  # Ajuste conforme necessário
+    # Detectar porta automaticamente
+    print("🔍 Detectando porta do ESP32...")
+    porta_detectada = detectar_porta_esp32()
+
+    if porta_detectada:
+        port = porta_detectada
+        print(f"✅ Usando porta detectada: {port}")
+    else:
+        # Fallback para configuração manual
+        port = '/dev/ttyACM0'  # Porta padrão
+        print(f"⚠️  Usando porta padrão: {port}")
+        print("💡 Se não funcionar, verifique a porta correta")
 
     # Criar integração
     esp32 = MPU6050Integration(esp32_port=port)
@@ -280,6 +338,7 @@ def menu_interativo():
         print("\n" + "="*50)
         print("🎮 MENU DE TESTES ESP32")
         print("="*50)
+        print(f"📡 Porta atual: {esp32.esp32_port}")
         print("1. Teste básico de comunicação")
         print("2. Teste buzzer")
         print("3. Ler dados do MPU6050")
@@ -291,6 +350,7 @@ def menu_interativo():
         print("9. Parar motores")
         print("10. Status completo")
         print("11. Teste completo do sensor (10s)")
+        print("12. Alterar porta manualmente")
         print("0. Sair")
         print("="*50)
 
@@ -387,6 +447,41 @@ def menu_interativo():
             elif opcao == '11':
                 # Teste completo
                 esp32.teste_sensor(duracao=10)
+
+            elif opcao == '12':
+                # Alterar porta manualmente
+                print("🔧 ALTERAR PORTA MANUALMENTE")
+                print("Portas disponíveis:")
+                import glob
+                import platform
+                system = platform.system().lower()
+
+                if system == 'linux':
+                    portas = glob.glob('/dev/ttyACM*') + glob.glob('/dev/ttyUSB*')
+                elif system == 'darwin':
+                    portas = glob.glob('/dev/tty.usb*') + glob.glob('/dev/tty.wchusb*')
+                elif system == 'windows':
+                    import serial.tools.list_ports
+                    portas = [p.device for p in serial.tools.list_ports.comports()]
+                else:
+                    portas = []
+
+                for i, p in enumerate(portas, 1):
+                    print(f"   {i}. {p}")
+
+                try:
+                    escolha = input("Escolha o número da porta (ou digite a porta completa): ").strip()
+                    if escolha.isdigit() and 1 <= int(escolha) <= len(portas):
+                        nova_porta = portas[int(escolha) - 1]
+                    else:
+                        nova_porta = escolha
+
+                    # Recriar objeto com nova porta
+                    esp32 = MPU6050Integration(esp32_port=nova_porta)
+                    print(f"✅ Porta alterada para: {nova_porta}")
+
+                except Exception as e:
+                    print(f"❌ Erro ao alterar porta: {e}")
 
             elif opcao == '0':
                 print("👋 Saindo...")

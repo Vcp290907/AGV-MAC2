@@ -330,7 +330,7 @@ def get_esp32_controller() -> ESP32Controller:
     return esp32_controller
 
 # Funções de conveniência para uso direto
-def connect_esp32(port: str = '/dev/ttyUSB0') -> bool:
+def connect_esp32(port: str = '/dev/ttyACM0') -> bool:
     """Conecta ao ESP32"""
     controller = get_esp32_controller()
     controller.port = port
