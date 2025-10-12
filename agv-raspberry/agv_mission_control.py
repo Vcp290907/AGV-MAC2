@@ -9,6 +9,7 @@ import json
 import requests
 from datetime import datetime
 from navigation_basic import BasicNavigation
+from line_following_navigation import LineFollowingNavigation
 # from qr_reader_with_api import QRReaderWithAPI  # Desabilitado - usa picamera2
 from qr_reader_opencv_only import OpenCVOnlyQRReader
 from config import get_esp32_port
@@ -29,6 +30,7 @@ class AGVMissionControl:
 
         # Componentes do sistema
         self.navigation = BasicNavigation(esp32_port=esp32_port)
+        self.line_navigation = LineFollowingNavigation(esp32_port=esp32_port)
         # self.qr_reader = QRReaderWithAPI(pc_ip=pc_ip, pc_port=pc_port)  # Desabilitado
         self.qr_detector = OpenCVOnlyQRReader()  # Detector direto para navegação
 
@@ -46,15 +48,21 @@ class AGVMissionControl:
         print("INICIALIZANDO SISTEMA AGV MISSION CONTROL")
         print("=" * 50)
 
-        # Inicializar navegação
+        # Inicializar navegação básica
         if not self.navigation.inicializar():
-            print("❌ Falha na inicialização da navegação")
+            print("❌ Falha na inicialização da navegação básica")
             return False
 
-        # Inicializar detector QR
-        if not self.qr_detector.initialize():
-            print("❌ Falha na inicialização do detector QR")
+        # Inicializar navegação por linha
+        if not self.line_navigation.initialize():
+            print("❌ Falha na inicialização da navegação por linha")
             return False
+
+        # Inicializar detector QR (opcional - continua se falhar)
+        if not self.qr_detector.initialize():
+            print("Aviso: Camera nao disponivel - sistema funcionara sem QR detection")
+            print("Para usar camera: sudo apt-get install v4l-utils")
+            # Não retorna False - permite que o sistema continue sem câmera
 
         # Testar conexão com PC (opcional)
         try:
@@ -191,57 +199,20 @@ class AGVMissionControl:
             return False
 
     def _navegar_ate_subcorredor(self, subcorredor_destino):
-        """Navegar até o QR code do subcorredor usando câmera e QR detection"""
+        """Navegar até o QR code do subcorredor usando navegação por linha"""
         print(f"🧭 Navegando até subcorredor: {subcorredor_destino}")
 
-        # QR code esperado baseado no subcorredor
-        qr_esperado = f"Corredor01_{subcorredor_destino}"
-        print(f"🔍 Procurando QR code: {qr_esperado}")
+        # Usar navegação por linha para encontrar interseção
+        qr_encontrado = self.line_navigation.navigate_to_intersection(subcorredor_destino)
 
-        # Usar câmera para detectar QR code enquanto navega
-        qr_detectado = None
-        tentativas = 0
-        max_tentativas = 10
-
-        while qr_detectado != qr_esperado and tentativas < max_tentativas:
-            # Mover um pouco para frente
-            if not self.navigation.mover_em_linha_reta(20, 'frente'):  # 20cm por vez
-                print("❌ Falha no movimento durante busca")
-                return False
-
-            # Verificar QR code com câmera
-            try:
-                qr_resultado = self.qr_reader.detectar_qr_code()
-                if qr_resultado and qr_resultado['detectado']:
-                    qr_detectado = qr_resultado['codigo']
-                    print(f"📷 QR code detectado: {qr_detectado}")
-
-                    if qr_detectado == qr_esperado:
-                        print("✅ QR code correto encontrado!")
-                        break
-                    else:
-                        print(f"⚠️ QR code errado detectado: {qr_detectado} (esperado: {qr_esperado})")
-                        # Continuar procurando
-                else:
-                    print("📷 Nenhum QR code detectado, continuando...")
-
-            except Exception as e:
-                print(f"⚠️ Erro na detecção de QR: {e}")
-
-            tentativas += 1
-
-        if qr_detectado != qr_esperado:
-            print(f"❌ QR code {qr_esperado} não encontrado após {max_tentativas} tentativas")
+        if not qr_encontrado:
+            print(f"❌ Não foi possível encontrar o subcorredor {subcorredor_destino}")
             return False
 
-        # QR encontrado! Fazer curva de 90° para acessar prateleira
-        print("🔄 Fazendo curva de 90° para acessar prateleira")
-        if not self.navigation.virar_90_graus('direita'):
-            return False
-
-        # Mover até a prateleira
-        print(f"📏 Movendo {self.distancia_ate_prateleira}cm até a prateleira")
-        if not self.navigation.mover_em_linha_reta(self.distancia_ate_prateleira, 'frente'):
+        # QR encontrado! Entrar no subcorredor
+        print("✅ Subcorredor encontrado, entrando...")
+        if not self.line_navigation.enter_subcorredor():
+            print("❌ Falha ao entrar no subcorredor")
             return False
 
         return True
@@ -306,59 +277,21 @@ class AGVMissionControl:
 
             print(f"✅ Item coletado: {item['nome']}")
 
-        # Dar ré e voltar à linha principal
-        print("⬅️ Dando ré para voltar à linha principal")
-        if not self.navigation.mover_em_linha_reta(self.distancia_ate_prateleira, 'tras'):
-            return False
-
-        # Virar -90° para voltar à linha
-        print("🔄 Virando -90° para voltar à linha principal")
-        if not self.navigation.virar_90_graus('esquerda'):
+        # Sair do subcorredor usando navegação por linha
+        print("⬅️ Saindo do subcorredor")
+        if not self.line_navigation.exit_subcorredor():
+            print("❌ Falha ao sair do subcorredor")
             return False
 
         return True
 
     def _ir_ate_entrega(self):
-        """Ir até o ponto de entrega usando QR code"""
+        """Ir até o ponto de entrega usando navegação por linha"""
         print("📦 Indo para ponto de entrega")
 
-        # QR code esperado para entrega
-        qr_entrega = "Entrega"
-        print(f"🔍 Procurando QR code: {qr_entrega}")
-
-        # Navegar procurando QR code de entrega
-        qr_detectado = None
-        tentativas = 0
-        max_tentativas = 15
-
-        while qr_detectado != qr_entrega and tentativas < max_tentativas:
-            # Mover um pouco para frente
-            if not self.navigation.mover_em_linha_reta(30, 'frente'):  # 30cm por vez
-                print("❌ Falha no movimento durante busca de entrega")
-                return False
-
-            # Verificar QR code com câmera
-            try:
-                qr_resultado = self.qr_detector.detectar_qr_code()
-                if qr_resultado and qr_resultado['detectado']:
-                    qr_detectado = qr_resultado['codigo']
-                    print(f"📷 QR code detectado: {qr_detectado}")
-
-                    if qr_detectado == qr_entrega:
-                        print("✅ Ponto de entrega encontrado!")
-                        break
-                    else:
-                        print(f"⚠️ QR code errado: {qr_detectado} (esperado: {qr_entrega})")
-                else:
-                    print("📷 Nenhum QR code detectado, continuando...")
-
-            except Exception as e:
-                print(f"⚠️ Erro na detecção de QR: {e}")
-
-            tentativas += 1
-
-        if qr_detectado != qr_entrega:
-            print(f"❌ Ponto de entrega não encontrado após {max_tentativas} tentativas")
+        # Usar navegação por linha para encontrar ponto de entrega
+        if not self.line_navigation.navigate_to_delivery_point():
+            print("❌ Não foi possível chegar ao ponto de entrega")
             return False
 
         # Chegou ao ponto de entrega!

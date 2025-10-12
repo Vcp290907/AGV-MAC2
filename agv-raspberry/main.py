@@ -109,11 +109,14 @@ class AGVSystem:
         """Loop de processamento de visão"""
         while self.running:
             try:
-                # TODO: Implementar processamento de visão
-                # - Capturar imagem da câmera
-                # - Processar QR codes
+                # TODO: Implementar processamento de visão completo
+                # - Capturar imagem da câmera superior (prateleiras)
+                # - Processar QR codes dos itens
                 # - Detectar obstáculos
-                # - Calcular posição
+                # - Calcular posição relativa
+
+                # Por enquanto, apenas log
+                logger.debug("Processamento de visão ativo")
 
                 await asyncio.sleep(0.5)  # Processamento em 2Hz
 
@@ -168,6 +171,8 @@ class AGVSystem:
                 await self.execute_qr_scan_command(command_data)
             elif command_type == 'pickup_item':
                 await self.execute_pickup_command(command_data)
+            elif command_type == 'start_mission':
+                return await self.execute_mission_command(command_data)
             elif command_type == 'status':
                 return self.get_status()
             else:
@@ -191,9 +196,43 @@ class AGVSystem:
 
     async def execute_pickup_command(self, data):
         """Executa comando de coleta de item"""
-        # TODO: Implementar coleta
+        # TODO: Implementar coleta com braço robótico
         logger.info(f"Executando coleta: {data}")
-        pass
+        # Por enquanto, apenas simular
+        return {'success': True, 'message': 'Coleta simulada'}
+
+    async def execute_mission_command(self, data):
+        """Executa comando de missão completa"""
+        try:
+            from agv_mission_control import AGVMissionControl
+
+            # Criar controle de missão
+            mission_control = AGVMissionControl()
+
+            # Inicializar
+            if not mission_control.inicializar_sistema():
+                return {'success': False, 'error': 'Falha na inicialização do sistema de missão'}
+
+            # Obter pedido ativo
+            pedido = mission_control.obter_pedido_ativo()
+            if not pedido:
+                return {'success': False, 'error': 'Nenhum pedido ativo encontrado'}
+
+            # Iniciar missão
+            if not mission_control.iniciar_missao(pedido):
+                return {'success': False, 'error': 'Falha ao iniciar missão'}
+
+            # Executar missão em thread separada para não bloquear
+            import threading
+            mission_thread = threading.Thread(target=mission_control.executar_missao)
+            mission_thread.daemon = True
+            mission_thread.start()
+
+            return {'success': True, 'message': f'Missão iniciada para pedido {pedido["id"]}'}
+
+        except Exception as e:
+            logger.error(f"Erro na execução da missão: {e}")
+            return {'success': False, 'error': str(e)}
 
     async def run(self):
         """Loop principal do sistema"""

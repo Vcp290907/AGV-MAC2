@@ -68,28 +68,53 @@ class OpenCVOnlyQRReader:
 
     def initialize(self):
         """Inicializar câmera OpenCV"""
-        print(f"📷 Inicializando câmera OpenCV {self.camera_id}...")
+        print(f"Inicializando camera OpenCV {self.camera_id}...")
 
-        self.cap = cv2.VideoCapture(self.camera_id)
+        # Tentar diferentes backends para Raspberry Pi
+        backends = [
+            cv2.CAP_V4L2,    # Video4Linux2 (Raspberry Pi)
+            cv2.CAP_GSTREAMER,  # GStreamer
+            cv2.CAP_ANY      # Qualquer backend
+        ]
 
-        if not self.cap.isOpened():
-            print(f"❌ Não foi possível abrir câmera {self.camera_id}")
-            print("💡 Verifique se uma webcam está conectada")
+        for backend in backends:
+            try:
+                print(f"Tentando backend: {backend}")
+                self.cap = cv2.VideoCapture(self.camera_id, backend)
+
+                if self.cap.isOpened():
+                    print(f"Backend {backend} funcionou!")
+                    break
+                else:
+                    self.cap.release()
+            except Exception as e:
+                print(f"Erro com backend {backend}: {e}")
+                continue
+
+        if not self.cap or not self.cap.isOpened():
+            print(f"Nao foi possivel abrir camera {self.camera_id}")
+            print("Sistema continuara sem camera - use apenas navegacao basica")
             return False
 
-        # Configurar resolução
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+        # Configurar resolução (menor para Raspberry Pi)
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
-        # Testar captura
-        ret, frame = self.cap.read()
-        if not ret or frame is None:
-            print("❌ Falha ao capturar frame de teste")
-            self.cap.release()
-            return False
+        # Testar captura com timeout
+        import time
+        timeout = 5  # segundos
+        start_time = time.time()
 
-        print("✅ Câmera OpenCV inicializada com sucesso!")
-        return True
+        while time.time() - start_time < timeout:
+            ret, frame = self.cap.read()
+            if ret and frame is not None and frame.size > 0:
+                print("Camera OpenCV inicializada com sucesso!")
+                return True
+            time.sleep(0.1)
+
+        print("Falha ao capturar frame de teste")
+        self.cap.release()
+        return False
 
     def detectar_qr_codes(self, frame):
         """Detectar QR codes no frame"""
