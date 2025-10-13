@@ -89,7 +89,11 @@ class BasicNavigation:
     def parar(self):
         """Parar todos os movimentos"""
         try:
-            self.mpu.enviar_comando('parar')
+            # Somente enviar comando se houver conexão serial ativa
+            if getattr(self.mpu, 'serial_conn', None):
+                self.mpu.enviar_comando('parar')
+            else:
+                print("(simulação) parar")
             self.movimento_ativo = False
             print("🛑 Movimento parado")
             return True

@@ -15,14 +15,34 @@ import cv2
 import numpy as np
 import time
 import sys
+import os
+try:
+    # Tenta obter configuração padrão da câmera do config.py
+    from config import HARDWARE_CONFIG
+    DEFAULT_CAM_INDEX = HARDWARE_CONFIG.get('camera', {}).get('device', 0)
+except Exception:
+    DEFAULT_CAM_INDEX = 0
 
 class LineDetector:
     """Detector de linha preta usando Picamera2"""
 
-    def __init__(self, width=640, height=480):
-        self.width = width
-        self.height = height
+    def __init__(self, width=None, height=None, camera_index=None):
+        # Ler resolução do config se não fornecida
+        try:
+            cfg_res = HARDWARE_CONFIG.get('camera', {}).get('resolution', (640, 480))
+        except Exception:
+            cfg_res = (640, 480)
+        self.width = width or int(cfg_res[0])
+        self.height = height or int(cfg_res[1])
         self.picam2 = None
+        self.camera_controls = None  # Controles de exposição/ganho a aplicar após iniciar
+        # Permitir selecionar câmera por parâmetro, variável de ambiente ou config padrão
+        env_idx = os.getenv('CAMERA_INDEX')
+        self.camera_index = (
+            int(camera_index)
+            if camera_index is not None
+            else (int(env_idx) if env_idx is not None and env_idx.isdigit() else int(DEFAULT_CAM_INDEX))
+        )
 
         # Configurações de processamento de imagem - MAIS TOLERANTE
         self.lower_black = np.array([0, 0, 0])
@@ -34,9 +54,13 @@ class LineDetector:
         self.max_qr_width = 500  # Largura máxima provável para QR codes
         self.line_center_offset = 0  # Offset do centro da linha
 
-        # ROI (Region of Interest) - área inferior da imagem
-        self.roi_y_start = int(height * 0.4)  # 40% inferior (mais área)
-        self.roi_height = height - self.roi_y_start
+        # ROI (Region of Interest) - área inferior da imagem (configurável)
+        try:
+            roi_start_frac = HARDWARE_CONFIG.get('camera', {}).get('roi_y_start_frac', 0.3)
+        except Exception:
+            roi_start_frac = 0.3
+        self.roi_y_start = int(self.height * float(roi_start_frac))  # 30% inferior por padrão (mais área visível)
+        self.roi_height = self.height - self.roi_y_start
 
         # PID para controle de direção
         self.kp = 0.5
@@ -47,50 +71,136 @@ class LineDetector:
 
         # Estado da linha
         self.line_detected = False
-        self.line_center = width // 2
+        self.line_center = self.width // 2
         self.line_width = 0
         self.line_confidence = 0
 
     def initialize(self):
-        """Inicializar Picamera2 para detecção de linha"""
+        """Inicializar Picamera2 para detecção de linha - versão simplificada"""
         print("Inicializando Picamera2 para detecção de linha...")
+        print(f"🎛️ Índice de câmera solicitado: {self.camera_index}")
 
         if PICAMERA2_AVAILABLE:
             try:
-                self.picam2 = Picamera2(camera_num=1)  # Câmera inferior
-                config = self.picam2.create_preview_configuration(
-                    main={"format": 'XRGB8888', "size": (self.width, self.height)}
-                )
-                self.picam2.configure(config)
-                self.picam2.start()
-
-                # Testar captura
-                frame = self.picam2.capture_array()
-                if frame is not None:
-                    print("✅ Picamera2 inicializada para detecção de linha!")
-                    return True
-                else:
-                    print("❌ Falha ao capturar frame de teste")
+                # Verificar câmeras disponíveis primeiro
+                cameras = Picamera2.global_camera_info()
+                if not cameras:
+                    print("❌ Nenhuma câmera encontrada")
                     return False
+
+                print(f"📷 {len(cameras)} câmera(s) encontrada(s)")
+                for idx, info in enumerate(cameras):
+                    try:
+                        model = info.get('Model', 'Desconhecido')
+                    except Exception:
+                        model = 'Desconhecido'
+                    print(f"   - Câmera {idx}: {model}")
+
+                # Usar câmera selecionada
+                chosen = self.camera_index if 0 <= self.camera_index < len(cameras) else 0
+                if chosen != self.camera_index:
+                    print(f"⚠️ Índice {self.camera_index} indisponível. Usando {chosen}")
+                else:
+                    print(f"✅ Usando câmera {chosen}")
+                self.picam2 = Picamera2(chosen)
+
+                # Configuração ainda mais simples
+                config = self.picam2.create_still_configuration(
+                    main={"format": 'RGB888', "size": (self.width, self.height)}
+                )
+
+                self.picam2.configure(config)
+                print("✅ Câmera configurada")
+
+                # Preparar controles de exposição/ganho (simular 'abertura' maior)
+                try:
+                    cam_cfg = HARDWARE_CONFIG.get('camera', {})
+                    exp_cfg = cam_cfg.get('exposure', {})
+                    controls = {}
+                    # Auto exposure e AWB
+                    if 'auto' in exp_cfg:
+                        controls['AeEnable'] = bool(exp_cfg.get('auto', True))
+                    if 'awb_auto' in exp_cfg:
+                        controls['AwbEnable'] = bool(exp_cfg.get('awb_auto', True))
+                    # Manual exposure/ganho (aplicado somente se auto=False)
+                    if exp_cfg.get('auto') is False:
+                        if exp_cfg.get('exposure_time'):
+                            controls['ExposureTime'] = int(exp_cfg['exposure_time'])  # microssegundos
+                        if exp_cfg.get('analogue_gain'):
+                            controls['AnalogueGain'] = float(exp_cfg['analogue_gain'])
+                    # Armazenar para aplicar após iniciar a câmera
+                    if controls:
+                        self.camera_controls = controls
+                        print(f"🛠️ Controles de câmera preparados: {controls}")
+                except Exception as e:
+                    print(f"⚠️ Não foi possível preparar controles de exposição: {e}")
+
+                # NÃO iniciar automaticamente - vamos iniciar sob demanda
+                # self.picam2.start()
+
+                print("✅ Picamera2 inicializada (modo sob demanda)!")
+                return True
 
             except Exception as e:
                 print(f"❌ Erro ao inicializar Picamera2: {e}")
+                print("💡 Dica: Verifique se a câmera não está sendo usada por outro processo")
                 return False
         else:
             print("⚠️ Picamera2 não disponível - modo simulação ativado")
             print("✅ Detector de linha inicializado (simulação)")
             return True
 
-    def preprocess_image(self, frame):
-        """Pré-processar imagem para detecção de linha"""
-        try:
-            # Converter de XRGB para BGR
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            
-            # Recortar ROI (apenas área inferior)
-            roi = frame[self.roi_y_start:self.roi_y_start + self.roi_height, :]
+    def capture_frame(self):
+        """Capturar frame da câmera sob demanda"""
+        if not PICAMERA2_AVAILABLE or self.picam2 is None:
+            return None
 
-            # Converter para HSV
+        try:
+            # Iniciar câmera se não estiver rodando
+            if not self.picam2.started:
+                self.picam2.start()
+                time.sleep(0.1)  # Pequena pausa para estabilizar
+                # Aplicar controles após iniciar
+                if self.camera_controls:
+                    try:
+                        self.picam2.set_controls(self.camera_controls)
+                        # Pequena espera para exposição estabilizar
+                        time.sleep(0.05)
+                    except Exception as e:
+                        print(f"⚠️ Falha ao aplicar controles: {e}")
+
+            # Capturar frame
+            frame = self.picam2.capture_array()
+
+            # Parar câmera imediatamente para liberar recursos
+            self.picam2.stop()
+
+            return frame
+
+        except Exception as e:
+            print(f"❌ Erro ao capturar frame: {e}")
+            try:
+                if self.picam2.started:
+                    self.picam2.stop()
+            except:
+                pass
+            return None
+
+    def preprocess_image(self, frame):
+        """Pré-processar imagem para detecção de linha.
+        Retorna (mask, roi, frame_bgr).
+        """
+        try:
+            # Picamera2 capture_array retorna RGB; OpenCV usa BGR
+            # Converter RGB -> BGR corretamente
+            frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+
+            # Recortar ROI (apenas área inferior) - alinhado com a resolução nova
+            y1 = max(0, min(self.height - 1, self.roi_y_start))
+            y2 = max(y1 + 1, min(self.height, self.roi_y_start + self.roi_height))
+            roi = frame_bgr[y1:y2, :]
+
+            # Converter para HSV a partir de BGR
             hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
 
             # Aplicar filtro de cor para detectar preto
@@ -101,7 +211,7 @@ class LineDetector:
             mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
             mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
 
-            return mask, roi
+            return mask, roi, frame_bgr
 
         except Exception as e:
             print(f"Erro no pré-processamento: {e}")
@@ -211,13 +321,13 @@ class LineDetector:
         """Processar um frame completo"""
         try:
             if frame is None and self.picam2:
-                frame = self.picam2.capture_array()
+                frame = self.capture_frame()
 
             if frame is None:
                 return None
 
             # Pré-processar
-            mask, roi = self.preprocess_image(frame)
+            mask, roi, frame_bgr = self.preprocess_image(frame)
             if mask is None:
                 return None
 
@@ -234,9 +344,14 @@ class LineDetector:
             info = self.get_line_info()
             info['mask'] = mask
             info['roi'] = roi
+            info['frame_bgr'] = frame_bgr  # frame completo em BGR para usos futuros (ex.: snapshots/verde)
             info['debug_black_ratio'] = black_ratio
 
             return info
+
+        except Exception as e:
+            print(f"❌ Erro no processamento de frame: {e}")
+            return None
 
         except Exception as e:
             print(f"Erro no processamento do frame: {e}")
@@ -286,13 +401,74 @@ class LineDetector:
             self.picam2.stop()
             print("🛑 Picamera2 liberada")
 
+    def start_continuous_capture(self):
+        """Iniciar captura contínua para sessões de calibração/visualização"""
+        if not PICAMERA2_AVAILABLE or self.picam2 is None:
+            return False
+
+        try:
+            if not self.picam2.started:
+                self.picam2.start()
+                time.sleep(0.2)  # Pausa maior para estabilizar
+                # Aplicar controles após iniciar
+                if self.camera_controls:
+                    try:
+                        self.picam2.set_controls(self.camera_controls)
+                        time.sleep(0.05)
+                    except Exception as e:
+                        print(f"⚠️ Falha ao aplicar controles (contínuo): {e}")
+                print("📷 Câmera iniciada para captura contínua")
+            return True
+        except Exception as e:
+            print(f"❌ Erro ao iniciar captura contínua: {e}")
+            return False
+
+    def stop_continuous_capture(self):
+        """Parar captura contínua"""
+        if not PICAMERA2_AVAILABLE or self.picam2 is None:
+            return
+
+        try:
+            if self.picam2.started:
+                self.picam2.stop()
+                print("📷 Captura contínua parada")
+        except Exception as e:
+            print(f"❌ Erro ao parar captura contínua: {e}")
+
+    def capture_continuous_frame(self):
+        """Capturar frame durante sessão contínua (câmera já deve estar iniciada)"""
+        if not PICAMERA2_AVAILABLE or self.picam2 is None:
+            return None
+
+        try:
+            if not self.picam2.started:
+                print("⚠️ Câmera não está ativa para captura contínua")
+                return None
+
+            frame = self.picam2.capture_array()
+            return frame
+
+        except Exception as e:
+            print(f"❌ Erro ao capturar frame contínuo: {e}")
+            return None
+
 def main():
     """Função principal para teste"""
     print("🎯 TESTE DO DETECTOR DE LINHA PRETA - PICAMERA2")
     print("=" * 50)
 
+    # CLI simples para selecionar câmera: python line_detector.py --camera 1
+    cam_index = None
+    try:
+        if '--camera' in sys.argv:
+            i = sys.argv.index('--camera')
+            if i + 1 < len(sys.argv):
+                cam_index = int(sys.argv[i + 1])
+    except Exception:
+        cam_index = None
+
     # Criar detector
-    detector = LineDetector()
+    detector = LineDetector(camera_index=cam_index)
 
     # Inicializar
     if not detector.initialize():

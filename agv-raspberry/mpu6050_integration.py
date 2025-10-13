@@ -4,7 +4,12 @@ Integração MPU6050 (Giroscópio + Acelerômetro) com ESP32
 Para navegação avançada do AGV
 """
 
-import serial
+try:
+    import serial
+    HAVE_PYSERIAL = True
+except Exception:
+    serial = None
+    HAVE_PYSERIAL = False
 import time
 import json
 import math
@@ -41,6 +46,8 @@ class MPU6050Integration:
     def conectar_esp32(self):
         """Conectar ao ESP32 via serial"""
         try:
+            if not HAVE_PYSERIAL:
+                raise RuntimeError("pyserial não está instalado/disponível")
             self.serial_conn = serial.Serial(
                 self.esp32_port,
                 self.baudrate,
@@ -181,6 +188,9 @@ def detectar_porta_esp32():
     """Detectar automaticamente a porta do ESP32"""
     import glob
     import platform
+    if not HAVE_PYSERIAL:
+        print("⚠️ pyserial não disponível - detecção automática desativada")
+        return None
     import serial
 
     system = platform.system().lower()

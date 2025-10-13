@@ -20,10 +20,20 @@ NETWORK_CONFIG = {
 HARDWARE_CONFIG = {
     'camera': {
         'enabled': True,
-        'resolution': (640, 480),
+    'resolution': (1280, 1280),  # altura aumentada para melhor enquadramento do QR
         'fps': 30,
         'qr_detection': True,
-        'device': 0  # /dev/video0
+        'device': 1  # índice padrão da câmera para seguir linha (ex: /dev/video1 no Pi)
+        ,
+    # Fração vertical onde começa a ROI (0.0 topo, 1.0 base). Menor valor = mais área.
+    'roi_y_start_frac': 0.15,
+        # Controles opcionais de exposição/ganho; se auto=True, manual é ignorado.
+        'exposure': {
+            'auto': True,
+            'awb_auto': True,
+            # 'exposure_time': 8000,       # microssegundos (exemplo, usar quando auto=False)
+            # 'analogue_gain': 2.0         # ganho analógico (exemplo, usar quando auto=False)
+        }
     },
     'esp32': {
         'enabled': True,
