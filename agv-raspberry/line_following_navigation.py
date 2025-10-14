@@ -11,7 +11,7 @@ import platform
 import numpy as np
 from line_detector import LineDetector
 from navigation_basic import BasicNavigation
-from config import get_esp32_port
+from config import get_esp32_port, NAVIGATION_CONFIG
 import cv2
 
 class LineFollowingNavigation:
@@ -27,10 +27,13 @@ class LineFollowingNavigation:
 
         # Estado da navegação
         self.following_line = False
-        # Velocidades mais baixas para melhorar leitura de QR em movimento
-        self.speed_base = 50  # antes 65
-        self.speed_min = 20   # antes 30
-        self.speed_max = 70   # antes 85
+        # Velocidades e ganho vindos de config para tuning rápido
+        lf_cfg = NAVIGATION_CONFIG.get('line_following', {}) if isinstance(NAVIGATION_CONFIG, dict) else {}
+        self.speed_base = int(lf_cfg.get('speed_base', 50))
+        self.speed_min = int(lf_cfg.get('speed_min', 20))
+        self.speed_max = int(lf_cfg.get('speed_max', 70))
+        # Ganho adicional para a correção de direção (escala o steering do detector)
+        self.steering_gain = float(lf_cfg.get('steering_gain', 1.6))
 
         # Detecção de QR codes
         self.qr_detected_recently = False
@@ -298,6 +301,141 @@ class LineFollowingNavigation:
         except:
             pass
         print("👁️ Feedback visual desativado")
+
+    def _scan_shelf_qr_secondary_camera(self, camera_index=0, duration_s=3.0, debug=False, debug_dir=None, debug_prefix='shelf_qr'):
+        """Usar segunda câmera (Picamera2) para varrer e ler QR codes na estante.
+        Retorna lista de dicts {bbox, data} (únicos por texto). Se debug=True, salva imagem anotada e .txt com posições.
+        """
+        try:
+            from picamera2 import Picamera2
+        except Exception as e:
+            print(f"❌ Picamera2 indisponível para câmera secundária: {e}")
+            return []
+
+        unique = {}
+        best_frame_bgr = None
+        last_frame_bgr = None  # manter último frame para salvar mesmo sem QR
+        best_results = []
+        picam = None
+        try:
+            cams = Picamera2.global_camera_info()
+            if not cams or camera_index < 0 or camera_index >= len(cams):
+                print(f"⚠️ Índice de câmera secundária inválido: {camera_index}")
+                return []
+
+            picam = Picamera2(camera_index)
+            # Alta resolução para camera 0 (IMX219): 3280x2464; demais câmeras usam 1280x720
+            try:
+                if int(camera_index) == 0:
+                    cfg = picam.create_still_configuration(main={"format": 'RGB888', "size": (3280, 2464)})
+                else:
+                    cfg = picam.create_preview_configuration(main={"format": 'RGB888', "size": (1280, 720)})
+            except Exception:
+                # Fallback caso still falhe
+                cfg = picam.create_preview_configuration(main={"format": 'RGB888', "size": (1280, 720)})
+            picam.configure(cfg)
+            picam.start()
+            time.sleep(0.15)
+
+            t0 = time.time()
+            while time.time() - t0 < float(duration_s):
+                try:
+                    frame = picam.capture_array()
+                except Exception:
+                    continue
+                if frame is None:
+                    continue
+                # frame vem em RGB, converter para BGR
+                frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                last_frame_bgr = frame_bgr
+                results = self._decode_qr_multi(frame_bgr)
+                # Manter o melhor frame (maior número de QRs lidos nesta captura)
+                if results and len(results) > len(best_results):
+                    best_results = results
+                    best_frame_bgr = frame_bgr.copy()
+                for r in results:
+                    txt = r.get('data')
+                    if not txt:
+                        continue
+                    if txt not in unique:
+                        unique[txt] = r
+                time.sleep(0.02)
+        except Exception as e:
+            print(f"⚠️ Erro na varredura com câmera secundária: {e}")
+        finally:
+            try:
+                if picam is not None:
+                    picam.stop()
+            except Exception:
+                pass
+
+        # Salvar imagem anotada SEMPRE; TXT opcional se debug=True (grid 2x2 com quadrantes)
+        try:
+            frame_to_use = best_frame_bgr if best_frame_bgr is not None else last_frame_bgr
+            if frame_to_use is not None:
+                save_dir = debug_dir or self.snapshots_dir
+                os.makedirs(save_dir, exist_ok=True)
+                ts = int(time.time()*1000)
+                out_img = frame_to_use.copy()
+                H, W = out_img.shape[:2]
+                cx_mid, cy_mid = W//2, H//2
+                # desenhar linhas do grid 2x2
+                cv2.line(out_img, (cx_mid, 0), (cx_mid, H-1), (0, 255, 255), 2)
+                cv2.line(out_img, (0, cy_mid), (W-1, cy_mid), (0, 255, 255), 2)
+                # helper de quadrante
+                def quadrant_for_bbox(bx, by, bw, bh):
+                    c_x, c_y = bx + bw//2, by + bh//2
+                    if c_y < cy_mid and c_x < cx_mid:
+                        return 'TopLeft', (c_x, c_y)
+                    if c_y < cy_mid and c_x >= cx_mid:
+                        return 'TopRight', (c_x, c_y)
+                    if c_y >= cy_mid and c_x < cx_mid:
+                        return 'BottomLeft', (c_x, c_y)
+                    return 'BottomRight', (c_x, c_y)
+                # Anotar bbox/labels (se houver resultados)
+                if best_results:
+                    for r in best_results:
+                        bx, by, bw, bh = r.get('bbox', (0,0,0,0))
+                        data = r.get('data', '')
+                        quad, _ = quadrant_for_bbox(bx, by, bw, bh)
+                        cv2.rectangle(out_img, (bx, by), (bx+bw, by+bh), (0, 255, 0), 2)
+                        label = f"{quad}: {data[:48]}" if data else quad
+                        font_scale = max(0.6, min(2.0, W / 1280.0))
+                        thickness = 2 if W <= 1920 else 3
+                        cv2.putText(out_img, label, (bx, max(30, by-10)), cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0,255,0), thickness)
+                else:
+                    # indicar que nenhum QR foi detectado
+                    cv2.putText(out_img, 'Nenhum QR detectado', (20, max(40, cy_mid-10)), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0,0,255), 2)
+                img_path = os.path.join(save_dir, f"{debug_prefix}_{ts}.png")
+                cv2.imwrite(img_path, out_img)
+                self.last_shelf_qr_image_path = img_path
+                print(f"🖼️ Imagem da estante anotada salva: {img_path}")
+                # TXT somente se debug=True
+                if debug:
+                    txt_path = os.path.join(save_dir, f"{debug_prefix}_{ts}.txt")
+                    with open(txt_path, 'w', encoding='utf-8') as f:
+                        f.write(f"Shelf QR scan at {ts}\n")
+                        for idx, r in enumerate(best_results):
+                            bx, by, bw, bh = r.get('bbox', (0,0,0,0))
+                            data = r.get('data', '')
+                            quad, center_pt = quadrant_for_bbox(bx, by, bw, bh)
+                            f.write(f"{idx+1}. quadrant={quad}\tdata={data}\tbbox=({bx},{by},{bw},{bh})\tcenter=({center_pt[0]},{center_pt[1]})\n")
+                    print(f"📝 Lista de QR (debug) salva: {txt_path}")
+        except Exception as e:
+            print(f"⚠️ Falha ao salvar imagem/TXT da estante: {e}")
+
+        # anexar caminho da imagem anotada aos resultados
+        results_list = list(unique.values())
+        try:
+            img_path = getattr(self, 'last_shelf_qr_image_path', None)
+            if img_path:
+                for r in results_list:
+                    # não sobrescrever se já existir
+                    if isinstance(r, dict) and 'image_path' not in r:
+                        r['image_path'] = img_path
+        except Exception:
+            pass
+        return results_list
 
     def update_visual_frame(self, frame, line_info=None):
         """Atualizar frame para display visual com interface aprimorada"""
@@ -713,6 +851,366 @@ class LineFollowingNavigation:
             print(f"Erro na detecção de quadrado verde: {e}")
             return {'detected': False}
 
+    def _detect_blue_square(self, frame):
+        """Detectar quadrado azul no frame (em HSV). Retorna dict semelhante ao verde."""
+        try:
+            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+            # Faixa comum de azul em HSV (mais permissiva)
+            lower_blue = np.array([95, 40, 40])
+            upper_blue = np.array([135, 255, 255])
+            mask = cv2.inRange(hsv, lower_blue, upper_blue)
+            kernel = np.ones((5, 5), np.uint8)
+            mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+            mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            contours = sorted(contours, key=cv2.contourArea, reverse=True)
+            for c in contours:
+                area = cv2.contourArea(c)
+                if area < 800:
+                    continue
+                x, y, w, h = cv2.boundingRect(c)
+                if w < 40 or h < 40:
+                    continue
+                peri = cv2.arcLength(c, True)
+                approx = cv2.approxPolyDP(c, 0.04 * peri, True)
+                vertices = len(approx)
+                aspect_ratio = float(w) / h if h > 0 else 999
+                extent = area / float(w * h) if (w * h) > 0 else 0.0
+                if 4 <= vertices <= 8 and 0.6 <= aspect_ratio <= 1.6 and extent >= 0.45:
+                    return {
+                        'detected': True,
+                        'bbox': (x, y, w, h),
+                        'area': area,
+                        'center': (x + w//2, y + h//2),
+                        'vertices': vertices,
+                        'aspect': aspect_ratio,
+                        'extent': extent
+                    }
+            return {'detected': False}
+        except Exception as e:
+            print(f"Erro na detecção de quadrado azul: {e}")
+            return {'detected': False}
+
+    def go_until_blue_then_turn_right_until_green(self, drive_speed=20, turn_speed_fast=22, turn_speed_slow=8,
+                                                 timeout_drive=20.0, timeout_turn=12.0,
+                                                 min_turn_time_s=0.8, green_persist_frames=3, green_min_area=1400,
+                                                 turn_direction='direita', invert_turn=False,
+                                                 follow_line_while_search=True,
+                                                 ignore_right_black_during_blue=False,
+                                                 ignore_right_frac=0.35,
+                                                 align_after_turn=True,
+                                                 align_timeout_s=3.0,
+                                                 align_tol_px=22,
+                                                 align_min_conf=0.45,
+                                                 align_pulse_speed=12,
+                                                 align_pulse_s=0.06,
+                                                 scan_shelf_qr_after_turn=False,
+                                                 shelf_cam_index=0,
+                                                 shelf_scan_time_s=3.0,
+                                                 shelf_scan_debug=False,
+                                                 shelf_debug_dir=None,
+                                                 shelf_debug_prefix='shelf_qr',
+                                                 shelf_expected_qr=None,
+                                                 post_match_forward_s=4.0,
+                                                 post_match_forward_speed=25):
+        """Fluxo: seguir linha e avançar até AZUL; foto; girar (visão) até VERDE; alinhar à linha preta.
+        - follow_line_while_search: aplica micro-correções na busca do azul
+        - align_after_turn: faz alinhamento do centro da linha após parar no verde
+        """
+        print("🧭 Rotina: frente até AZUL, foto, curva à direita até VERDE (sem giroscópio)")
+        # Garantir câmera ativa
+        if not self.line_detector.picam2:
+            if not self.line_detector.initialize():
+                print("❌ Falha ao iniciar câmera para a rotina azul->verde")
+                return False
+        # Iniciar captura contínua para estabilidade
+        started_cont = False
+        try:
+            started_cont = self.line_detector.start_continuous_capture()
+        except Exception as e:
+            print(f"⚠️ Falha ao iniciar captura contínua: {e}")
+
+        # Helper: mapear comando de giro conforme inversão global
+        def map_turn(cmd_name: str) -> str:
+            try:
+                from config import NAVIGATION_CONFIG as _NC, HARDWARE_CONFIG as _HC
+                inv = bool(_NC.get('turn', {}).get('invert_commands', False)) or bool(_HC.get('motors', {}).get('invert_turn_commands', False))
+            except Exception:
+                inv = False
+            if not inv:
+                return cmd_name
+            if cmd_name == 'virar_direita':
+                return 'virar_esquerda'
+            if cmd_name == 'virar_esquerda':
+                return 'virar_direita'
+            return cmd_name
+
+        # 1) Andar para frente até detectar azul (seguindo a linha com micro-correções)
+        t0 = time.time()
+        if getattr(self.basic_nav, 'mpu', None) and getattr(self.basic_nav.mpu, 'serial_conn', None):
+            self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': drive_speed})
+        blue_found = None
+        in_pulse = False
+        pulse_until = 0.0
+        last_forward_keepalive = 0.0
+        forward_keepalive_interval = 0.6
+        while time.time() - t0 < timeout_drive:
+            frame = self.line_detector.capture_continuous_frame() if started_cont else self.line_detector.capture_frame()
+            if frame is None:
+                time.sleep(0.05)
+                continue
+            frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+            blue = self._detect_blue_square(frame_bgr)
+            if blue.get('detected'):
+                print("🔵 Quadrado azul detectado — tirando foto e parando")
+                try:
+                    os.makedirs(self.snapshots_dir, exist_ok=True)
+                    cv2.imwrite(os.path.join(self.snapshots_dir, f'blue_found_{int(time.time()*1000)}.png'), frame_bgr)
+                except Exception:
+                    pass
+                self.basic_nav.parar()
+                blue_found = blue
+                break
+            # Seguir a mesma lógica padrão do controle da linha preta enquanto busca o azul
+            if follow_line_while_search:
+                # Opcional: ignorar a parte direita do preto (mascarar área direita do frame em branco)
+                frame_for_line = frame
+                try:
+                    if ignore_right_black_during_blue:
+                        H, W = frame.shape[:2]
+                        cut_x = int(max(0, min(W, W * (1.0 - float(ignore_right_frac)))))
+                        if cut_x < W:
+                            frame_for_line = frame.copy()
+                            frame_for_line[:, cut_x:W, :] = 255  # branco para não contar como preto
+                except Exception:
+                    frame_for_line = frame
+
+                info = self.line_detector.process_frame(frame_for_line)
+                esp32_available = hasattr(self.basic_nav, 'mpu') and getattr(self.basic_nav.mpu, 'serial_conn', None) is not None
+                if info and info.get('detected'):
+                    steering_raw = info.get('steering_correction', 0.0)
+                    steering_correction = max(-1.0, min(1.0, float(steering_raw) * self.steering_gain))
+                    base_speed = int(drive_speed)
+                    if abs(steering_correction) < 0.03:
+                        # Movimento reto
+                        if esp32_available:
+                            self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': base_speed})
+                    elif abs(steering_correction) < 0.2:
+                        # Correção leve com redução
+                        reduced_speed = max(self.speed_min, base_speed - int(abs(steering_correction) * 14))
+                        if esp32_available:
+                            self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': reduced_speed})
+                    else:
+                        # Pulso de correção, mesma convenção: >0 vira esquerda, <0 vira direita
+                        correction_speed = max(10, min(22, int(abs(steering_correction) * 18)))
+                        if esp32_available:
+                            if steering_correction > 0:
+                                self.basic_nav.mpu.enviar_comando('virar_esquerda', {'velocidade': correction_speed})
+                            else:
+                                self.basic_nav.mpu.enviar_comando('virar_direita', {'velocidade': correction_speed})
+                            time.sleep(0.03)
+                            self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': base_speed})
+                else:
+                    # Linha não detectada momentaneamente: avance devagar e continue procurando
+                    if esp32_available:
+                        self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': max(12, int(drive_speed * 0.6))})
+                        time.sleep(0.10)
+            time.sleep(0.05)
+        if not blue_found:
+            print("⏱️ Timeout: azul não encontrado")
+            try:
+                if started_cont:
+                    self.line_detector.stop_continuous_capture()
+            except Exception:
+                pass
+            return False
+
+        # 2) Curvar à direita por visão até encontrar quadrado verde (sem giroscópio)
+        print("🔄 Iniciando curva à direita guiada por visão até encontrar VERDE")
+        t1 = time.time()
+        last_speed = None
+        last_cmd_time = 0.0
+        cmd_interval = 0.25
+        green_streak = 0
+        # Mapear comando de giro conforme direção desejada e possível inversão
+        try:
+            inv_cfg = False
+            try:
+                from config import NAVIGATION_CONFIG, HARDWARE_CONFIG
+                inv_cfg = bool(NAVIGATION_CONFIG.get('turn', {}).get('invert_commands', False)) or bool(HARDWARE_CONFIG.get('motors', {}).get('invert_turn_commands', False))
+            except Exception:
+                inv_cfg = False
+            invert = bool(invert_turn or inv_cfg)
+        except Exception:
+            invert = bool(invert_turn)
+        cmd_turn = 'virar_direita' if str(turn_direction).lower() == 'direita' else 'virar_esquerda'
+        if invert:
+            cmd_turn = 'virar_esquerda' if cmd_turn == 'virar_direita' else 'virar_direita'
+        print(f"↪️ Direção física desejada: {turn_direction} | comando enviado: {cmd_turn}{' (invertido)' if invert else ''}")
+        if getattr(self.basic_nav, 'mpu', None) and getattr(self.basic_nav.mpu, 'serial_conn', None):
+            self.basic_nav.mpu.enviar_comando(cmd_turn, {'velocidade': turn_speed_fast})
+            last_speed = turn_speed_fast
+        while time.time() - t1 < timeout_turn:
+            frame = self.line_detector.capture_continuous_frame() if started_cont else self.line_detector.capture_frame()
+            if frame is None:
+                time.sleep(0.05)
+                continue
+            frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+            elapsed_turn = time.time() - t1
+            green = {'detected': False}
+            try:
+                y1 = self.line_detector.roi_y_start
+                y2 = y1 + self.line_detector.roi_height
+                roi_bgr = frame_bgr[y1:y2, :]
+                green_roi = self._detect_green_square(roi_bgr)
+                if green_roi.get('detected') and green_roi.get('area', 0) >= green_min_area:
+                    green = green_roi
+            except Exception:
+                pass
+            if getattr(self.basic_nav, 'mpu', None) and getattr(self.basic_nav.mpu, 'serial_conn', None) and last_speed is not None:
+                if time.time() - last_cmd_time >= cmd_interval:
+                    self.basic_nav.mpu.enviar_comando(cmd_turn, {'velocidade': int(last_speed)})
+                    last_cmd_time = time.time()
+            info = self.line_detector.process_frame(frame)
+            if info and info.get('detected'):
+                img_center = self.line_detector.width // 2
+                err_raw = int(info.get('center', img_center)) - img_center
+                abs_err = abs(err_raw)
+                speed_cmd = turn_speed_slow if abs_err < 100 else turn_speed_fast
+                if speed_cmd != last_speed and getattr(self.basic_nav, 'mpu', None) and getattr(self.basic_nav.mpu, 'serial_conn', None):
+                    self.basic_nav.mpu.enviar_comando(cmd_turn, {'velocidade': speed_cmd})
+                    last_speed = speed_cmd
+            if elapsed_turn >= min_turn_time_s and green.get('detected'):
+                green_streak += 1
+            else:
+                green_streak = 0
+            if green_streak >= green_persist_frames:
+                print("🟩 Quadrado verde encontrado (persistente) — parando curva")
+                self.basic_nav.parar()
+                try:
+                    os.makedirs(self.snapshots_dir, exist_ok=True)
+                    y1 = self.line_detector.roi_y_start
+                    bx, by, bw, bh = green.get('bbox', (0,0,0,0))
+                    vis = frame_bgr.copy()
+                    cv2.rectangle(vis, (bx, y1 + by), (bx + bw, y1 + by + bh), (0, 255, 0), 2)
+                    cv2.putText(vis, 'GREEN FOUND', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,255,0), 2)
+                    cv2.imwrite(os.path.join(self.snapshots_dir, f'green_found_{int(time.time()*1000)}.png'), vis)
+                except Exception:
+                    pass
+                # 3) Opcional: alinhar ao centro da linha preta após a curva
+                if align_after_turn:
+                    print("🧭 Alinhando ao centro da linha preta após a curva...")
+                    align_start = time.time()
+                    aligned = False
+                    while time.time() - align_start < align_timeout_s:
+                        frame2 = self.line_detector.capture_continuous_frame() if started_cont else self.line_detector.capture_frame()
+                        if frame2 is None:
+                            time.sleep(0.03)
+                            continue
+                        info2 = self.line_detector.process_frame(frame2)
+                        if info2 and info2.get('detected') and info2.get('confidence', 0) >= align_min_conf:
+                            img_center2 = self.line_detector.width // 2
+                            err_px2 = int(info2.get('center', img_center2)) - img_center2
+                            if abs(err_px2) <= align_tol_px:
+                                print(f"✅ Linha alinhada (erro {err_px2}px)")
+                                aligned = True
+                                break
+                            nominal2 = 'virar_direita' if err_px2 > 0 else 'virar_esquerda'
+                            turn_cmd2 = map_turn(nominal2)
+                            try:
+                                if getattr(self.basic_nav, 'mpu', None) and getattr(self.basic_nav.mpu, 'serial_conn', None):
+                                    self.basic_nav.mpu.enviar_comando(turn_cmd2, {'velocidade': int(align_pulse_speed)})
+                                time.sleep(max(0.04, float(align_pulse_s)))
+                                self.basic_nav.parar()
+                            except Exception:
+                                pass
+                            time.sleep(0.04)
+                        else:
+                            try:
+                                if getattr(self.basic_nav, 'mpu', None) and getattr(self.basic_nav.mpu, 'serial_conn', None):
+                                    self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': max(12, int(drive_speed * 0.6))})
+                                time.sleep(0.12)
+                                self.basic_nav.parar()
+                            except Exception:
+                                pass
+                    if not aligned:
+                        print("⚠️ Alinhamento por visão não atingiu tolerância no tempo limite, seguindo assim mesmo")
+                # 4) Opcional: após curva, ligar outra câmera e ler QR na estante
+                if scan_shelf_qr_after_turn:
+                    print("📷 Lendo QR codes da estante com a outra câmera...")
+                    try:
+                        # Parar captura contínua antes de abrir outra câmera (evita conflito de device)
+                        try:
+                            if started_cont:
+                                self.line_detector.stop_continuous_capture()
+                                started_cont = False
+                        except Exception:
+                            pass
+                        # Honrar o índice solicitado (p.ex., 0 em alta resolução). Como paramos a captura contínua,
+                        # é seguro reutilizar a mesma câmera do seguidor de linha.
+                        selected_idx = int(shelf_cam_index)
+                        results = self._scan_shelf_qr_secondary_camera(
+                            camera_index=int(selected_idx),
+                            duration_s=float(shelf_scan_time_s),
+                            debug=bool(shelf_scan_debug),
+                            debug_dir=shelf_debug_dir,
+                            debug_prefix=shelf_debug_prefix,
+                        )
+                        if results:
+                            textos = [r.get('data', '') for r in results if r.get('data')]
+                            unicos = []
+                            for t in textos:
+                                if t not in unicos:
+                                    unicos.append(t)
+                            print(f"🧾 QR codes presentes na estante ({len(unicos)}):")
+                            for t in unicos:
+                                print(f"   • {t}")
+                            # Se houver um QR esperado, e foi encontrado, avançar reto por X segundos
+                            try:
+                                if shelf_expected_qr:
+                                    matched = any(t == shelf_expected_qr for t in unicos)
+                                    if not matched:
+                                        # fallback: contains match (caso venha com sufixos/variantes)
+                                        matched = any(shelf_expected_qr in t for t in unicos)
+                                    if matched:
+                                        fwd_speed = int(post_match_forward_speed) if post_match_forward_speed is not None else int(drive_speed)
+                                        dur = max(0.0, float(post_match_forward_s))
+                                        if getattr(self.basic_nav, 'mpu', None) and getattr(self.basic_nav.mpu, 'serial_conn', None) and dur > 0:
+                                            print(f"➡️ QR esperado encontrado: '{shelf_expected_qr}'. Avançando reto por {dur:.2f}s...")
+                                            self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': fwd_speed})
+                                            time.sleep(dur)
+                                            self.basic_nav.parar()
+                            except Exception as e:
+                                print(f"⚠️ Falha ao executar avanço pós-leitura: {e}")
+                        else:
+                            print("⚠️ Nenhum QR code detectado na estante no período de varredura")
+
+                        # Informar caminho da imagem anotada, independentemente de ter encontrado QR
+                        try:
+                            img_path = getattr(self, 'last_shelf_qr_image_path', None)
+                            if img_path:
+                                print(f"🖼️ Foto com marcações dos QR salva em: {img_path}")
+                        except Exception:
+                            pass
+                    except Exception as e:
+                        print(f"⚠️ Falha ao escanear QR na estante: {e}")
+                try:
+                    if started_cont:
+                        self.line_detector.stop_continuous_capture()
+                except Exception:
+                    pass
+                return True
+            time.sleep(0.05)
+
+        print("⏱️ Timeout: verde não encontrado durante a curva")
+        self.basic_nav.parar()
+        try:
+            if started_cont:
+                self.line_detector.stop_continuous_capture()
+        except Exception:
+            pass
+        return False
+
     def initialize(self):
         """Inicializar todos os componentes"""
         print("INICIALIZANDO NAVEGAÇÃO SEGUINDO LINHA")
@@ -734,6 +1232,13 @@ class LineFollowingNavigation:
         if not self.line_detector.initialize():
             print("❌ Falha no detector de linha")
             success = False
+        else:
+            # Entregar detector compartilhado para a navegação básica
+            try:
+                if hasattr(self.basic_nav, 'set_shared_detector'):
+                    self.basic_nav.set_shared_detector(self.line_detector)
+            except Exception:
+                pass
 
         # Inicializar detector QR (opcional - usa pyzbar diretamente)
         try:
@@ -792,17 +1297,22 @@ class LineFollowingNavigation:
             # Primeiro, verificar se há quadrado verde (prioridade alta)
             green_square = self._detect_green_square(current_frame) if current_frame is not None else {'detected': False}
 
-            # Obter correção de direção calculada pelo detector
-            steering_correction = line_info['steering_correction']
+            # Obter correção de direção calculada pelo detector e aplicar ganho adicional
+            steering_raw = line_info['steering_correction']
+            steering_correction = max(-1.0, min(1.0, steering_raw * self.steering_gain))
             error_pixels = line_info['center'] - (self.line_detector.width // 2)
 
-            print(f"📏 Centro linha: {line_info['center']}, Erro: {error_pixels}px, Correção: {steering_correction:.3f}")
+            print(f"📏 Centro linha: {line_info['center']}, Erro: {error_pixels}px, Correção: {steering_correction:.3f} (raw={steering_raw:.3f}, gain={self.steering_gain})")
 
             # QR code SÓ é lido quando quadrado verde é detectado
             qr_content = None
             qr_source = None  # 'green_square' ou 'line_detection'
             # Verificar disponibilidade do ESP32 apenas uma vez
             esp32_available = hasattr(self.basic_nav, 'mpu') and getattr(self.basic_nav.mpu, 'serial_conn', None) is not None
+            if not esp32_available and not getattr(self, '_warned_no_esp32', False):
+                print("⚠️ ESP32 não conectado (sem comandos de movimento). Visual e detecção funcionando, mas sem locomoção.")
+                print("   Verifique a porta no config.py (esp32.port) e o cabo USB. Use o teste em navigation_basic.py.")
+                self._warned_no_esp32 = True
 
             if green_square['detected']:
                 # Quadrado verde detectado - PARAR e focar nessa área para QR (evitar blur)
@@ -822,10 +1332,8 @@ class LineFollowingNavigation:
                         'roi': current_frame,
                         'detected': refreshed.get('detected', line_info.get('detected')),
                         'center': refreshed.get('center', line_info.get('center')),
-                        'confidence': refreshed.get('confidence', line_info.get('confidence')),
-                        'steering_correction': refreshed.get('steering_correction', line_info.get('steering_correction'))
+                        'confidence': refreshed.get('confidence', line_info.get('confidence'))
                     })
-
                 # Recalcular quadrado verde no frame estabilizado
                 green_square = self._detect_green_square(current_frame) if current_frame is not None else {'detected': False}
                 if green_square.get('detected'):
@@ -937,16 +1445,16 @@ class LineFollowingNavigation:
                 # Correção gradual: pequenas correções intercaladas com movimento para frente
                 base_speed = self.speed_base
 
-                if abs(steering_correction) < 0.05:
+                if abs(steering_correction) < 0.03:
                     # Movimento reto normal - manter por mais tempo
                     print("➡️ Movimento reto")
                     direcao = 'frente'
                     velocidade = base_speed
                     if esp32_available:
                         self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': base_speed})
-                elif abs(steering_correction) < 0.3:
+                elif abs(steering_correction) < 0.2:
                     # Correção leve - movimento para frente com velocidade reduzida
-                    reduced_speed = max(self.speed_min, base_speed - int(abs(steering_correction) * 10))
+                    reduced_speed = max(self.speed_min, base_speed - int(abs(steering_correction) * 14))
                     print(f"🔄 Correção leve ({steering_correction:.3f}) - velocidade reduzida: {reduced_speed}")
                     direcao = 'frente_corrigido'
                     velocidade = reduced_speed
@@ -955,7 +1463,7 @@ class LineFollowingNavigation:
                 else:
                     # Correção necessária - impulso de correção mais rápido
                     # INVERTER A DIREÇÃO: steering_correction > 0 significa linha à direita, então virar para ESQUERDA
-                    correction_speed = max(8, min(15, int(abs(steering_correction) * 12)))  # Velocidade maior
+                    correction_speed = max(10, min(22, int(abs(steering_correction) * 18)))  # mais agressivo
 
                     if steering_correction > 0:
                         # Linha à direita - virar para ESQUERDA (invertido)
@@ -974,7 +1482,7 @@ class LineFollowingNavigation:
 
                     # Imediatamente voltar ao movimento para frente (pausa menor)
                     if esp32_available:
-                        time.sleep(0.02)  # Tempo ainda menor para correção mais rápida
+                        time.sleep(0.03)  # impulso um pouco mais longo para efetivar correção
                         self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': base_speed})
                     direcao = 'frente_apos_correcao'
                     velocidade = base_speed
@@ -1068,6 +1576,32 @@ class LineFollowingNavigation:
         """Navegar até encontrar a interseção do subcorredor alvo"""
         print(f"🎯 Navegando até interseção do subcorredor: {target_subcorredor}")
 
+    # Preparar padrões aceitos para o QR, aceitando dígitos com e sem zero à esquerda
+        expected_labels = set()
+        code = (target_subcorredor or "").strip()
+        expected_labels.add(f"Corredor{code}")  # ex.: Corredor1_1 ou Corredor01_01
+        if '_' in code:
+            try:
+                cc_raw, ss_raw = code.split('_', 1)
+                cc_i = int(cc_raw)
+                ss_i = int(ss_raw)
+                cc_1 = str(cc_i)          # "1"
+                ss_1 = str(ss_i)          # "1"
+                cc_2 = f"{cc_i:02d}"      # "01"
+                ss_2 = f"{ss_i:02d}"      # "01"
+
+                # Formatos possíveis dos QRs impressos
+                expected_labels.update({
+                    f"Corredor{cc_1}_SubCorredor{ss_1}",
+                    f"Corredor{cc_2}_SubCorredor{ss_2}",
+                    f"Corredor{cc_1}_{ss_1}",
+                    f"Corredor{cc_2}_{ss_2}",
+                })
+            except Exception:
+                pass
+
+        print(f"🔎 Aceitando formatos de QR: {', '.join(sorted(expected_labels))}")
+
         start_time = time.time()
         qr_found = None
 
@@ -1076,6 +1610,14 @@ class LineFollowingNavigation:
             if not self.follow_line_step():
                 break
 
+            # Se o QR do subcorredor já foi detectado no bloco do quadrado verde, aceitar e prosseguir
+            if self.current_subcorredor:
+                qr_norm = self.current_subcorredor.strip()
+                if qr_norm in expected_labels:
+                    print(f"✅ Subcorredor reconhecido via QR (verde): {qr_norm}")
+                    qr_found = qr_norm
+                    break
+
             # Verificar interseção
             if self.detect_intersection():
                 print("🔀 Interseção encontrada!")
@@ -1083,11 +1625,15 @@ class LineFollowingNavigation:
                 # Verificar QR code na interseção
                 qr_found = self.check_qr_codes()
 
-                if qr_found and qr_found == f"Corredor01_{target_subcorredor}":
-                    print(f"✅ Subcorredor correto encontrado: {qr_found}")
+                # Normalizar detecção: remover espaços extras
+                qr_norm = qr_found.strip() if qr_found else None
+
+                if qr_norm and (qr_norm in expected_labels):
+                    print(f"✅ Subcorredor correto encontrado: {qr_norm}")
                     break
                 else:
-                    print(f"⚠️ Subcorredor errado ou QR não encontrado: {qr_found}")
+                    exp_all = sorted(expected_labels)
+                    print(f"⚠️ Subcorredor errado ou QR não encontrado: {qr_found} (esperado: {', '.join(exp_all)})")
                     # Continuar procurando
 
             # Timeout
@@ -1103,17 +1649,167 @@ class LineFollowingNavigation:
         """Entrar no subcorredor após encontrar a interseção"""
         print("➡️ Entrando no subcorredor")
 
-        # Virar 90° para direita (assumindo layout em T)
-        if not self.basic_nav.virar_90_graus('direita'):
+        # Opcional: centralizar QR na imagem antes de avançar
+        try:
+            center_ok = self._center_qr_before_enter()
+            if not center_ok:
+                print("⚠️ Não foi possível centralizar o QR dentro do tempo; prosseguindo assim mesmo")
+        except Exception as e:
+            print(f"⚠️ Falha ao centralizar QR: {e}")
+
+        # Avançar antes da curva, conforme config
+        try:
+            esp32_available = hasattr(self.basic_nav, 'mpu') and getattr(self.basic_nav.mpu, 'serial_conn', None) is not None
+            if esp32_available:
+                sc_cfg = NAVIGATION_CONFIG.get('subcorredor_entry', {}) if isinstance(NAVIGATION_CONFIG, dict) else {}
+                forward_sec = float(sc_cfg.get('forward_seconds', 3.0))
+                forward_speed = sc_cfg.get('forward_speed', None)
+                velocidade = int(forward_speed) if forward_speed is not None else getattr(self, 'speed_base', 18)
+                print(f"🚗 Avançando por {forward_sec:.1f}s (velocidade={velocidade})")
+                self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': velocidade})
+                time.sleep(forward_sec)
+                self.basic_nav.parar()
+            else:
+                sc_cfg = NAVIGATION_CONFIG.get('subcorredor_entry', {}) if isinstance(NAVIGATION_CONFIG, dict) else {}
+                forward_sec = float(sc_cfg.get('forward_seconds', 3.0))
+                print(f"(simulação) avançando {forward_sec:.1f}s para frente")
+                time.sleep(forward_sec)
+        except Exception as e:
+            print(f"❌ Falha ao avançar: {e}")
+            self.basic_nav.parar()
             return False
 
-        # Seguir em frente por uma distância
-        distance_to_shelf = 30  # cm até a prateleira
-        if not self.basic_nav.mover_em_linha_reta(distance_to_shelf, 'frente'):
+        # Virar usando giroscópio conforme config
+        sc_cfg = NAVIGATION_CONFIG.get('subcorredor_entry', {}) if isinstance(NAVIGATION_CONFIG, dict) else {}
+        turn_dir = sc_cfg.get('turn_direction', 'direita')
+        # Se existir configuração de ângulo, ajuste o navigation_basic
+        try:
+            angle_cfg = int(sc_cfg.get('turn_angle_deg', 90))
+            if hasattr(self.basic_nav, 'angulo_curva'):
+                self.basic_nav.angulo_curva = angle_cfg
+        except Exception:
+            pass
+
+        if not self.basic_nav.virar_90_graus(turn_dir):
             return False
 
-        print("✅ Entrada no subcorredor concluída")
+        print(f"✅ Entrada no subcorredor concluída (frente {sc_cfg.get('forward_seconds', 3.0)}s + curva à {turn_dir})")
         return True
+
+    def _center_qr_before_enter(self):
+        """Usa o bbox do QR atual para centralizá-lo horizontalmente na imagem antes de avançar.
+        Faz pequenos pulsos de rotação e avanço até que o centro do QR esteja próximo do centro da imagem
+        ou até atingir timeout. Retorna True se centralizado, False caso contrário.
+        """
+        try:
+            cfg = NAVIGATION_CONFIG.get('qr_centering', {}) if isinstance(NAVIGATION_CONFIG, dict) else {}
+            if not cfg or not cfg.get('enabled', True):
+                return True
+
+            timeout = float(cfg.get('timeout_s', 4.0))
+            tol_px = int(cfg.get('tolerance_px', 24))
+            rot_speed = int(cfg.get('rotate_speed', 12))
+            rot_pulse = float(cfg.get('rotate_pulse_s', 0.08))
+            fwd_speed_cfg = cfg.get('forward_speed', None)
+            fwd_pulse = float(cfg.get('forward_pulse_s', 0.10))
+            fwd_speed = int(fwd_speed_cfg) if fwd_speed_cfg is not None else int(getattr(self, 'speed_base', 40))
+
+            start = time.time()
+            last_seen = 0
+            last_snap = 0.0
+            # Garantir pasta de snapshots
+            os.makedirs(self.snapshots_dir, exist_ok=True)
+
+            while time.time() - start < timeout:
+                # Pegar frame atual processado (garante ROI/frame reais)
+                info = self.line_detector.process_frame()
+                if not info or info.get('roi') is None:
+                    time.sleep(0.05)
+                    continue
+                frame = info.get('frame_bgr') if info.get('frame_bgr') is not None else info.get('roi')
+
+                dec = self._decode_qr_multi(frame)
+                # Selecionar QR principal (maior área)
+                qr_bbox = None
+                max_area = -1
+                for d in dec:
+                    bx, by, bw, bh = d.get('bbox', (0,0,0,0))
+                    area = bw * bh
+                    if area > max_area and bw > 0 and bh > 0:
+                        max_area = area
+                        qr_bbox = (bx, by, bw, bh)
+
+                if qr_bbox is None:
+                    # Dê um passo pequeno à frente para tentar trazer o QR de volta ao campo
+                    if getattr(self.basic_nav, 'mpu', None) and getattr(self.basic_nav.mpu, 'serial_conn', None):
+                        self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': fwd_speed})
+                        time.sleep(fwd_pulse)
+                        self.basic_nav.parar()
+                    # Snapshot periódico quando não encontra QR
+                    if time.time() - last_snap > 0.35 and info.get('frame_bgr') is not None:
+                        try:
+                            fbgr = info.get('frame_bgr').copy()
+                            cv2.putText(fbgr, 'QR nao detectado', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,255), 2)
+                            cv2.imwrite(os.path.join(self.snapshots_dir, f'qr_center_none_{int(time.time()*1000)}.png'), fbgr)
+                        except Exception:
+                            pass
+                        last_snap = time.time()
+                    time.sleep(0.05)
+                    continue
+
+                h, w = frame.shape[:2]
+                cx_img = w // 2
+                bx, by, bw, bh = qr_bbox
+                cx_qr = bx + bw // 2
+                err = cx_qr - cx_img
+
+                if abs(err) <= tol_px:
+                    print(f"🎯 QR centralizado (erro {err}px <= {tol_px}px)")
+                    # Snapshot de sucesso
+                    try:
+                        fbgr = info.get('frame_bgr') if info.get('frame_bgr') is not None else frame
+                        vis = fbgr.copy()
+                        cv2.rectangle(vis, (bx, by), (bx+bw, by+bh), (0,255,0), 2)
+                        cv2.line(vis, (cx_img, 0), (cx_img, h), (0,255,255), 1)
+                        cv2.putText(vis, f'centralizado err={err}px', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,255,255), 2)
+                        cv2.imwrite(os.path.join(self.snapshots_dir, f'qr_center_ok_{int(time.time()*1000)}.png'), vis)
+                    except Exception:
+                        pass
+                    return True
+
+                # Decidir direção do pulso de rotação (inverter devido à orientação do MPU/ESP32)
+                turn_cmd = 'virar_direita' if err > 0 else 'virar_esquerda'
+                # NOTA: No BasicNavigation o sentido é invertido, mas aqui enviamos direto ao ESP32
+                if getattr(self.basic_nav, 'mpu', None) and getattr(self.basic_nav.mpu, 'serial_conn', None):
+                    self.basic_nav.mpu.enviar_comando(turn_cmd, {'velocidade': rot_speed})
+                    time.sleep(rot_pulse)
+                    self.basic_nav.parar()
+
+                # Pequeno pulso à frente para manter QR visível
+                if getattr(self.basic_nav, 'mpu', None) and getattr(self.basic_nav.mpu, 'serial_conn', None):
+                    self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': fwd_speed})
+                    time.sleep(fwd_pulse)
+                    self.basic_nav.parar()
+
+                # Snapshot periódico mostrando bbox/erro
+                if time.time() - last_snap > 0.35:
+                    try:
+                        fbgr = info.get('frame_bgr') if info.get('frame_bgr') is not None else frame
+                        vis = fbgr.copy()
+                        cv2.rectangle(vis, (bx, by), (bx+bw, by+bh), (0,255,255), 2)
+                        cv2.line(vis, (cx_img, 0), (cx_img, h), (0,255,255), 1)
+                        cv2.putText(vis, f'err={err}px', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,255,255), 2)
+                        cv2.imwrite(os.path.join(self.snapshots_dir, f'qr_center_try_{int(time.time()*1000)}.png'), vis)
+                    except Exception:
+                        pass
+                    last_snap = time.time()
+
+                last_seen = time.time()
+
+            return False
+        except Exception as e:
+            print(f"Erro no centralizador de QR: {e}")
+            return False
 
     def exit_subcorredor(self):
         """Sair do subcorredor de volta à linha principal"""

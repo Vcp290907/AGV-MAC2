@@ -63,9 +63,9 @@ class LineDetector:
         self.roi_height = self.height - self.roi_y_start
 
         # PID para controle de direção
-        self.kp = 0.5
+        self.kp = 0.8  # ganho maior para resposta mais rápida
         self.ki = 0.0
-        self.kd = 0.1
+        self.kd = 0.12
         self.previous_error = 0
         self.integral = 0
 

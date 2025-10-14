@@ -159,8 +159,12 @@ export default function Status({ usuario }) {
     const corredores = pedido.corredores ? pedido.corredores.split(',') : [];
     const subCorredores = pedido.sub_corredores ? pedido.sub_corredores.split(',') : [];
     const posicoesX = pedido.posicoes_x ? pedido.posicoes_x.split(',') : [];
+    const tag = pedido.tag ? pedido.tag.split(',') : [];
 
-    console.log('Dados do pedido:', { itens, corredores, subCorredores, posicoesX }); // Debug
+    console.log('Pedido completo:', pedido); // Debug adicional
+    console.log('Campo tag do pedido:', pedido.tag); // Debug específico para tag
+
+    console.log('Dados do pedido:', { itens, corredores, subCorredores, posicoesX, tag }); // Debug
 
     const rota = itens.map((item, index) => {
       // Para pedidos reais, todos os itens começam com status 'N' (não pego ainda)
@@ -174,6 +178,7 @@ export default function Status({ usuario }) {
         subCorredor: subCorredores[index] || '1',
         posicao: posicoesX[index] || '1',
         status: status,
+        tag: tag[index] || '1',
         coletado: false
       };
     });
@@ -385,7 +390,7 @@ export default function Status({ usuario }) {
                   <div className="w-24 h-2 bg-gray-200 dark:bg-gray-700 rounded-full">
                     <div
                       className={`h-2 rounded-full ${statusSistema.bateria > 50 ? 'bg-green-500' :
-                          statusSistema.bateria > 20 ? 'bg-yellow-500' : 'bg-red-500'
+                        statusSistema.bateria > 20 ? 'bg-yellow-500' : 'bg-red-500'
                         }`}
                       style={{ width: `${statusSistema.bateria}%` }}
                     ></div>
@@ -400,12 +405,12 @@ export default function Status({ usuario }) {
             {/* Status do AGV */}
             <div className="flex items-center space-x-3">
               <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${statusAgv.status === 'disponivel' ? 'bg-green-100 dark:bg-green-900/20' :
-                  statusAgv.status === 'ocupado' ? 'bg-yellow-100 dark:bg-yellow-900/20' :
-                    'bg-red-100 dark:bg-red-900/20'
+                statusAgv.status === 'ocupado' ? 'bg-yellow-100 dark:bg-yellow-900/20' :
+                  'bg-red-100 dark:bg-red-900/20'
                 }`}>
                 <svg className={`w-6 h-6 ${statusAgv.status === 'disponivel' ? 'text-green-600 dark:text-green-400' :
-                    statusAgv.status === 'ocupado' ? 'text-yellow-600 dark:text-yellow-400' :
-                      'text-red-600 dark:text-red-400'
+                  statusAgv.status === 'ocupado' ? 'text-yellow-600 dark:text-yellow-400' :
+                    'text-red-600 dark:text-red-400'
                   }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
@@ -413,8 +418,8 @@ export default function Status({ usuario }) {
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Status</p>
                 <p className={`text-sm font-medium ${statusAgv.status === 'disponivel' ? 'text-green-600 dark:text-green-400' :
-                    statusAgv.status === 'ocupado' ? 'text-yellow-600 dark:text-yellow-400' :
-                      'text-red-600 dark:text-red-400'
+                  statusAgv.status === 'ocupado' ? 'text-yellow-600 dark:text-yellow-400' :
+                    'text-red-600 dark:text-red-400'
                   }`}>
                   {statusAgv.status === 'disponivel' ? 'Disponível' :
                     statusAgv.status === 'ocupado' ? 'Em Operação' :
@@ -552,6 +557,7 @@ export default function Status({ usuario }) {
                   <thead>
                     <tr className="border-b-2 border-gray-200 dark:border-gray-600">
                       <th className="text-left py-4 px-4 font-semibold text-gray-900 dark:text-white">Item</th>
+                      <th className="text-center py-4 px-4 font-semibold text-gray-900 dark:text-white">Tag</th>
                       <th className="text-center py-4 px-4 font-semibold text-gray-900 dark:text-white">Corredor</th>
                       <th className="text-center py-4 px-4 font-semibold text-gray-900 dark:text-white">SubCorredor</th>
                       <th className="text-center py-4 px-4 font-semibold text-gray-900 dark:text-white">Status</th>
@@ -561,18 +567,18 @@ export default function Status({ usuario }) {
                   <tbody>
                     {rotaAtual.map((item, index) => (
                       <tr key={item.id} className={`border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/30 ${item.status === 'P' ? 'bg-green-50 dark:bg-green-900/10' :
-                          item.status === 'F' ? 'bg-red-50 dark:bg-red-900/10' :
-                            'bg-white dark:bg-gray-800'
+                        item.status === 'F' ? 'bg-red-50 dark:bg-red-900/10' :
+                          'bg-white dark:bg-gray-800'
                         }`}>
                         <td className="py-4 px-4">
                           <div className="flex items-center space-x-3">
                             <div className={`w-3 h-3 rounded-full ${item.status === 'P' ? 'bg-green-500' :
-                                item.status === 'F' ? 'bg-red-500' :
-                                  'bg-gray-400'
+                              item.status === 'F' ? 'bg-red-500' :
+                                'bg-gray-400'
                               }`}></div>
                             <span className={`font-medium ${item.status === 'P' ? 'text-green-900 dark:text-green-100' :
-                                item.status === 'F' ? 'text-red-900 dark:text-red-100' :
-                                  'text-gray-900 dark:text-white'
+                              item.status === 'F' ? 'text-red-900 dark:text-red-100' :
+                                'text-gray-900 dark:text-white'
                               }`}>{item.nome}</span>
                             {item.status === 'P' && (
                               <span className="px-2 py-1 bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300 rounded text-xs font-medium">
@@ -586,6 +592,7 @@ export default function Status({ usuario }) {
                             )}
                           </div>
                         </td>
+                        <td className="text-center py-4 px-4 text-gray-700 dark:text-gray-300 font-medium">{item.tag}</td>
                         <td className="text-center py-4 px-4 text-gray-700 dark:text-gray-300 font-medium">{item.corredor}</td>
                         <td className="text-center py-4 px-4 text-gray-700 dark:text-gray-300 font-medium">{item.subCorredor}</td>
                         <td className="text-center py-4 px-4">

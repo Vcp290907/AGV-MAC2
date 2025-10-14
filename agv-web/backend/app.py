@@ -85,10 +85,11 @@ def broadcast_agv_status():
                 SELECT p.id, p.status, p.created_at, p.dispositivo_id,
                        u.nome as usuario_nome, u.username,
                        d.nome as dispositivo_nome, d.codigo as dispositivo_codigo,
-                       GROUP_CONCAT(i.nome) as itens,
-                       GROUP_CONCAT(i.corredor) as corredores,
-                       GROUP_CONCAT(i.sub_corredor) as sub_corredores,
-                       GROUP_CONCAT(i.posicao_x) as posicoes_x,
+                       GROUP_CONCAT(i.nome ORDER BY pi.id) as itens,
+                       GROUP_CONCAT(i.corredor ORDER BY pi.id) as corredores,
+                       GROUP_CONCAT(i.sub_corredor ORDER BY pi.id) as sub_corredores,
+                       GROUP_CONCAT(i.posicao_x ORDER BY pi.id) as posicoes_x,
+                       GROUP_CONCAT(i.tag ORDER BY pi.id) as tag,
                        COUNT(pi.id) as total_itens
                 FROM pedidos p
                 LEFT JOIN usuarios u ON p.usuario_id = u.id

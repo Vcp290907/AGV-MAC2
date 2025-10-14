@@ -17,6 +17,20 @@ raspberry_bp = Blueprint('raspberry', __name__)
 # Armazenamento temporário de Raspberry Pis conectados
 connected_raspberries = {}
 
+
+def _get_client_ip():
+    """Obtém o IP real do cliente considerando possíveis proxies."""
+    # X-Forwarded-For pode conter lista de IPs, o primeiro é o do cliente original
+    xff = request.headers.get('X-Forwarded-For', '')
+    if xff:
+        return xff.split(',')[0].strip()
+    # Nginx/Ingress com X-Real-IP
+    xri = request.headers.get('X-Real-IP')
+    if xri:
+        return xri.strip()
+    # Fallback direto do Flask
+    return request.remote_addr
+
 @raspberry_bp.route('/agv/register', methods=['POST'])
 def register_raspberry():
     """Registra um Raspberry Pi no sistema"""
@@ -107,7 +121,22 @@ def receive_agv_status():
         logger.info(f"Status recebido do AGV {agv_id}: {status_data}")
 
         # Atualizar status no banco de dados se necessário
-        # TODO: Implementar atualização de status do dispositivo
+        try:
+            conn = get_db_connection()
+            order_id = status_data.get('orderId')
+            estado = status_data.get('estado')
+            if order_id and estado:
+                # Transições simples: indo_para_corredor -> em_andamento, no_corredor -> coletando
+                if estado == 'indo_para_corredor':
+                    conn.execute('UPDATE pedidos SET status = ? WHERE id = ?', ('em_andamento', order_id))
+                elif estado == 'no_corredor':
+                    conn.execute('UPDATE pedidos SET status = ? WHERE id = ?', ('coletando', order_id))
+                elif estado == 'concluida':
+                    conn.execute('UPDATE pedidos SET status = ? WHERE id = ?', ('concluido', order_id))
+                conn.commit()
+            conn.close()
+        except Exception as db_e:
+            logger.error(f"Falha ao atualizar status do pedido: {db_e}")
 
         # Broadcast status via WebSocket
         from app import socketio
@@ -177,7 +206,7 @@ def receive_command_acknowledgment():
 def get_next_command():
     """Retorna próximo comando para o AGV"""
     try:
-        agv_ip = request.remote_addr
+        agv_ip = _get_client_ip()
         logger.info(f"Solicitando próximo comando para AGV: {agv_ip}")
 
         # Encontrar pedidos pendentes
@@ -186,23 +215,23 @@ def get_next_command():
         # Buscar pedido pendente mais antigo
         pending_order = conn.execute('''
             SELECT p.id, p.usuario_id, p.dispositivo_id,
-                   u.nome as usuario_nome, u.username,
-                   d.nome as dispositivo_nome, d.codigo as dispositivo_codigo,
-                   GROUP_CONCAT(i.id) as item_ids,
-                   GROUP_CONCAT(i.nome) as item_names,
-                   GROUP_CONCAT(i.corredor) as corredores,
-                   GROUP_CONCAT(i.sub_corredor) as sub_corredores,
-                   GROUP_CONCAT(i.posicao_x) as posicoes_x,
-                   COUNT(pi.id) as total_itens
+                u.nome as usuario_nome, u.username,
+                d.nome as dispositivo_nome, d.codigo as dispositivo_codigo,
+                GROUP_CONCAT(i.id) as item_ids,
+                GROUP_CONCAT(i.nome) as item_names,
+                GROUP_CONCAT(i.corredor) as corredores,
+                GROUP_CONCAT(i.sub_corredor) as sub_corredores,
+                GROUP_CONCAT(i.posicao_x) as posicoes_x,
+                COUNT(pi.id) as total_itens
             FROM pedidos p
-            LEFT JOIN usuarios u ON p.usuario_id = u.id
-            LEFT JOIN dispositivos d ON p.dispositivo_id = d.id
-            LEFT JOIN pedido_itens pi ON p.id = pi.pedido_id
-            LEFT JOIN itens i ON pi.item_id = i.id
-            WHERE p.status = 'pendente'
-            GROUP BY p.id
-            ORDER BY p.created_at ASC
-            LIMIT 1
+                LEFT JOIN usuarios u ON p.usuario_id = u.id
+                LEFT JOIN dispositivos d ON p.dispositivo_id = d.id
+                LEFT JOIN pedido_itens pi ON p.id = pi.pedido_id
+                LEFT JOIN itens i ON pi.item_id = i.id
+                WHERE p.status = 'pendente'
+                GROUP BY p.id
+                ORDER BY p.created_at ASC
+                LIMIT 1
         ''').fetchone()
 
         if pending_order:
@@ -221,7 +250,7 @@ def get_next_command():
                 'user': {
                     'id': pending_order['usuario_id'],
                     'name': pending_order['usuario_nome'],
-                    'username': pending_order['usuario_username']
+                    'username': pending_order['username']
                 },
                 'device': {
                     'id': pending_order['dispositivo_id'],
@@ -231,7 +260,7 @@ def get_next_command():
                 'items': []
             }
 
-            # Adicionar itens
+            # Adicionar itens (dados do item ficam em tabelas separadas: pedido e pedido_itens)
             if pending_order['item_ids']:
                 item_ids = pending_order['item_ids'].split(',')
                 item_names = pending_order['item_names'].split(',')
@@ -277,7 +306,7 @@ def get_next_command():
 def sync_orders():
     """Sincroniza pedidos com o Raspberry Pi"""
     try:
-        agv_ip = request.remote_addr
+        agv_ip = _get_client_ip()
         logger.info(f"Sincronizando pedidos com AGV: {agv_ip}")
 
         conn = get_db_connection()
@@ -285,18 +314,18 @@ def sync_orders():
         # Buscar pedidos ativos
         active_orders = conn.execute('''
             SELECT p.id, p.status, p.created_at,
-                   u.nome as usuario_nome, u.username,
-                   GROUP_CONCAT(i.nome) as itens,
-                   GROUP_CONCAT(i.corredor) as corredores,
-                   GROUP_CONCAT(i.sub_corredor) as sub_corredores,
-                   GROUP_CONCAT(i.posicao_x) as posicoes_x
+                u.nome as usuario_nome, u.username as usuario_username,
+                GROUP_CONCAT(i.nome) as itens,
+                GROUP_CONCAT(i.corredor) as corredores,
+                GROUP_CONCAT(i.sub_corredor) as sub_corredores,
+                GROUP_CONCAT(i.posicao_x) as posicoes_x
             FROM pedidos p
-            LEFT JOIN usuarios u ON p.usuario_id = u.id
-            LEFT JOIN pedido_itens pi ON p.id = pi.pedido_id
-            LEFT JOIN itens i ON pi.item_id = i.id
-            WHERE p.status IN ('pendente', 'em_andamento', 'coletando')
-            GROUP BY p.id
-            ORDER BY p.created_at DESC
+                LEFT JOIN usuarios u ON p.usuario_id = u.id
+                LEFT JOIN pedido_itens pi ON p.id = pi.pedido_id
+                LEFT JOIN itens i ON pi.item_id = i.id
+                WHERE p.status IN ('pendente', 'em_andamento', 'coletando')
+                GROUP BY p.id
+                ORDER BY p.created_at DESC
         ''').fetchall()
 
         conn.close()

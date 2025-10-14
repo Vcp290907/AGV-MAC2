@@ -20,13 +20,12 @@ NETWORK_CONFIG = {
 HARDWARE_CONFIG = {
     'camera': {
         'enabled': True,
-    'resolution': (1280, 1280),  # altura aumentada para melhor enquadramento do QR
+        'resolution': (720, 1024),  # 720p padrão, boa taxa de quadros
         'fps': 30,
         'qr_detection': True,
-        'device': 1  # índice padrão da câmera para seguir linha (ex: /dev/video1 no Pi)
-        ,
-    # Fração vertical onde começa a ROI (0.0 topo, 1.0 base). Menor valor = mais área.
-    'roi_y_start_frac': 0.15,
+    'device': 1,  # usar câmera 1 (/dev/video1)
+        # Fração vertical onde começa a ROI (0.0 topo, 1.0 base). Menor valor = mais área.
+        'roi_y_start_frac': 0.15,
         # Controles opcionais de exposição/ganho; se auto=True, manual é ignorado.
         'exposure': {
             'auto': True,
@@ -44,7 +43,9 @@ HARDWARE_CONFIG = {
     'motors': {
         'max_speed': 100,  # Velocidade máxima (%)
         'acceleration': 50,  # Aceleração (%)
-        'deceleration': 50   # Desaceleração (%)
+        'deceleration': 50,   # Desaceleração (%)
+        # Inverter comandos de giro (se a fiação/firmware estiver invertida)
+        'invert_turn_commands': True
     },
     'sensors': {
         'ultrasonic': {
@@ -79,7 +80,77 @@ NAVIGATION_CONFIG = {
     'safety_margin': 20,  # Margem de segurança em cm
     'max_path_length': 500,  # Comprimento máximo do caminho em cm
     'path_planning_algorithm': 'astar',  # Algoritmo de planejamento de caminho
-    'obstacle_detection_range': 50  # Alcance de detecção de obstáculos em cm
+    'obstacle_detection_range': 50,  # Alcance de detecção de obstáculos em cm
+
+    # Parâmetros do seguidor de linha e entrada no subcorredor (tuning rápido)
+    'line_following': {
+        'speed_base': 50,
+        'speed_min': 20,
+        'speed_max': 70,
+        'steering_gain': 1.6
+    },
+    'subcorredor_entry': {
+        'forward_seconds': 4.0,     # tempo de avanço antes da curva
+        'forward_speed': None,       # se None, usa speed_base do seguidor de linha
+        'turn_direction': 'direita', # 'direita' ou 'esquerda'
+        'turn_angle_deg': 90         # ângulo da curva
+    },
+    'qr_centering': {
+        'enabled': False,
+        'timeout_s': 4.0,
+        'tolerance_px': 24,       # quanto o centro pode diferir do centro da imagem
+        'rotate_speed': 12,       # velocidade do pulso de rotação
+        'rotate_pulse_s': 0.08,   # duração do pulso de rotação
+        'forward_speed': None,    # se None, usa speed_base
+        'forward_pulse_s': 0.10   # pequeno avanço para manter QR visível
+    },
+    'turn': {
+    'strategy': 'vision_center',   # 'vision_center' | 'gyro' | 'time'
+        # Inverter comandos de curva globalmente (alternativo ao hardware.motors)
+        'invert_commands': True,
+        'simple_mode': True,          # modo simples: rápido até faltar X graus, depois desacelera
+        'slowdown_start_deg': 10.0,   # começa a desacelerar faltando X graus (modo simples)
+        'simple_rate_brake_thresh': 25.0, # se a taxa for maior que isso ao entrar na zona lenta, dá um breve freio
+        'simple_brake_pause_s': 0.09, # pausa após o freio rápido na transição para zona lenta
+        'simple_pulse_s': 0.05,       # duração dos pulsos no modo simples na zona lenta
+        'simple_pause_s': 0.05,       # pausa entre pulsos no modo simples na zona lenta
+        'simple_disable_sign_flip': True, # desabilita freio por cruzamento no modo simples
+        'max_speed': 22,                # velocidade máxima de giro (reduzido para menos overshoot)
+        'min_speed': 6,                 # velocidade mínima de giro
+        'slowdown_threshold_deg': 30.0, # começa a desacelerar ao se aproximar (graus)
+        'stop_tolerance_deg': 0.8,      # tolerância para parar no alvo (graus)
+        'inertia_comp_deg': 2.0,        # compensação base de inércia (graus)
+        'inertia_rate_k': 0.03,         # ganho adicional pela taxa angular (graus/seg)
+        'speed_k': 1.0,                 # ganho para curva de velocidade
+        'slowdown_gamma': 1.8,          # mapeamento exponencial da desaceleração (>=1)
+        'brake_pause_s': 0.45,          # pausa para estabilizar após parar
+        'sign_flip_brake': True,        # frear imediatamente ao cruzar o ponto de parada
+        'dynamic_compensation': True,   # atualizar compensação de inércia dinamicamente
+        'creep_threshold_deg': 3.0,     # abaixo deste erro, entrar em modo de pulsos curtos
+        'creep_pulse_s': 0.06,          # duração do pulso no modo creep
+        'creep_pause_s': 0.05,          # pausa entre pulsos de creep
+        'max_rate_deg_s': 180.0,        # filtro anti-glitch: taxa máxima plausível
+        'max_jump_deg': 45.0,           # filtro anti-glitch: salto máximo plausível entre leituras
+        # Parâmetros do modo visão (parar quando a linha centraliza)
+        'vision': {
+            'exclusive': True,     # usar somente câmera para a curva (sem giroscópio)
+            'tolerance_px': 22,     # quão perto do alvo parar (px)
+            'slowdown_px': 110,     # abaixo disso, usa velocidade lenta (px)
+            'target_offset_px': 18, # para parar um pouco antes do centro: direita usa -offset, esquerda +offset
+            'min_confidence': 0.45, # confiança mínima da linha
+            'timeout_s': 8.0,       # tempo máximo procurando a linha durante a curva
+            'speed_fast': 22,       # velocidade rápida
+            'speed_slow': 8,        # velocidade lenta na aproximação
+            'start_delay_s': 0.0,   # sem pré-giro quando exclusivo
+            'start_progress_deg': 0.0 # sem pré-giro quando exclusivo
+        },
+        # Parâmetros do modo tempo (curva baseada em duração)
+        'time': {
+            'seconds_right': 1.2,
+            'seconds_left': 1.2,
+            'speed': 20
+        }
+    }
 }
 
 # Configurações de visão computacional

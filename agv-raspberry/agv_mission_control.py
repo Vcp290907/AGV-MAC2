@@ -5,6 +5,7 @@ Coordena navegação, detecção de QR codes e execução de pedidos
 """
 
 import time
+import threading
 import json
 import requests
 from datetime import datetime
@@ -17,7 +18,7 @@ from config import get_esp32_port
 class AGVMissionControl:
     """Sistema completo de controle de missões do AGV"""
 
-    def __init__(self, pc_ip="192.168.0.100", pc_port=5000, esp32_port=None):
+    def __init__(self, pc_ip="192.168.0.120", pc_port=5000, esp32_port=None):
         self.pc_ip = pc_ip
         self.pc_port = pc_port
         self.base_url = f"http://{pc_ip}:{pc_port}"
@@ -42,6 +43,10 @@ class AGVMissionControl:
         # Configurações
         self.distancia_ate_prateleira = 30  # cm até a prateleira após curva
         self.tempo_busca_item = 5  # segundos para "pegar" item
+        self.agv_id = 'agv_1'
+        # Controle do loop de missões
+        self._mission_loop_stop = threading.Event()
+        self._mission_loop_thread = None
 
     def inicializar_sistema(self):
         """Inicializar todos os componentes"""
@@ -90,6 +95,37 @@ class AGVMissionControl:
         except Exception as e:
             print(f"❌ Erro ao obter pedido ativo: {e}")
             return None
+
+    def obter_proximo_comando(self):
+        """Consulta o backend por /agv/next_command e retorna a missão (se houver)."""
+        try:
+            url = f"{self.base_url}/agv/next_command"
+            r = requests.get(url, timeout=5)
+            if r.status_code == 200:
+                data = r.json()
+                if data.get('success') and data.get('command'):
+                    return data['command']
+            return None
+        except Exception as e:
+            print(f"❌ Erro ao obter próximo comando: {e}")
+            return None
+
+    def reportar_status(self, estado, detalhe=None, qr=None, missao_id=None, order_id=None):
+        try:
+            url = f"{self.base_url}/agv/status"
+            payload = {
+                'agv_id': self.agv_id,
+                'status': {
+                    'estado': estado,
+                    'detalhe': detalhe,
+                    'qr': qr,
+                    'missaoId': missao_id,
+                    'orderId': order_id
+                }
+            }
+            requests.post(url, json=payload, timeout=3)
+        except Exception:
+            pass
 
     def iniciar_missao(self, pedido):
         """Iniciar missão baseada no pedido"""
@@ -200,7 +236,13 @@ class AGVMissionControl:
 
     def _navegar_ate_subcorredor(self, subcorredor_destino):
         """Navegar até o QR code do subcorredor usando navegação por linha"""
-        print(f"🧭 Navegando até subcorredor: {subcorredor_destino}")
+        # Formatar para o padrão do usuário nos logs
+        try:
+            cc, ss = subcorredor_destino.split('_', 1)
+            destino_label = f"Corredor{cc}_SubCorredor{ss}"
+        except Exception:
+            destino_label = subcorredor_destino
+        print(f"🧭 Navegando até subcorredor: {destino_label}")
 
         # Usar navegação por linha para encontrar interseção
         qr_encontrado = self.line_navigation.navigate_to_intersection(subcorredor_destino)
@@ -209,13 +251,95 @@ class AGVMissionControl:
             print(f"❌ Não foi possível encontrar o subcorredor {subcorredor_destino}")
             return False
 
-        # QR encontrado! Entrar no subcorredor
-        print("✅ Subcorredor encontrado, entrando...")
-        if not self.line_navigation.enter_subcorredor():
-            print("❌ Falha ao entrar no subcorredor")
+        # QR encontrado! Entrar no subcorredor usando APENAS o processo azul->verde (sem avanço fixo/giroscópio)
+        print("✅ Subcorredor encontrado, entrando com rotina azul→verde (visão)")
+        ok = self.line_navigation.go_until_blue_then_turn_right_until_green(
+            drive_speed=22,
+            turn_speed_fast=35,
+            turn_speed_slow=14,
+            timeout_drive=25.0,
+            timeout_turn=15.0,
+            min_turn_time_s=1.2,
+            green_persist_frames=3,
+            green_min_area=1800,
+            turn_direction='direita',
+            scan_shelf_qr_after_turn=True,
+            shelf_cam_index=0,
+            shelf_scan_time_s=3.0,
+            shelf_scan_debug=False,
+            shelf_expected_qr=destino_label,
+            post_match_forward_s=3.0,
+            post_match_forward_speed=22,
+        )
+        if not ok:
+            print("❌ Falha na rotina azul→verde para entrar no subcorredor")
             return False
 
         return True
+
+    def loop_missoes(self):
+        """Loop simples: busca próximo comando e executa ida ao subcorredor."""
+        print("🔄 Loop de missões iniciado (polling /agv/next_command)")
+        while not self._mission_loop_stop.is_set():
+            cmd = self.obter_proximo_comando()
+            if not cmd:
+                # Dorme pouco e verifica se deve parar
+                for _ in range(20):
+                    if self._mission_loop_stop.is_set():
+                        break
+                    time.sleep(0.1)
+                continue
+
+            missao_id = cmd.get('id')
+            order_id = cmd.get('order_id')
+            itens = cmd.get('items') or []
+            if not itens:
+                self.reportar_status('erro', detalhe='Comando sem itens', missao_id=missao_id)
+                continue
+
+            # Como sua maquete tem dois subcorredores em sequência, vamos ao primeiro destino do primeiro item
+            loc = itens[0].get('location', {})
+            corredor = int(loc.get('corredor', 1))
+            subc = int(loc.get('sub_corredor', 1))
+            destino_code = f"{corredor:02d}_{subc:02d}"
+            destino_label = f"Corredor{corredor:02d}_SubCorredor{subc:02d}"
+            print(f"🎯 Missão recebida {missao_id}: ir ao subcorredor {destino_label}")
+            self.reportar_status('indo_para_corredor', detalhe=destino_label, missao_id=missao_id, order_id=order_id)
+
+            ok = self._navegar_ate_subcorredor(destino_code)
+            if not ok:
+                self.reportar_status('erro', detalhe=f'Falha na navegacao {destino_label}', missao_id=missao_id, order_id=order_id)
+                continue
+
+            self.reportar_status('no_corredor', detalhe=destino_label, missao_id=missao_id, order_id=order_id)
+            print("✅ No corredor. (coleta pode ser adicionada depois). Marcando pedido como concluído para fluxo simples.")
+            # Para fluxo simples da maquete, concluímos a missão após chegar ao corredor
+            self.reportar_status('concluida', detalhe=destino_label, missao_id=missao_id, order_id=order_id)
+            for _ in range(10):
+                if self._mission_loop_stop.is_set():
+                    break
+                time.sleep(0.1)
+
+        print("🛑 Loop de missões finalizado")
+
+    def iniciar_loop_missoes(self):
+        if self._mission_loop_thread and self._mission_loop_thread.is_alive():
+            print("⚠️ Loop de missões já está em execução")
+            return
+        self._mission_loop_stop.clear()
+        self._mission_loop_thread = threading.Thread(target=self.loop_missoes, daemon=True)
+        self._mission_loop_thread.start()
+        print("▶️ Loop de missões iniciado em segundo plano")
+
+    def parar_loop_missoes(self):
+        if not self._mission_loop_thread:
+            print("ℹ️ Loop de missões não está em execução")
+            return
+        print("⏹️ Parando loop de missões...")
+        self._mission_loop_stop.set()
+        self._mission_loop_thread.join(timeout=3)
+        self._mission_loop_thread = None
+        print("✅ Loop de missões parado")
 
     def _coletar_itens_subcorredor(self, subcorredor):
         """Coletar todos os itens do subcorredor usando QR codes"""
@@ -359,7 +483,7 @@ def main():
     print("=" * 25)
 
     # Configurações
-    pc_ip = "192.168.0.100"
+    pc_ip = "192.168.0.120"
     pc_port = 5000
     esp32_port = get_esp32_port()
 
@@ -380,6 +504,8 @@ def main():
         print("3. Executar teste do sistema")
         print("4. Mostrar status")
         print("5. Parar motores")
+        print("6. Iniciar loop de missões (polling)")
+        print("7. Parar loop de missões")
         print("0. Sair")
         print("="*50)
 
@@ -395,6 +521,15 @@ def main():
                     agv.iniciar_missao(pedido)
                 else:
                     print("❌ Nenhum pedido ativo encontrado")
+                    # Ajuda: buscar automaticamente um comando pendente
+                    print("🔎 Verificando se há pedido pendente...")
+                    cmd = agv.obter_proximo_comando()
+                    if cmd and cmd.get('items'):
+                        print("✅ Pedido pendente encontrado e iniciado como 'em_andamento'.")
+                        print(f"   Pedido #{cmd.get('order_id')} | Itens: {len(cmd.get('items', []))}")
+                        print("   Dica: use a opção 6 para iniciar o loop de missões e navegar até o subcorredor.")
+                    else:
+                        print("ℹ️ Nenhum comando pendente. Crie um pedido no site/app e tente novamente.")
 
             elif opcao == '2':
                 if agv.missao_ativa:
@@ -412,6 +547,12 @@ def main():
                 agv.navigation.parar()
                 print("🛑 Motores parados")
 
+            elif opcao == '6':
+                agv.iniciar_loop_missoes()
+
+            elif opcao == '7':
+                agv.parar_loop_missoes()
+
             elif opcao == '0':
                 agv.navigation.parar()
                 print("👋 Saindo...")
@@ -423,10 +564,12 @@ def main():
         except KeyboardInterrupt:
             print("\n🛑 Interrompido pelo usuário")
             agv.navigation.parar()
+            agv.parar_loop_missoes()
             break
         except Exception as e:
             print(f"❌ Erro: {e}")
             agv.navigation.parar()
+            agv.parar_loop_missoes()
 
 if __name__ == "__main__":
     main()
