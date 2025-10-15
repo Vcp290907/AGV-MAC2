@@ -4,16 +4,146 @@ API Local do Raspberry Pi
 Fornece endpoints REST para comunicação com o sistema PC
 """
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
 import logging
 import json
-from config import get_esp32_port
+from config import get_esp32_port, HARDWARE_CONFIG
 from datetime import datetime
 import asyncio
 import threading
+import time
+
+# Câmera e processamento de imagem
+try:
+    from picamera2 import Picamera2
+    PICAMERA2_AVAILABLE = True
+except Exception:
+    PICAMERA2_AVAILABLE = False
+
+try:
+    import cv2
+    CV2_AVAILABLE = True
+except Exception:
+    CV2_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
+
+class CameraStreamer:
+    """Gerencia captura contínua e disponibiliza frames JPEG para streaming."""
+    def __init__(self, width=640, height=480, target_fps=20, camera_index=0):
+        self.width = int(width)
+        self.height = int(height)
+        self.target_fps = int(target_fps)
+        self.camera_index = int(camera_index)
+        self.running = False
+        self._thread = None
+        self._last_jpeg = None
+        self._lock = threading.Lock()
+        self._cv_cap = None
+        self._picam2 = None
+
+    def _init_camera(self):
+        # Tenta Picamera2 primeiro
+        if PICAMERA2_AVAILABLE:
+            try:
+                self._picam2 = Picamera2()
+                cfg = self._picam2.create_preview_configuration(main={"format": 'RGB888', "size": (self.width, self.height)})
+                self._picam2.configure(cfg)
+                self._picam2.start()
+                return True
+            except Exception as e:
+                logging.getLogger(__name__).warning(f"Falha Picamera2, tentando OpenCV: {e}")
+                self._picam2 = None
+
+        # Fallback para OpenCV
+        if CV2_AVAILABLE:
+            try:
+                cap = cv2.VideoCapture(self.camera_index)
+                if not cap.isOpened():
+                    cap.release()
+                    return False
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
+                cap.set(cv2.CAP_PROP_FPS, self.target_fps)
+                self._cv_cap = cap
+                return True
+            except Exception:
+                self._cv_cap = None
+                return False
+        return False
+
+    def _grab_loop(self):
+        interval = 1.0 / max(self.target_fps, 1)
+        encode_params = [int(cv2.IMWRITE_JPEG_QUALITY), 80] if CV2_AVAILABLE else None
+        while self.running:
+            try:
+                frame = None
+                if self._picam2 is not None:
+                    import numpy as np
+                    frame = self._picam2.capture_array()
+                elif self._cv_cap is not None:
+                    ok, frm = self._cv_cap.read()
+                    if ok:
+                        frame = frm
+
+                if frame is not None and CV2_AVAILABLE:
+                    ok, buf = cv2.imencode('.jpg', frame, encode_params)
+                    if ok:
+                        with self._lock:
+                            self._last_jpeg = buf.tobytes()
+
+            except Exception as e:
+                logging.getLogger(__name__).warning(f"Erro capturando frame: {e}")
+
+            time.sleep(interval)
+
+        # Cleanup
+        try:
+            if self._picam2 is not None:
+                self._picam2.stop()
+                self._picam2.close()
+        except Exception:
+            pass
+        try:
+            if self._cv_cap is not None:
+                self._cv_cap.release()
+        except Exception:
+            pass
+
+    def start(self):
+        if self.running:
+            return True
+        if not self._init_camera():
+            return False
+        self.running = True
+        self._thread = threading.Thread(target=self._grab_loop, daemon=True)
+        self._thread.start()
+        return True
+
+    def stop(self):
+        self.running = False
+        if self._thread:
+            self._thread.join(timeout=1.0)
+        self._thread = None
+
+    def get_jpeg(self):
+        with self._lock:
+            return self._last_jpeg
+
+    def set_camera(self, index: int):
+        """Troca o índice da câmera (para setups com 2 câmeras CSI)."""
+        try:
+            index = int(index)
+        except Exception:
+            return False
+        if index == self.camera_index and self.running:
+            return True
+        # Reiniciar com novo índice
+        if self.running:
+            self.stop()
+        self.camera_index = index
+        return self.start()
 
 class RaspberryAPI:
     """API local do Raspberry Pi"""
@@ -33,6 +163,13 @@ class RaspberryAPI:
             'requests_count': 0
         }
 
+        # Streaming de câmera para preview (usa índice padrão do config se existir)
+        try:
+            default_cam = int(HARDWARE_CONFIG.get('camera', {}).get('device', 0))
+        except Exception:
+            default_cam = 0
+        self._camera_streamer = CameraStreamer(camera_index=default_cam)
+
     def setup_routes(self):
         """Configura todas as rotas da API"""
 
@@ -46,7 +183,9 @@ class RaspberryAPI:
                 'endpoints': [
                     'GET /status - Status do sistema',
                     'POST /execute - Executar comando',
-                    'GET /camera - Stream da câmera',
+                    'GET /camera - Status da câmera',
+                    'GET /preview - Página HTML simples com stream',
+                    'GET /video - Stream MJPEG da câmera',
                     'POST /shutdown - Desligar sistema'
                 ]
             })
@@ -173,9 +312,10 @@ class RaspberryAPI:
 
                 # TODO: Implementar status real da câmera
                 camera_status = {
-                    'available': True,
-                    'resolution': '640x480',
-                    'fps': 30,
+                    'available': bool(PICAMERA2_AVAILABLE or CV2_AVAILABLE),
+                    'backend': 'picamera2' if PICAMERA2_AVAILABLE else ('opencv' if CV2_AVAILABLE else 'none'),
+                    'resolution': f"{self._camera_streamer.width}x{self._camera_streamer.height}",
+                    'fps': self._camera_streamer.target_fps,
                     'qr_detection': True,
                     'last_frame': datetime.now().isoformat()
                 }
@@ -191,6 +331,73 @@ class RaspberryAPI:
                     'success': False,
                     'error': str(e)
                 }), 500
+
+        @self.app.route('/preview', methods=['GET'])
+        def preview_page():
+            """Página HTML simples exibindo o stream em /video"""
+            try:
+                self.api_status['requests_count'] += 1
+                html = f"""
+                <!doctype html>
+                <html>
+                <head>
+                  <meta charset='utf-8'>
+                  <title>AGV Preview</title>
+                  <style>
+                    body {{ font-family: Arial, sans-serif; background: #111; color: #eee; margin: 0; padding: 0; }}
+                    .wrap {{ display: flex; flex-direction: column; align-items: center; padding: 16px; }}
+                    img {{ max-width: 96vw; max-height: 88vh; border: 2px solid #444; background: #000; }}
+                    .info {{ margin: 8px; font-size: 14px; color: #bbb; }}
+                  </style>
+                </head>
+                <body>
+                  <div class='wrap'>
+                    <div class='info'>Backend: {('picamera2' if PICAMERA2_AVAILABLE else ('opencv' if CV2_AVAILABLE else 'none'))} – {self._camera_streamer.width}x{self._camera_streamer.height} @ ~{self._camera_streamer.target_fps} FPS</div>
+                    <img src="/video" alt="AGV Camera Preview" />
+                  </div>
+                </body>
+                </html>
+                """
+                return Response(html, mimetype='text/html')
+            except Exception as e:
+                logger.error(f"Erro no preview: {e}")
+                return jsonify({'success': False, 'error': str(e)}), 500
+
+        @self.app.route('/video', methods=['GET'])
+        def video_stream():
+            """Endpoint de stream MJPEG da câmera."""
+            try:
+                self.api_status['requests_count'] += 1
+
+                # Permitir seleção de câmera via query (?cam=0 ou 1)
+                cam_qs = request.args.get('cam')
+                if cam_qs is not None:
+                    if not self._camera_streamer.set_camera(cam_qs):
+                        return jsonify({'success': False, 'error': 'Falha ao selecionar camera'}), 400
+
+                if not self._camera_streamer.running:
+                    started = self._camera_streamer.start()
+                    if not started:
+                        return jsonify({'success': False, 'error': 'Camera indisponível'}), 503
+
+                def generate():
+                    boundary = b'--frame\r\n'
+                    while True:
+                        frame = self._camera_streamer.get_jpeg()
+                        if frame is None:
+                            time.sleep(0.02)
+                            continue
+                        yield boundary
+                        yield b'Content-Type: image/jpeg\r\n'
+                        yield f'Content-Length: {len(frame)}\r\n\r\n'.encode('ascii')
+                        yield frame
+                        yield b'\r\n'
+
+                return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+            except Exception as e:
+                logger.error(f"Erro no stream de vídeo: {e}")
+                return jsonify({'success': False, 'error': str(e)}), 500
 
         @self.app.route('/shutdown', methods=['POST'])
         def shutdown():
@@ -386,3 +593,19 @@ async def start_api_server(agv_system):
     # Manter thread viva
     while agv_system.running:
         await asyncio.sleep(1)
+
+if __name__ == "__main__":
+    # Execução standalone do servidor Flask (útil para testar preview de câmera)
+    logging.basicConfig(level=logging.INFO)
+    try:
+        from config import NETWORK_CONFIG
+        port = int(NETWORK_CONFIG.get('local_port', 8080))
+    except Exception:
+        port = 8080
+
+    class _DummySystem:
+        running = True
+
+    api = RaspberryAPI(_DummySystem())
+    logger.info(f"API standalone iniciando em 0.0.0.0:{port}")
+    api.app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)

@@ -898,6 +898,9 @@ class LineFollowingNavigation:
                                                  follow_line_while_search=True,
                                                  ignore_right_black_during_blue=False,
                                                  ignore_right_frac=0.35,
+                                                 pre_blue_forward_s=0.0,
+                                                pre_blue_forward_speed=None,
+                                                pre_blue_ignore_line=True,
                                                  align_after_turn=True,
                                                  align_timeout_s=3.0,
                                                  align_tol_px=22,
@@ -947,8 +950,10 @@ class LineFollowingNavigation:
 
         # 1) Andar para frente até detectar azul (seguindo a linha com micro-correções)
         t0 = time.time()
+        pre_phase_until = t0 + max(0.0, float(pre_blue_forward_s or 0.0))
+        pre_speed = int(pre_blue_forward_speed) if pre_blue_forward_speed is not None else int(drive_speed)
         if getattr(self.basic_nav, 'mpu', None) and getattr(self.basic_nav.mpu, 'serial_conn', None):
-            self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': drive_speed})
+            self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': pre_speed if pre_phase_until > t0 else drive_speed})
         blue_found = None
         in_pulse = False
         pulse_until = 0.0
@@ -959,18 +964,29 @@ class LineFollowingNavigation:
             if frame is None:
                 time.sleep(0.05)
                 continue
+            # Se fase prévia ativa e queremos ignorar a linha, apenas manter avanço reto
+            pre_active = time.time() < pre_phase_until
+            esp32_available = hasattr(self.basic_nav, 'mpu') and getattr(self.basic_nav.mpu, 'serial_conn', None) is not None
+            if pre_active and pre_blue_ignore_line:
+                if esp32_available and (time.time() - last_forward_keepalive) >= forward_keepalive_interval:
+                    self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': pre_speed})
+                    last_forward_keepalive = time.time()
+                time.sleep(0.05)
+                continue
             frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-            blue = self._detect_blue_square(frame_bgr)
-            if blue.get('detected'):
-                print("🔵 Quadrado azul detectado — tirando foto e parando")
-                try:
-                    os.makedirs(self.snapshots_dir, exist_ok=True)
-                    cv2.imwrite(os.path.join(self.snapshots_dir, f'blue_found_{int(time.time()*1000)}.png'), frame_bgr)
-                except Exception:
-                    pass
-                self.basic_nav.parar()
-                blue_found = blue
-                break
+            # Durante a fase prévia, ignorar detecção do azul para avançar mais
+            if time.time() >= pre_phase_until:
+                blue = self._detect_blue_square(frame_bgr)
+                if blue.get('detected'):
+                    print("🔵 Quadrado azul detectado — tirando foto e parando")
+                    try:
+                        os.makedirs(self.snapshots_dir, exist_ok=True)
+                        cv2.imwrite(os.path.join(self.snapshots_dir, f'blue_found_{int(time.time()*1000)}.png'), frame_bgr)
+                    except Exception:
+                        pass
+                    self.basic_nav.parar()
+                    blue_found = blue
+                    break
             # Seguir a mesma lógica padrão do controle da linha preta enquanto busca o azul
             if follow_line_while_search:
                 # Opcional: ignorar a parte direita do preto (mascarar área direita do frame em branco)
@@ -986,34 +1002,16 @@ class LineFollowingNavigation:
                     frame_for_line = frame
 
                 info = self.line_detector.process_frame(frame_for_line)
-                esp32_available = hasattr(self.basic_nav, 'mpu') and getattr(self.basic_nav.mpu, 'serial_conn', None) is not None
                 if info and info.get('detected'):
+                    # Durante a fase prévia, usar velocidade de avanço definida
+                    base_speed = int(pre_speed if time.time() < pre_phase_until else drive_speed)
                     steering_raw = info.get('steering_correction', 0.0)
-                    steering_correction = max(-1.0, min(1.0, float(steering_raw) * self.steering_gain))
-                    base_speed = int(drive_speed)
-                    if abs(steering_correction) < 0.03:
-                        # Movimento reto
-                        if esp32_available:
-                            self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': base_speed})
-                    elif abs(steering_correction) < 0.2:
-                        # Correção leve com redução
-                        reduced_speed = max(self.speed_min, base_speed - int(abs(steering_correction) * 14))
-                        if esp32_available:
-                            self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': reduced_speed})
-                    else:
-                        # Pulso de correção, mesma convenção: >0 vira esquerda, <0 vira direita
-                        correction_speed = max(10, min(22, int(abs(steering_correction) * 18)))
-                        if esp32_available:
-                            if steering_correction > 0:
-                                self.basic_nav.mpu.enviar_comando('virar_esquerda', {'velocidade': correction_speed})
-                            else:
-                                self.basic_nav.mpu.enviar_comando('virar_direita', {'velocidade': correction_speed})
-                            time.sleep(0.03)
-                            self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': base_speed})
+                    self._apply_line_follow_corrections(steering_raw, base_speed)
                 else:
                     # Linha não detectada momentaneamente: avance devagar e continue procurando
                     if esp32_available:
-                        self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': max(12, int(drive_speed * 0.6))})
+                        fallback_speed = pre_speed if time.time() < pre_phase_until else drive_speed
+                        self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': max(12, int(fallback_speed * 0.6))})
                         time.sleep(0.10)
             time.sleep(0.05)
         if not blue_found:
@@ -1265,6 +1263,48 @@ class LineFollowingNavigation:
         left_speed = max(self.speed_min, min(self.speed_max, left_speed))
         right_speed = max(self.speed_min, min(self.speed_max, right_speed))
         return int(left_speed), int(right_speed)
+
+    def _apply_line_follow_corrections(self, steering_raw, base_speed):
+        """Aplicar lógica padrão de seguimento de linha (mesma da follow_line_step).
+        Usa thresholds 0.03/0.2 e pulso de correção, com possível inversão de giro.
+        """
+        try:
+            from config import NAVIGATION_CONFIG as _NC, HARDWARE_CONFIG as _HC
+            invert_turn_cmds = bool(_NC.get('turn', {}).get('invert_commands', False)) or bool(_HC.get('motors', {}).get('invert_turn_commands', False))
+        except Exception:
+            invert_turn_cmds = False
+
+        def map_turn(cmd_name: str) -> str:
+            if not invert_turn_cmds:
+                return cmd_name
+            if cmd_name == 'virar_direita':
+                return 'virar_esquerda'
+            if cmd_name == 'virar_esquerda':
+                return 'virar_direita'
+            return cmd_name
+
+        steering_correction = max(-1.0, min(1.0, float(steering_raw) * self.steering_gain))
+        esp32_available = hasattr(self.basic_nav, 'mpu') and getattr(self.basic_nav.mpu, 'serial_conn', None) is not None
+
+        if abs(steering_correction) < 0.03:
+            if esp32_available:
+                self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': int(base_speed)})
+            return
+
+        if abs(steering_correction) < 0.2:
+            reduced_speed = max(self.speed_min, int(base_speed) - int(abs(steering_correction) * 14))
+            if esp32_available:
+                self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': int(reduced_speed)})
+            return
+
+        correction_speed = max(10, min(22, int(abs(steering_correction) * 18)))
+        if esp32_available:
+            if steering_correction > 0:
+                self.basic_nav.mpu.enviar_comando(map_turn('virar_esquerda'), {'velocidade': correction_speed})
+            else:
+                self.basic_nav.mpu.enviar_comando(map_turn('virar_direita'), {'velocidade': correction_speed})
+            time.sleep(0.03)
+            self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': int(base_speed)})
 
     def follow_line_step(self):
         """Executar um passo de seguimento de linha com detecção de QR codes"""

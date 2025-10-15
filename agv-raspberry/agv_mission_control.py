@@ -263,6 +263,9 @@ class AGVMissionControl:
             green_persist_frames=3,
             green_min_area=1800,
             turn_direction='direita',
+            # Novo: avançar mais após o QR inicial antes de procurar o azul
+            pre_blue_forward_s=2,
+            pre_blue_forward_speed=35,
             scan_shelf_qr_after_turn=True,
             shelf_cam_index=0,
             shelf_scan_time_s=3.0,

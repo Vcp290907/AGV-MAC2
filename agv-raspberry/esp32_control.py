@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 """
-Módulo de Controle do ESP32 - Servo Motores
-Gerencia comunicação serial com ESP32 para controle de servo motores
+Módulo de Controle do ESP32 - Comunicação com ESP32
+
+Suporta dois protocolos:
+- Protocolo JSON (existente): comandos como {'comando': 'move', ...}
+- Protocolo texto para garra/servos: "MOVE a b c d e", "STATUS", "RUNSEQ"
+
+Assim podemos integrar um firmware de garra que já funciona com comandos de linha
+sem quebrar o restante do sistema que usa JSON.
 """
 
 import serial
@@ -61,26 +67,45 @@ class ESP32Controller:
             # Tentar conectar rapidamente
             test_serial = serial.Serial(port, self.baudrate, timeout=1)
 
-            # Enviar ping
+            # Enviar ping (JSON)
             ping_cmd = {'comando': 'ping', 'timestamp': time.time()}
             test_serial.write((json.dumps(ping_cmd) + '\n').encode('utf-8'))
             test_serial.flush()
 
             # Aguardar resposta
             response = test_serial.readline().decode('utf-8').strip()
-            test_serial.close()
-
             if response:
                 # Aceitar tanto JSON quanto resposta simples
                 if response.strip() in ['OK', 'ok', 'success', 'pong']:
+                    test_serial.close()
                     return True
-                
                 try:
                     response_data = json.loads(response)
                     if response_data.get('status') in ['ok', 'success'] or response_data.get('resposta') == 'pong':
+                        test_serial.close()
                         return True
                 except json.JSONDecodeError:
                     pass
+
+            # Fallback: tentar protocolo de texto da garra
+            try:
+                test_serial.write(b'STATUS\n')
+                test_serial.flush()
+                time.sleep(0.05)
+                lines = []
+                for _ in range(5):
+                    ln = test_serial.readline().decode('utf-8', errors='ignore').strip()
+                    if not ln:
+                        break
+                    lines.append(ln)
+                # Heurística: presença de "giro:" e/ou "OK"
+                if any(ln.lower() == 'ok' for ln in lines) or any('giro:' in ln for ln in lines):
+                    test_serial.close()
+                    return True
+            except Exception:
+                pass
+
+            test_serial.close()
 
         except (serial.SerialException, OSError):
             pass
@@ -146,7 +171,7 @@ class ESP32Controller:
             # Aguardar ESP32 estabilizar
             time.sleep(2)
 
-            # Enviar comando de teste simples (igual ao debug_serial.py)
+            # Enviar comando de teste (JSON)
             test_command = {'comando': 'ping'}
             command_json = json.dumps(test_command) + '\n'
 
@@ -168,6 +193,22 @@ class ESP32Controller:
                         return True
                 except json.JSONDecodeError:
                     pass
+
+            # Fallback: testar protocolo texto (garra)
+            try:
+                self.serial_connection.write(b'STATUS\n')
+                self.serial_connection.flush()
+                time.sleep(0.05)
+                lines = []
+                for _ in range(5):
+                    ln = self.serial_connection.readline().decode('utf-8', errors='ignore').strip()
+                    if not ln:
+                        break
+                    lines.append(ln)
+                if any(ln.lower() == 'ok' for ln in lines) or any('giro:' in ln for ln in lines):
+                    return True
+            except Exception:
+                pass
 
             return False
 
@@ -235,6 +276,79 @@ class ESP32Controller:
         except Exception as e:
             logger.error(f"Erro na comunicação serial: {e}")
             return None
+
+    # =========================
+    # Protocolo texto - Garra
+    # =========================
+    def _send_line(self, line: str, max_lines: int = 6, read_pause: float = 0.03) -> Optional[list]:
+        """Envia uma linha plain-text e retorna as linhas de resposta (ou None em erro)."""
+        if not self.connected or not self.serial_connection:
+            logger.error("ESP32 não está conectado")
+            return None
+        try:
+            if not line.endswith('\n'):
+                line_to_send = line + '\n'
+            else:
+                line_to_send = line
+            self.serial_connection.write(line_to_send.encode('utf-8'))
+            self.serial_connection.flush()
+            time.sleep(read_pause)
+            lines = []
+            for _ in range(max_lines):
+                try:
+                    ln = self.serial_connection.readline().decode('utf-8', errors='ignore').strip()
+                    if not ln:
+                        break
+                    lines.append(ln)
+                except Exception:
+                    break
+            logger.debug(f"📥 Resposta texto: {lines}")
+            return lines
+        except Exception as e:
+            logger.error(f"Erro ao enviar linha: {e}")
+            return None
+
+    def arm_move(self, giro: int, um: int, dois: int, garra: int, tres: int) -> Dict[str, Any]:
+        """Move a garra/servos com comando texto: MOVE a b c d e"""
+        cmd = f"MOVE {int(giro)} {int(um)} {int(dois)} {int(garra)} {int(tres)}"
+        logger.info(f"🦾 Enviando comando de garra: {cmd}")
+        lines = self._send_line(cmd)
+        ok = bool(lines) and any(l.strip().lower() == 'ok' for l in lines)
+        return {'success': ok, 'raw': lines or []}
+
+    def arm_status(self) -> Dict[str, Any]:
+        """Consulta STATUS dos servos (espera linhas com angulos + 'OK')."""
+        lines = self._send_line('STATUS')
+        if not lines:
+            return {'success': False, 'message': 'Sem resposta'}
+        # Tentar extrair leituras
+        status = {'raw': lines}
+        try:
+            for ln in lines:
+                low = ln.lower()
+                if 'giro:' in low:
+                    # Exemplo: "giro:30 um:160 dois:170 garra:73"
+                    parts = low.replace('\t', ' ').split()
+                    for p in parts:
+                        if ':' in p:
+                            k, v = p.split(':', 1)
+                            try:
+                                status[k] = int(float(v))
+                            except Exception:
+                                pass
+        except Exception:
+            pass
+        status['success'] = any(l.strip().lower() == 'ok' for l in lines)
+        return status
+
+    def arm_run_sequence(self) -> Dict[str, Any]:
+        """Roda a sequência interna do firmware (RUNSEQ ou 'x')."""
+        # Preferir RUNSEQ se suportado
+        lines = self._send_line('RUNSEQ')
+        if not lines or all('ERR' in l for l in lines):
+            lines = self._send_line('x')
+        ok = bool(lines) and any(l.strip().lower() == 'ok' for l in lines)
+        return {'success': ok, 'raw': lines or []}
 
     def move_forward(self, duration: float = 1.0) -> Dict[str, Any]:
         """Move o AGV para frente por determinado tempo"""
