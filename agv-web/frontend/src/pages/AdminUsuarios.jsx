@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../services/config';
 
 export default function AdminUsuarios({ usuario }) {
   const [usuarios, setUsuarios] = useState([]);
@@ -20,7 +21,7 @@ export default function AdminUsuarios({ usuario }) {
 
   const carregarUsuarios = async () => {
     try {
-      const response = await fetch('http://localhost:5000/usuarios');
+  const response = await fetch(`${API_BASE_URL}/usuarios`);
       const data = await response.json();
       setUsuarios(data);
     } catch (error) {
@@ -74,8 +75,8 @@ export default function AdminUsuarios({ usuario }) {
 
     try {
       const url = usuarioEditando 
-        ? `http://localhost:5000/usuarios/${usuarioEditando.id}`
-        : 'http://localhost:5000/usuarios';
+        ? `${API_BASE_URL}/usuarios/${usuarioEditando.id}`
+        : `${API_BASE_URL}/usuarios`;
       
       const method = usuarioEditando ? 'PUT' : 'POST';
       
@@ -115,7 +116,7 @@ export default function AdminUsuarios({ usuario }) {
     }
 
     try {
-      const response = await fetch(`http://localhost:5000/usuarios/${usuarioId}`, {
+      const response = await fetch(`${API_BASE_URL}/usuarios/${usuarioId}`, {
         method: 'DELETE'
       });
 
@@ -133,7 +134,7 @@ export default function AdminUsuarios({ usuario }) {
 
   const alternarStatus = async (usuarioId, statusAtual) => {
     try {
-      const response = await fetch(`http://localhost:5000/usuarios/${usuarioId}`, {
+      const response = await fetch(`${API_BASE_URL}/usuarios/${usuarioId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

@@ -2,8 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
-html {
-  overflow: hidden;
+/* Allow the whole page to scroll */
+html, body, #root {
+  height: 100%;
+}
+html, body {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch; /* smoother scroll on iOS */
 }
 
 body {

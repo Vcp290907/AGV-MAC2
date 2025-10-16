@@ -767,51 +767,95 @@ class LineFollowingNavigation:
                    cv2.FONT_HERSHEY_SIMPLEX, 1.5, color, 3)
 
     def _detect_green_square(self, frame):
-        """Detectar quadrado verde no frame"""
+        """Detectar quadrado verde no frame (método configurável: HSV ou norm_rgb)."""
         try:
-            # Converter para HSV para melhor detecção de cor
-            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+            from config import NAVIGATION_CONFIG as _NC
+        except Exception:
+            _NC = {}
+        gcfg = (_NC.get('green_square', {}) if isinstance(_NC, dict) else {})
+        method = str(gcfg.get('method', 'hsv')).lower()
+        min_area = int(gcfg.get('min_area', 800))
+        min_size = int(gcfg.get('min_size_px', 40))
+        aspect_min = float(gcfg.get('aspect_min', 0.6))
+        aspect_max = float(gcfg.get('aspect_max', 1.6))
+        extent_min = float(gcfg.get('extent_min', 0.45))
+        debug = bool(gcfg.get('debug', False))
 
-            # Definir range para verde (ajuste conforme necessário - mais permissivo)
-            lower_green = np.array([30, 30, 30])   # Verde escuro - mais permissivo
-            upper_green = np.array([90, 255, 255]) # Verde claro - mais permissivo
+        mask = None
+        candidates = []
+        vis_dbg = None
+        try:
+            if method == 'norm_rgb':
+                # frame chega em BGR aqui; converter para RGB
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                roi_f = frame_rgb.astype(np.float32) + 1e-3
+                R = roi_f[:, :, 0]
+                G = roi_f[:, :, 1]
+                B = roi_f[:, :, 2]
+                S = (R + G + B)
+                r = R / S
+                g = G / S
+                b = B / S
+                g_min = float(gcfg.get('nrgb_g_min', 0.36))
+                r_max = float(gcfg.get('nrgb_r_max', 0.35))
+                b_max = float(gcfg.get('nrgb_b_max', 0.35))
+                g_minus_maxrb_min = float(gcfg.get('nrgb_g_minus_maxrb_min', 0.06))
+                max_rb = np.maximum(r, b)
+                cond = (g >= g_min) & (r <= r_max) & (b <= b_max) & ((g - max_rb) >= g_minus_maxrb_min)
+                mask = (cond.astype(np.uint8) * 255)
+                mask = cv2.GaussianBlur(mask, (3, 3), 0)
+                kernel = np.ones((5, 5), np.uint8)
+                mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+                mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+                if debug:
+                    try:
+                        mask_bgr = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+                        g_vis = (np.clip(g, 0, 1) * 255).astype(np.uint8)
+                        g_vis = cv2.applyColorMap(g_vis, cv2.COLORMAP_SUMMER)
+                        vis_dbg = np.hstack((frame, mask_bgr, g_vis))
+                    except Exception:
+                        pass
+            else:
+                # HSV padrão (BGR->HSV)
+                hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+                lower_green = np.array([int(gcfg.get('h_low', 30)), int(gcfg.get('s_min', 30)), int(gcfg.get('v_min', 30))])
+                upper_green = np.array([int(gcfg.get('h_high', 90)), 255, 255])
+                mask = cv2.inRange(hsv, lower_green, upper_green)
+                kernel = np.ones((5, 5), np.uint8)
+                mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+                mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
 
-            # Criar máscara para verde
-            mask = cv2.inRange(hsv, lower_green, upper_green)
-
-            # Operações morfológicas para limpar a máscara
-            kernel = np.ones((5, 5), np.uint8)
-            mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
-            mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
-
-            # Encontrar contornos
             contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-            # Ordenar por área (maior primeiro)
             contours = sorted(contours, key=cv2.contourArea, reverse=True)
+            # Debug opcional com contornos
+            if debug:
+                try:
+                    if vis_dbg is None:
+                        mask_bgr = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+                        vis_dbg = np.hstack((frame.copy(), mask_bgr))
+                    for c_dbg in contours[:3]:
+                        x_d, y_d, w_d, h_d = cv2.boundingRect(c_dbg)
+                        cv2.rectangle(vis_dbg, (x_d, y_d), (x_d+w_d, y_d+h_d), (0,255,255), 2)
+                    os.makedirs(self.snapshots_dir, exist_ok=True)
+                    cv2.imwrite(os.path.join(self.snapshots_dir, f'green_debug_{int(time.time()*1000)}.png'), vis_dbg)
+                except Exception:
+                    pass
 
-            candidates = []
             for contour in contours:
-                # Calcular medidas básicas
                 area = cv2.contourArea(contour)
-                if area < 800:
+                if area < min_area:
                     continue
-
                 x, y, w, h = cv2.boundingRect(contour)
-                if w < 40 or h < 40:
+                if w < min_size or h < min_size:
                     continue
-
                 peri = cv2.arcLength(contour, True)
                 approx = cv2.approxPolyDP(contour, 0.04 * peri, True)
                 vertices = len(approx)
                 aspect_ratio = float(w) / h if h > 0 else 999
                 extent = area / float(w * h) if (w * h) > 0 else 0.0
-
                 candidates.append({'bbox': (x, y, w, h), 'area': area, 'vertices': vertices,
                                    'aspect': aspect_ratio, 'extent': extent})
-
-                # Critérios mais permissivos
-                if 4 <= vertices <= 8 and 0.6 <= aspect_ratio <= 1.6 and extent >= 0.45:
+                if 4 <= vertices <= 8 and aspect_min <= aspect_ratio <= aspect_max and extent >= extent_min:
                     return {
                         'detected': True,
                         'bbox': (x, y, w, h),
@@ -823,14 +867,12 @@ class LineFollowingNavigation:
                         'candidates': candidates
                     }
 
-            # Sem detecção forte, retornar candidatos para visualização
             return {'detected': False, 'candidates': candidates}
-
         except Exception as e:
             print(f"Erro na detecção de quadrado verde: {e}")
             return {'detected': False}
 
-    def _detect_blue_square(self, frame):
+    def _detect_blue_square(self, frame, force_color: str = None):
         """Detectar marcador (azul ou vermelho) no frame.
         Cor ativa controlada por NAVIGATION_CONFIG['markers']['active'] ("blue" ou "red").
         - Azul: modos legacy (BGR->HSV) ou novo (RGB->HSV + ROI/gates)
@@ -840,7 +882,7 @@ class LineFollowingNavigation:
         try:
             from config import NAVIGATION_CONFIG as _NC
             markers = _NC.get('markers', {})
-            active_color = str(markers.get('active', 'blue')).lower()
+            active_color = str(force_color or markers.get('active', 'blue')).lower()
             if active_color not in ('blue', 'red'):
                 active_color = 'blue'
             cfg = markers.get(active_color, {})
@@ -860,14 +902,30 @@ class LineFollowingNavigation:
 
             H, W = frame.shape[:2]
             if use_legacy and active_color == 'blue':
-                # LEGACY: frame é BGR; converter BGR->HSV e usar thresholds clássicos em frame completo
-                hsv_full = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-                lower_blue_legacy = np.array([95, 40, 40])
-                upper_blue_legacy = np.array([135, 255, 255])
-                mask_legacy = cv2.inRange(hsv_full, lower_blue_legacy, upper_blue_legacy)
+                # LEGACY (AGORA COM ROI INFERIOR E THRESHOLDS DO CONFIG): frame BGR -> HSV
+                h_low = int(cfg.get('h_low', 95))
+                h_high = int(cfg.get('h_high', 135))
+                s_min = int(cfg.get('s_min', 40))
+                v_min = int(cfg.get('v_min', 40))
+                roi_start_frac = float(cfg.get('roi_y_start_frac', 0.45))
+                y1 = int(max(0, min(H - 1, H * roi_start_frac)))
+                roi_bgr = frame[y1:H, :]
+                hsv_roi = cv2.cvtColor(roi_bgr, cv2.COLOR_BGR2HSV)
+                lower_blue_legacy = np.array([h_low, s_min, v_min])
+                upper_blue_legacy = np.array([h_high, 255, 255])
+                mask_legacy = cv2.inRange(hsv_roi, lower_blue_legacy, upper_blue_legacy)
                 kernel = np.ones((5, 5), np.uint8)
                 mask_legacy = cv2.morphologyEx(mask_legacy, cv2.MORPH_OPEN, kernel)
                 mask_legacy = cv2.morphologyEx(mask_legacy, cv2.MORPH_CLOSE, kernel)
+                # Debug opcional: salvar ROI e máscara lado a lado
+                if bool(cfg.get('debug', False)):
+                    try:
+                        mask_bgr = cv2.cvtColor(mask_legacy, cv2.COLOR_GRAY2BGR)
+                        vis_dbg = np.hstack((roi_bgr.copy(), mask_bgr))
+                        os.makedirs(getattr(self, 'snapshots_dir', './captures'), exist_ok=True)
+                        cv2.imwrite(os.path.join(self.snapshots_dir, f'blue_legacy_debug_{int(time.time()*1000)}.png'), vis_dbg)
+                    except Exception:
+                        pass
                 contours, _ = cv2.findContours(mask_legacy, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                 contours = sorted(contours, key=cv2.contourArea, reverse=True)
                 for c in contours:
@@ -888,17 +946,18 @@ class LineFollowingNavigation:
                     # Opcionalmente aplicar gates adicionais mesmo no legado
                     if bool(cfg.get('apply_gates_after_legacy', False)):
                         # Porta por posição vertical/ROI/bordas
-                        y0 = y
+                        y0 = y + y1
                         bbox_bottom = y0 + h
                         if bbox_bottom < int(H * float(cfg.get('bbox_bottom_min_frac', 0.5))):
                             continue
                         if y0 < int(H * float(cfg.get('min_y_frac', 0.4))):
                             continue
                         edge_margin_px = int(cfg.get('edge_margin_px', 0))
-                        if x < edge_margin_px or (x + w) > (W - edge_margin_px):
+                        x0 = x
+                        if x0 < edge_margin_px or (x0 + w) > (W - edge_margin_px):
                             continue
                         # Porta por centro-x
-                        cx = x + w // 2
+                        cx = x0 + w // 2
                         cx_min = int(W * float(cfg.get('center_x_min_frac', 0.0)))
                         cx_max = int(W * float(cfg.get('center_x_max_frac', 1.0)))
                         if not (cx_min <= cx <= cx_max):
@@ -908,10 +967,10 @@ class LineFollowingNavigation:
                             line_gate_min_black_frac = float(cfg.get('line_gate_min_black_frac', 0.0))
                             strip_h_frac = float(cfg.get('line_gate_strip_h_frac', 0.15))
                             if line_gate_min_black_frac > 0.0:
-                                strip_y1 = min(H - 1, y + h)
+                                strip_y1 = min(H - 1, y0 + h)
                                 strip_y2 = min(H, strip_y1 + max(2, int(h * strip_h_frac)))
                                 if strip_y2 > strip_y1:
-                                    strip = frame[strip_y1:strip_y2, max(0, x):min(W, x + w)]
+                                    strip = frame[strip_y1:strip_y2, max(0, x0):min(W, x0 + w)]
                                     strip_hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
                                     lower_black = np.array([0, 0, 0])
                                     upper_black = np.array([180, 255, 200])
@@ -923,9 +982,9 @@ class LineFollowingNavigation:
                             pass
                     return {
                         'detected': True,
-                        'bbox': (x, y, w, h),
+                        'bbox': (x, y + y1, w, h),
                         'area': area,
-                        'center': (x + w//2, y + h//2),
+                        'center': (x + w//2, y + y1 + h//2),
                         'vertices': vertices,
                         'aspect': aspect_ratio,
                         'extent': extent
@@ -1011,25 +1070,122 @@ class LineFollowingNavigation:
                     }
                 return {'detected': False}
 
-            # NOVO (azul): ROI em RGB
+            # NOVO (azul/vermelho): ROI em RGB com métodos selecionáveis (HSV padrão, norm_rgb, Lab ΔE)
             y1 = int(max(0, min(H - 1, H * roi_start_frac)))
             roi = frame[y1:H, :]
-            hsv = cv2.cvtColor(roi, cv2.COLOR_RGB2HSV)
-            # Faixa azul em HSV controlada por config
-            lower_blue = np.array([h_low, s_min, v_min])
-            upper_blue = np.array([h_high, 255, 255])
-            mask = cv2.inRange(hsv, lower_blue, upper_blue)
-            kernel = np.ones((5, 5), np.uint8)
-            mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
-            mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+            method = str(cfg.get('method', 'hsv')).lower()
+            mask = None
+            dbg_vis = None
+            if method == 'norm_rgb':
+                # Normalized RGB
+                roi_f = roi.astype(np.float32) + 1e-3
+                R = roi_f[:, :, 0]
+                G = roi_f[:, :, 1]
+                B = roi_f[:, :, 2]
+                S = (R + G + B)
+                r = R / S
+                g = G / S
+                b = B / S
+                if active_color == 'blue':
+                    # Azul: b alto, r/g menores e b - max(r,g) >= limiar
+                    b_min = float(cfg.get('nrgb_b_min', 0.38))
+                    r_max = float(cfg.get('nrgb_r_max', 0.35))
+                    g_max = float(cfg.get('nrgb_g_max', 0.35))
+                    b_minus_rg_min = float(cfg.get('nrgb_b_minus_maxrg_min', 0.06))
+                    max_rg = np.maximum(r, g)
+                    cond = (b >= b_min) & (r <= r_max) & (g <= g_max) & ((b - max_rg) >= b_minus_rg_min)
+                    mask = (cond.astype(np.uint8) * 255)
+                    if bool(cfg.get('debug', False)):
+                        try:
+                            roi_bgr = cv2.cvtColor(roi, cv2.COLOR_RGB2BGR)
+                            mask_bgr = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+                            b_vis = (np.clip(b, 0, 1) * 255).astype(np.uint8)
+                            b_vis = cv2.applyColorMap(b_vis, cv2.COLORMAP_OCEAN)
+                            dbg_vis = np.hstack((roi_bgr, mask_bgr, b_vis))
+                        except Exception:
+                            pass
+                else:
+                    # Vermelho: r alto, g/b menores e r - max(g,b) >= limiar
+                    r_min = float(cfg.get('nrgb_r_min', 0.38))
+                    g_max = float(cfg.get('nrgb_g_max', 0.40))
+                    b_max = float(cfg.get('nrgb_b_max', 0.40))
+                    r_minus_gb_min = float(cfg.get('nrgb_r_minus_maxgb_min', 0.06))
+                    max_gb = np.maximum(g, b)
+                    cond = (r >= r_min) & (g <= g_max) & (b <= b_max) & ((r - max_gb) >= r_minus_gb_min)
+                    mask = (cond.astype(np.uint8) * 255)
+                    if bool(cfg.get('debug', False)):
+                        try:
+                            roi_bgr = cv2.cvtColor(roi, cv2.COLOR_RGB2BGR)
+                            mask_bgr = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+                            r_vis = (np.clip(r, 0, 1) * 255).astype(np.uint8)
+                            r_vis = cv2.applyColorMap(r_vis, cv2.COLORMAP_HOT)
+                            dbg_vis = np.hstack((roi_bgr, mask_bgr, r_vis))
+                        except Exception:
+                            pass
+                # Optional blur + morph
+                mask = cv2.GaussianBlur(mask, (3, 3), 0)
+                kernel = np.ones((5, 5), np.uint8)
+                mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+                mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+            elif method == 'lab':
+                # Lab ΔE to a target color (blue or red)
+                roi_bgr = cv2.cvtColor(roi, cv2.COLOR_RGB2BGR)
+                lab = cv2.cvtColor(roi_bgr, cv2.COLOR_BGR2Lab)
+                Lc, Ac, Bc = cv2.split(lab)
+                tgt = cfg.get('lab_target', [32, 20, 200])  # OpenCV Lab ranges: L[0..255], a/b[0..255]
+                Lt, At, Bt = int(tgt[0]), int(tgt[1]), int(tgt[2])
+                dL = (Lc.astype(np.int16) - Lt)
+                dA = (Ac.astype(np.int16) - At)
+                dB = (Bc.astype(np.int16) - Bt)
+                dist = np.sqrt(dL.astype(np.float32)**2 + dA.astype(np.float32)**2 + dB.astype(np.float32)**2)
+                max_de = float(cfg.get('lab_delta_e_max', 30.0))
+                mask = (dist <= max_de).astype(np.uint8) * 255
+                mask = cv2.medianBlur(mask, 3)
+                kernel = np.ones((5, 5), np.uint8)
+                mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+                mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+                if bool(cfg.get('debug', False)):
+                    try:
+                        dist_norm = np.clip((dist / max(1.0, max_de)) * 255.0, 0, 255).astype(np.uint8)
+                        dist_cm = cv2.applyColorMap(255 - dist_norm, cv2.COLORMAP_TURBO)
+                        dbg_vis = np.hstack((roi_bgr, cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR), dist_cm))
+                    except Exception:
+                        pass
+            else:
+                # HSV padrão (novo caminho): azul usa faixa única; vermelho usa duas faixas
+                hsv = cv2.cvtColor(roi, cv2.COLOR_RGB2HSV)
+                if active_color == 'red':
+                    s_min_r = int(cfg.get('s_min', 60))
+                    v_min_r = int(cfg.get('v_min', 50))
+                    h1_low = int(cfg.get('h1_low', 0))
+                    h1_high = int(cfg.get('h1_high', 10))
+                    h2_low = int(cfg.get('h2_low', 170))
+                    h2_high = int(cfg.get('h2_high', 180))
+                    lower_red1 = np.array([h1_low, s_min_r, v_min_r])
+                    upper_red1 = np.array([h1_high, 255, 255])
+                    lower_red2 = np.array([h2_low, s_min_r, v_min_r])
+                    upper_red2 = np.array([h2_high, 255, 255])
+                    mask1 = cv2.inRange(hsv, lower_red1, upper_red1)
+                    mask2 = cv2.inRange(hsv, lower_red2, upper_red2)
+                    mask = cv2.bitwise_or(mask1, mask2)
+                else:
+                    lower_blue = np.array([h_low, s_min, v_min])
+                    upper_blue = np.array([h_high, 255, 255])
+                    mask = cv2.inRange(hsv, lower_blue, upper_blue)
+                kernel = np.ones((5, 5), np.uint8)
+                mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+                mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
             contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             contours = sorted(contours, key=cv2.contourArea, reverse=True)
             # Debug opcional: salvar ROI e máscara lado a lado
             if bool(cfg.get('debug', False)):
                 try:
-                    roi_bgr = cv2.cvtColor(roi, cv2.COLOR_RGB2BGR)
-                    mask_bgr = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
-                    vis_dbg = np.hstack((roi_bgr, mask_bgr))
+                    if dbg_vis is None:
+                        roi_bgr = cv2.cvtColor(roi, cv2.COLOR_RGB2BGR)
+                        mask_bgr = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+                        vis_dbg = np.hstack((roi_bgr, mask_bgr))
+                    else:
+                        vis_dbg = dbg_vis
                     # Desenhar até 3 maiores contornos
                     for i, c_dbg in enumerate(contours[:3]):
                         x_d, y_d, w_d, h_d = cv2.boundingRect(c_dbg)
@@ -1587,6 +1743,11 @@ class LineFollowingNavigation:
                     })
                 # Recalcular quadrado verde no frame estabilizado
                 green_square = self._detect_green_square(current_frame) if current_frame is not None else {'detected': False}
+                # Defaults seguros para offsets (evita NameError no bloco finally/overlays)
+                x_start = 0
+                y_start = 0
+                x_end = current_frame.shape[1] if current_frame is not None else 0
+                y_end = current_frame.shape[0] if current_frame is not None else 0
                 if green_square.get('detected'):
                     x, y, w, h = green_square['bbox']
 
@@ -1607,15 +1768,42 @@ class LineFollowingNavigation:
                     roi_qr = current_frame
 
                 try:
+                    # 1) Tentar no ROI expandido
                     decoded = self._decode_qr_multi(roi_qr)
 
+                    # 2) Se falhar e ainda temos bbox do verde, tentar exatamente o bbox sem margens
+                    if (not decoded) and green_square.get('detected'):
+                        x, y, w, h = green_square['bbox']
+                        y0 = max(0, y)
+                        x0 = max(0, x)
+                        y1b = min(current_frame.shape[0], y + h)
+                        x1b = min(current_frame.shape[1], x + w)
+                        tight_roi = current_frame[y0:y1b, x0:x1b]
+                        if tight_roi is not None and tight_roi.size > 0:
+                            decoded = self._decode_qr_multi(tight_roi)
+                            if decoded:
+                                # ajustar offsets para o bbox original do verde
+                                x_start, y_start = x0, y0
+
+                    # 3) Se ainda falhar, tentar no frame completo (BGR) - último recurso
+                    if not decoded:
+                        try:
+                            full_bgr = full_frame if full_frame is not None else cv2.cvtColor(current_frame, cv2.COLOR_RGB2BGR)
+                        except Exception:
+                            full_bgr = current_frame
+                        if full_bgr is not None and full_bgr.size > 0:
+                            decoded = self._decode_qr_multi(full_bgr)
+
                     if decoded:
-                        # Popular overlays com offset da ROI expandida
-                        # Popular overlays com offset da ROI expandida
+                        # Popular overlays com offset da ROI (se houver)
                         qrs_overlay = []
                         for d in decoded:
                             bx, by, bw, bh = d.get('bbox', (0, 0, 0, 0))
-                            qrs_overlay.append({'bbox': (x_start + bx, y_start + by, bw, bh),
+                            try:
+                                ox, oy = int(x_start), int(y_start)
+                            except Exception:
+                                ox, oy = 0, 0
+                            qrs_overlay.append({'bbox': (ox + bx, oy + by, bw, bh),
                                                 'data': d.get('data', '')})
                         line_info['qr_codes'] = qrs_overlay
 
@@ -2144,8 +2332,165 @@ class LineFollowingNavigation:
             # Parar após o loop
             self.basic_nav.parar()
 
+        elif strategy == 'turn_until_blue':
+            # Virar continuamente até detectar o marcador ativo (azul/vermelho) centralizado
+            try:
+                from config import NAVIGATION_CONFIG as _NCM
+                active_marker = str(_NCM.get('markers', {}).get('active', 'blue')).lower()
+                if active_marker not in ('blue', 'red'):
+                    active_marker = 'blue'
+            except Exception:
+                active_marker = 'blue'
+            color_label = 'AZUL' if active_marker == 'blue' else 'VERMELHO'
+            print(f"🔄 Virando para {turn_dir} até encontrar {color_label}")
+            # Respeitar inversão global de comandos, se configurada
+            try:
+                from config import NAVIGATION_CONFIG as _NC_INV, HARDWARE_CONFIG as _HC_INV
+                inv_cfg = bool(_NC_INV.get('turn', {}).get('invert_commands', False)) or bool(_HC_INV.get('motors', {}).get('invert_turn_commands', False))
+            except Exception:
+                inv_cfg = False
+            cmd_turn = 'virar_esquerda' if turn_dir == 'esquerda' else 'virar_direita'
+            if inv_cfg:
+                cmd_turn = 'virar_direita' if cmd_turn == 'virar_esquerda' else 'virar_esquerda'
+            print(f"↩️ Comando de giro selecionado: {cmd_turn} (invert={inv_cfg})")
+            # Parâmetros de detecção de azul
+            try:
+                from config import NAVIGATION_CONFIG as _NC2
+            except Exception:
+                _NC2 = {}
+            blue_cfg = _NC2.get('blue_turn', {})
+            tol_px = int(blue_cfg.get('tolerance_px', 22))
+            persist = int(blue_cfg.get('persist_frames', 2))
+            min_area = int(blue_cfg.get('min_area', 800))
+            timeout_s = float(blue_cfg.get('timeout_s', 10.0))
+            speed = int(blue_cfg.get('speed', 8))
+            pulse_s = float(blue_cfg.get('pulse_s', 0.06))
+            streak = 0
+            t_start = time.time()
+            last_cmd_time = 0.0
+            cmd_interval = 0.25
+            # Iniciar giro contínuo
+            if getattr(self.basic_nav, 'mpu', None) and getattr(self.basic_nav.mpu, 'serial_conn', None):
+                self.basic_nav.mpu.enviar_comando(cmd_turn, {'velocidade': speed})
+                last_cmd_time = time.time()
+            else:
+                print("⚠️ ESP32 não conectado (serial ausente): nenhum comando de giro será enviado")
+            while time.time() - t_start < timeout_s:
+                # Keepalive do comando de giro (sem parar entre pulsos)
+                if getattr(self.basic_nav, 'mpu', None) and getattr(self.basic_nav.mpu, 'serial_conn', None):
+                    if time.time() - last_cmd_time >= cmd_interval:
+                        self.basic_nav.mpu.enviar_comando(cmd_turn, {'velocidade': speed})
+                        last_cmd_time = time.time()
+                # Capturar frame e verificar azul
+                f = self.line_detector.capture_frame()
+                if f is None:
+                    continue
+                # Escolher pipeline conforme config (legacy usa BGR)
+                try:
+                    from config import NAVIGATION_CONFIG as _NC3
+                    markers = _NC3.get('markers', {})
+                    use_legacy = bool(markers.get(active_marker, {}).get('use_legacy', False))
+                except Exception:
+                    use_legacy = False
+                frame_for = cv2.cvtColor(f, cv2.COLOR_RGB2BGR) if use_legacy else f
+                det = self._detect_blue_square(frame_for, force_color=active_marker)
+                if det.get('detected') and det.get('area', 0) >= min_area:
+                    h, w = f.shape[:2]
+                    cx_img = w // 2
+                    cx = det['center'][0]
+                    bx, by, bw, bh = det.get('bbox', (0, 0, 0, 0))
+                    area_frac = float(det.get('area', 0)) / float(max(1, w * h))
+                    # Critério de aceitação imediato: marcador muito grande ocupa boa fração da largura/área
+                    if bw > 0 and ((bw / float(w)) >= 0.35 or area_frac >= 0.20):
+                        print(f"✅ {color_label} grande detectado (bw={bw}/{w}, area={area_frac:.2f}); encerrando curva")
+                        break
+                    if abs(cx - cx_img) <= tol_px:
+                        streak += 1
+                        if streak >= persist:
+                            print(f"✅ {color_label} centrado; encerrando curva")
+                            break
+                    else:
+                        # Log de rejeição útil para tunagem
+                        try:
+                            err = abs(cx - cx_img)
+                            print(f"↔️ {color_label} detectado, mas fora da tolerância (erro {err}px > {tol_px}px); bw={bw}, area_frac={area_frac:.2f}")
+                        except Exception:
+                            pass
+                        streak = 0
+                else:
+                    streak = 0
+                time.sleep(0.05)
+            # Parar após o loop
+            self.basic_nav.parar()
+
         print("✅ Saída do subcorredor concluída")
         return True
+
+    def turn_left_until_blue(self):
+        """Virar para a esquerda por visão até encontrar o marcador ativo (azul/vermelho) centrado."""
+        try:
+            from config import NAVIGATION_CONFIG as _NCM
+            active_marker = str(_NCM.get('markers', {}).get('active', 'blue')).lower()
+            if active_marker not in ('blue', 'red'):
+                active_marker = 'blue'
+        except Exception:
+            active_marker = 'blue'
+        color_label = 'AZUL' if active_marker == 'blue' else 'VERMELHO'
+        print(f"🔄 Virando para a esquerda até encontrar {color_label}")
+        try:
+            from config import NAVIGATION_CONFIG as _NC
+        except Exception:
+            _NC = {}
+        cfg = _NC.get('blue_turn', {})
+        tol_px = int(cfg.get('tolerance_px', 22))
+        persist = int(cfg.get('persist_frames', 2))
+        min_area = int(cfg.get('min_area', 800))
+        timeout_s = float(cfg.get('timeout_s', 10.0))
+        speed = int(cfg.get('speed', 8))
+        pulse_s = float(cfg.get('pulse_s', 0.06))
+
+        t0 = time.time()
+        streak = 0
+        while time.time() - t0 < timeout_s:
+            # Pulso de giro à esquerda
+            if getattr(self.basic_nav, 'mpu', None) and getattr(self.basic_nav.mpu, 'serial_conn', None):
+                self.basic_nav.mpu.enviar_comando('virar_esquerda', {'velocidade': speed})
+                time.sleep(pulse_s)
+                self.basic_nav.parar()
+            # Capturar e detectar azul
+            f = self.line_detector.capture_frame()
+            if f is None:
+                continue
+            # Usar modo ativo atual
+            try:
+                from config import NAVIGATION_CONFIG as _NC
+                markers = _NC.get('markers', {})
+                active = str(markers.get('active', 'blue')).lower()
+                use_legacy = bool(markers.get(active, {}).get('use_legacy', False))
+            except Exception:
+                active = 'blue'
+                use_legacy = False
+            frame_for = f if (not use_legacy and active == 'blue') else cv2.cvtColor(f, cv2.COLOR_RGB2BGR)
+            det = self._detect_blue_square(frame_for, force_color=active)
+            if det.get('detected') and det.get('area', 0) >= min_area:
+                # Checar centralização
+                h, w = f.shape[:2]
+                cx_img = w // 2
+                cx = det['center'][0]
+                if abs(cx - cx_img) <= tol_px:
+                    streak += 1
+                    if streak >= persist:
+                        print(f"✅ {color_label} centrado; parando curva")
+                        self.basic_nav.parar()
+                        return True
+                else:
+                    streak = 0
+            else:
+                streak = 0
+            time.sleep(0.05)
+        self.basic_nav.parar()
+        print("⏱️ Timeout procurando azul")
+        return False
 
     def navigate_to_delivery_point(self):
         """Navegar até o ponto de entrega"""

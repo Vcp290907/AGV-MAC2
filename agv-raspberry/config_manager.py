@@ -22,7 +22,7 @@ class ConfigManager:
             if os.path.exists(self.config_file):
                 with open(self.config_file, 'r', encoding='utf-8') as f:
                     self.config = json.load(f)
-                print(f"✅ Configurações carregadas de {self.config_file}")
+                print(f"Configuracoes carregadas de {self.config_file}")
                 return True
             else:
                 print(f"⚠️ Arquivo de configuração não encontrado: {self.config_file}")
@@ -30,7 +30,7 @@ class ConfigManager:
                 self._create_default_config()
                 return False
         except Exception as e:
-            print(f"❌ Erro ao carregar configurações: {e}")
+            print(f"Erro ao carregar configuracoes: {e}")
             self._create_default_config()
             return False
 

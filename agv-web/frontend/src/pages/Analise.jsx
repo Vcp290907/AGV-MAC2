@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import socketService from '../services/socketService';
+import { API_BASE_URL } from '../services/config';
 
 export default function Analise({ usuario }) {
   const [analyticsData, setAnalyticsData] = useState({
@@ -35,15 +36,15 @@ export default function Analise({ usuario }) {
       setLoading(true);
 
       // Load orders data
-      const ordersResponse = await fetch('http://localhost:5000/pedidos');
+      const ordersResponse = await fetch(`${API_BASE_URL}/pedidos`);
       const ordersData = await ordersResponse.json();
 
       // Load devices data
-      const devicesResponse = await fetch('http://localhost:5000/dispositivos');
+  const devicesResponse = await fetch(`${API_BASE_URL}/dispositivos`);
       const devicesData = await devicesResponse.json();
 
       // Load warehouse data
-      const warehouseResponse = await fetch('http://localhost:5000/armazem/itens');
+  const warehouseResponse = await fetch(`${API_BASE_URL}/armazem/itens`);
       const warehouseData = await warehouseResponse.json();
 
       // Process analytics
@@ -199,7 +200,7 @@ export default function Analise({ usuario }) {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 pb-24 space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>

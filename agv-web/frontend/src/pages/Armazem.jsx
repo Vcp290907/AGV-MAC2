@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../services/config';
 
 export default function Armazem({ usuario }) {
   const [itens, setItens] = useState([]);
@@ -53,7 +54,7 @@ export default function Armazem({ usuario }) {
 
   const carregarItens = async () => {
     try {
-      const response = await fetch('http://localhost:5000/armazem/itens');
+  const response = await fetch(`${API_BASE_URL}/armazem/itens`);
       const data = await response.json();
       setItens(data);
     } catch (error) {
@@ -63,7 +64,7 @@ export default function Armazem({ usuario }) {
 
   const carregarCategorias = async () => {
     try {
-      const response = await fetch('http://localhost:5000/armazem/categorias');
+  const response = await fetch(`${API_BASE_URL}/armazem/categorias`);
       const data = await response.json();
       setCategorias(data);
     } catch (error) {
@@ -80,7 +81,7 @@ export default function Armazem({ usuario }) {
 
   const gerarProximaTag = async () => {
     try {
-      const response = await fetch('http://localhost:5000/armazem/proxima-tag');
+  const response = await fetch(`${API_BASE_URL}/armazem/proxima-tag`);
       const data = await response.json();
       return data.tag;
     } catch (error) {
@@ -198,7 +199,7 @@ export default function Armazem({ usuario }) {
     const formData = new FormData();
     formData.append('imagem', file);
 
-    const response = await fetch('http://localhost:5000/armazem/upload-imagem', {
+    const response = await fetch(`${API_BASE_URL}/armazem/upload-imagem`, {
       method: 'POST',
       body: formData
     });
@@ -233,8 +234,8 @@ export default function Armazem({ usuario }) {
       }
 
       const url = itemEditando.id 
-        ? `http://localhost:5000/armazem/itens/${itemEditando.id}`
-        : 'http://localhost:5000/armazem/itens';
+  ? `${API_BASE_URL}/armazem/itens/${itemEditando.id}`
+  : `${API_BASE_URL}/armazem/itens`;
       
       const method = itemEditando.id ? 'PUT' : 'POST';
 
@@ -280,7 +281,7 @@ export default function Armazem({ usuario }) {
     if (!window.confirm('Tem certeza que deseja excluir este item?')) return;
 
     try {
-      const response = await fetch(`http://localhost:5000/armazem/itens/${itemId}`, {
+      const response = await fetch(`${API_BASE_URL}/armazem/itens/${itemId}`, {
         method: 'DELETE'
       });
 
@@ -353,7 +354,7 @@ export default function Armazem({ usuario }) {
             </p>
           </div>
         ) : (
-          <div className="max-h-[60vh] overflow-y-auto pr-2">
+          <div className="pr-2">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {itensFiltrados.map(item => (
                 <div
@@ -364,7 +365,7 @@ export default function Armazem({ usuario }) {
                   <div className="w-24 h-24 bg-gray-200 dark:bg-gray-600 rounded-lg mx-auto mb-4 flex items-center justify-center overflow-hidden">
                     {item.imagem ? (
                       <img 
-                        src={`http://localhost:5000/static/images/${item.imagem}`} 
+                        src={`${API_BASE_URL}/static/images/${item.imagem}`} 
                         alt={item.nome}
                         className="w-full h-full object-cover rounded-lg"
                       />
@@ -436,7 +437,7 @@ export default function Armazem({ usuario }) {
     if (!subCorredorSelecionado) {
       const corredor = corredores.find(c => c.id === corredorSelecionado);
       return (
-        <div className="max-h-[70vh] overflow-y-auto pr-2 space-y-8">
+  <div className="pr-2 space-y-8">
           {corredor?.subCorredores.map(subCorredor => {
             const posicoes = gerarPosicoesSubCorredor(subCorredor.id);
             const itensCount = posicoes.filter(p => !p.vazia).length;
@@ -488,7 +489,7 @@ export default function Armazem({ usuario }) {
                           <div className="w-12 h-12 bg-gray-200 dark:bg-gray-600 rounded-lg mx-auto mb-2 flex items-center justify-center">
                             {item.imagem ? (
                               <img 
-                                src={`http://localhost:5000/static/images/${item.imagem}`} 
+                                src={`${API_BASE_URL}/static/images/${item.imagem}`} 
                                 alt={item.nome}
                                 className="w-full h-full object-cover rounded-lg"
                               />
@@ -584,7 +585,7 @@ export default function Armazem({ usuario }) {
                     <div className="w-16 h-16 bg-gray-200 dark:bg-gray-600 rounded-lg mx-auto mb-3 flex items-center justify-center">
                       {item.imagem ? (
                         <img 
-                          src={`http://localhost:5000/static/images/${item.imagem}`} 
+                          src={`${API_BASE_URL}/static/images/${item.imagem}`} 
                           alt={item.nome}
                           className="w-full h-full object-cover rounded-lg"
                         />
@@ -629,7 +630,7 @@ export default function Armazem({ usuario }) {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 pb-24 space-y-6">
       {/* Cabeçalho */}
       <div className="text-center">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
@@ -713,13 +714,13 @@ export default function Armazem({ usuario }) {
           </div>
 
           {/* Conteúdo Principal - Disposição */}
-          <div className="min-h-96 max-h-[calc(100vh-300px)] overflow-y-auto">
+          <div className="min-h-96">
             {renderizarConteudo()}
           </div>
         </div>
       ) : (
         /* Conteúdo Principal - Lista */
-        <div className="min-h-96 max-h-[calc(100vh-300px)]">
+  <div className="min-h-96">
           {renderizarListaItens()}
         </div>
       )}
@@ -759,7 +760,7 @@ export default function Armazem({ usuario }) {
                       <div className="w-16 h-16 bg-gray-200 dark:bg-gray-600 rounded-lg mx-auto mb-3 flex items-center justify-center overflow-hidden">
                         {item.imagem ? (
                           <img 
-                            src={`http://localhost:5000/static/images/${item.imagem}`} 
+                            src={`${API_BASE_URL}/static/images/${item.imagem}`} 
                             alt={item.nome}
                             className="w-full h-full object-cover rounded-lg"
                           />
@@ -833,7 +834,7 @@ export default function Armazem({ usuario }) {
                   {previewImagem || itemEditando.imagem ? (
                     <div className="w-32 h-32 mx-auto bg-gray-200 dark:bg-gray-600 rounded-lg overflow-hidden">
                       <img 
-                        src={previewImagem || `http://localhost:5000/static/images/${itemEditando.imagem}`}
+                        src={previewImagem || `${API_BASE_URL}/static/images/${itemEditando.imagem}`}
                         alt="Preview"
                         className="w-full h-full object-cover"
                       />

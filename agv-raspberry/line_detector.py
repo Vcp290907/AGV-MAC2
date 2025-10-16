@@ -27,7 +27,7 @@ except Exception:
 try:
     from qr_reader_opencv_only import get_camera_manager
     CAMERA_MANAGER_AVAILABLE = True
-    print("✅ CameraManager importado com sucesso")
+    print("CameraManager importado com sucesso")
 except ImportError as e:
     CAMERA_MANAGER_AVAILABLE = False
     print(f"❌ Falha ao importar CameraManager: {e}")
@@ -460,12 +460,14 @@ def main():
 
                 # Adicionar ROI e máscara
                 if 'roi' in info and 'mask' in info:
-                    # Converter máscara para BGR
-                    mask_bgr = cv2.cvtColor(info['mask'], cv2.COLOR_GRAY2BGR)
-
-                    # Combinar ROI original com máscara
-                    combined = cv2.addWeighted(info['roi'], 0.7, mask_bgr, 0.3, 0)
-
+                    roi = info['roi']
+                    mask = info['mask']
+                    # Em vez de escurecer o ROI inteiro com a máscara, vamos apenas colorir os pixels detectados
+                    overlay = roi.copy()
+                    # Cor da sobreposição para pixels pretos detectados (amarelo)
+                    overlay[mask == 255] = (0, 255, 255)
+                    # Misturar levemente apenas nas regiões coloridas
+                    combined = cv2.addWeighted(overlay, 0.35, roi, 0.65, 0)
                     # Colocar na visualização
                     vis_frame[detector.roi_y_start:detector.roi_y_start + detector.roi_height, :] = combined
 

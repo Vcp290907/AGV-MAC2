@@ -150,13 +150,15 @@ def criar_item_armazem():
 
 @armazem_bp.route("/armazem/itens/<int:item_id>", methods=["PUT"])
 def atualizar_item_armazem(item_id):
-    """Atualiza informações de um item do armazém"""
+    """Atualiza informações de um item do armazém
+    - Se a imagem for alterada, remove o arquivo antigo apenas se não houver mais referências.
+    """
     data = request.json
     
     conn = get_db_connection()
     
-    # Verificar se item existe
-    item = conn.execute('SELECT id FROM itens WHERE id = ?', (item_id,)).fetchone()
+    # Verificar se item existe e capturar imagem atual
+    item = conn.execute('SELECT id, imagem FROM itens WHERE id = ?', (item_id,)).fetchone()
     if not item:
         conn.close()
         return jsonify({"error": "Item não encontrado"}), 404
@@ -196,6 +198,23 @@ def atualizar_item_armazem(item_id):
         query = f"UPDATE itens SET {', '.join(campos)} WHERE id = ?"
         conn.execute(query, valores)
         conn.commit()
+
+        # Se a imagem foi alterada, tentar limpar a antiga se não houver mais referências
+        if 'imagem' in data and data['imagem'] != (item['imagem'] or None) and (item['imagem'] or None):
+            try:
+                count_row = conn.execute(
+                    'SELECT COUNT(*) as cnt FROM itens WHERE imagem = ? AND id != ?',
+                    (item['imagem'], item_id)
+                ).fetchone()
+                if (count_row and (count_row['cnt'] or 0) == 0):
+                    old_image_path = os.path.join(UPLOAD_FOLDER, item['imagem'])
+                    if os.path.exists(old_image_path):
+                        try:
+                            os.remove(old_image_path)
+                        except Exception:
+                            pass
+            except Exception:
+                pass
     
     conn.close()
     
@@ -206,7 +225,9 @@ def atualizar_item_armazem(item_id):
 
 @armazem_bp.route("/armazem/itens/<int:item_id>", methods=["DELETE"])
 def excluir_item_armazem(item_id):
-    """Exclui um item do armazém"""
+    """Exclui um item do armazém.
+    Remove o arquivo de imagem apenas se nenhum outro item referenciá-lo.
+    """
     conn = get_db_connection()
     
     # Verificar se item existe e pegar nome da imagem
@@ -215,18 +236,29 @@ def excluir_item_armazem(item_id):
         conn.close()
         return jsonify({"error": "Item não encontrado"}), 404
     
-    # Excluir arquivo de imagem se existir
-    if item['imagem']:
-        image_path = os.path.join(UPLOAD_FOLDER, item['imagem'])
-        if os.path.exists(image_path):
-            try:
-                os.remove(image_path)
-            except:
-                pass  # Ignorar erros na exclusão do arquivo
+    imagem_nome = item['imagem']
     
-    # Excluir item do banco
+    # Excluir item do banco primeiro
     conn.execute('DELETE FROM itens WHERE id = ?', (item_id,))
     conn.commit()
+
+    # Se havia imagem, verificar se ainda é referenciada por outros itens
+    if imagem_nome:
+        try:
+            count_row = conn.execute(
+                'SELECT COUNT(*) as cnt FROM itens WHERE imagem = ?',
+                (imagem_nome,)
+            ).fetchone()
+            if (count_row and (count_row['cnt'] or 0) == 0):
+                image_path = os.path.join(UPLOAD_FOLDER, imagem_nome)
+                if os.path.exists(image_path):
+                    try:
+                        os.remove(image_path)
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
     conn.close()
     
     return jsonify({

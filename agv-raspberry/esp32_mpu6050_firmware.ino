@@ -54,8 +54,18 @@ float angulo_offset_z = 0;
 Servo servoEsquerdo;
 Servo servoDireito;
 
-int velocidade_esquerda = 90; // 90 = parado
-int velocidade_direita = 90;  // 90 = parado
+// Constantes de servo (contínuo): 90=parado, >90 um sentido, <90 outro
+const int SERVO_NEUTRO = 90;
+// Valores de avanço/re quando mapeados a 100% (ajuste conforme seu hardware)
+// Observação: muitos kits usam servos espelhados, então esquerda e direita podem ter "frente" opostos
+// Defina aqui de forma explícita para evitar confusão:
+const int LEFT_FORWARD_VAL = 180;   // esquerda indo para frente
+const int LEFT_BACKWARD_VAL = 0;    // esquerda indo para trás
+const int RIGHT_FORWARD_VAL = 0;    // direita indo para frente (se seu servo for espelhado, troque para 180)
+const int RIGHT_BACKWARD_VAL = 180; // direita indo para trás (se trocar o FORWARD_VAL, troque este também)
+
+int velocidade_esquerda = SERVO_NEUTRO; // 90 = parado
+int velocidade_direita = SERVO_NEUTRO;  // 90 = parado
 
 // Comunicação serial
 String comando_recebido = "";
@@ -312,9 +322,9 @@ void lerDadosMPU6050()
 
 void moverFrente(int velocidade)
 {
-  // Para frente: Esquerda 180, Direita 0 (invertido novamente)
-  velocidade_esquerda = map(velocidade, 0, 100, 90, 180);
-  velocidade_direita = map(velocidade, 0, 100, 90, 0);
+  // Para frente: usar constantes explícitas por lado
+  velocidade_esquerda = map(velocidade, 0, 100, SERVO_NEUTRO, LEFT_FORWARD_VAL);
+  velocidade_direita = map(velocidade, 0, 100, SERVO_NEUTRO, RIGHT_FORWARD_VAL);
 
   aplicarVelocidadeMotores();
 
@@ -327,9 +337,9 @@ void moverFrente(int velocidade)
 
 void moverTras(int velocidade)
 {
-  // Para trás: Esquerda 0, Direita 180 (invertido novamente)
-  velocidade_esquerda = map(velocidade, 0, 100, 90, 0);
-  velocidade_direita = map(velocidade, 0, 100, 90, 180);
+  // Para trás: usar constantes explícitas por lado
+  velocidade_esquerda = map(velocidade, 0, 100, SERVO_NEUTRO, LEFT_BACKWARD_VAL);
+  velocidade_direita = map(velocidade, 0, 100, SERVO_NEUTRO, RIGHT_BACKWARD_VAL);
 
   aplicarVelocidadeMotores();
 
@@ -342,9 +352,9 @@ void moverTras(int velocidade)
 
 void virarEsquerda(int velocidade)
 {
-  // Virar esquerda: Esquerda para trás (0), Direita para frente (0) para rotação anti-horária
-  velocidade_esquerda = map(velocidade, 0, 100, 90, 0); // Esquerda: trás
-  velocidade_direita = map(velocidade, 0, 100, 90, 0);  // Direita: frente
+  // Virar esquerda: esquerda para trás, direita para frente
+  velocidade_esquerda = map(velocidade, 0, 100, SERVO_NEUTRO, LEFT_BACKWARD_VAL);
+  velocidade_direita = map(velocidade, 0, 100, SERVO_NEUTRO, RIGHT_FORWARD_VAL);
 
   aplicarVelocidadeMotores();
 
@@ -357,9 +367,9 @@ void virarEsquerda(int velocidade)
 
 void virarDireita(int velocidade)
 {
-  // Virar direita: Esquerda para frente (180), Direita para trás (180) para rotação horária
-  velocidade_esquerda = map(velocidade, 0, 100, 90, 180); // Esquerda: frente
-  velocidade_direita = map(velocidade, 0, 100, 90, 180);  // Direita: trás
+  // Virar direita: esquerda para frente, direita para trás
+  velocidade_esquerda = map(velocidade, 0, 100, SERVO_NEUTRO, LEFT_FORWARD_VAL);
+  velocidade_direita = map(velocidade, 0, 100, SERVO_NEUTRO, RIGHT_BACKWARD_VAL);
 
   aplicarVelocidadeMotores();
 
@@ -372,8 +382,8 @@ void virarDireita(int velocidade)
 
 void pararMotores()
 {
-  velocidade_esquerda = 90;
-  velocidade_direita = 90;
+  velocidade_esquerda = SERVO_NEUTRO;
+  velocidade_direita = SERVO_NEUTRO;
   aplicarVelocidadeMotores();
 
   Serial.println("{\"status\": \"success\"}");
@@ -386,8 +396,9 @@ void aplicarVelocidadeMotores()
   servoDireito.write(velocidade_direita);
 
   // Debug: mostrar valores aplicados
-  Serial.printf("{\"motores\": {\"esquerdo\": %d, \"direito\": %d}}\n",
-                velocidade_esquerda, velocidade_direita);
+  Serial.printf("{\"motores\": {\"esquerdo\": %d, \"direito\": %d, \"L_FWD\": %d, \"L_BCK\": %d, \"R_FWD\": %d, \"R_BCK\": %d}}\n",
+                velocidade_esquerda, velocidade_direita,
+                LEFT_FORWARD_VAL, LEFT_BACKWARD_VAL, RIGHT_FORWARD_VAL, RIGHT_BACKWARD_VAL);
 }
 
 void enviarStatus()

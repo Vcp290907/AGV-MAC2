@@ -5,12 +5,13 @@ import Armazem from './Armazem';
 import AdminUsuarios from './AdminUsuarios';
 import Status from './Status';
 import Analise from './Analise';
+import Pedidos from './Pedidos';
 
 export default function Dashboard({ usuario, onLogout, darkMode, toggleDarkMode }) {
   const [paginaAtiva, setPaginaAtiva] = useState('controle');
 
   return (
-    <div className="flex h-screen bg-gray-100 dark:bg-gray-900 transition-colors">
+    <div className="flex min-h-screen bg-gray-100 dark:bg-gray-900 transition-colors">
       <Sidebar 
         usuario={usuario} 
         paginaAtiva={paginaAtiva}
@@ -20,8 +21,8 @@ export default function Dashboard({ usuario, onLogout, darkMode, toggleDarkMode 
         toggleDarkMode={toggleDarkMode}
       />
       
-      <div className="flex-1 overflow-y-auto">
-        <div className="bg-white dark:bg-gray-800 m-6 rounded-lg shadow-md h-[calc(100vh-3rem)] transition-colors">
+      <div className="flex-1 flex flex-col min-h-0">
+        <div className="bg-white dark:bg-gray-800 m-6 rounded-lg shadow-md transition-colors">
           <div className="p-6 border-b dark:border-gray-700">
             <h1 className="text-2xl font-bold text-gray-800 dark:text-white">
               {getPaginaTitulo(paginaAtiva)}
@@ -31,7 +32,7 @@ export default function Dashboard({ usuario, onLogout, darkMode, toggleDarkMode 
             </p>
           </div>
           
-          <div className="h-[calc(100%-5rem)]">
+          <div>
             {renderizarConteudo(paginaAtiva, usuario)}
           </div>
         </div>
@@ -45,10 +46,9 @@ function getPaginaTitulo(pagina) {
     controle: 'Controle',
     analise: 'Análise',
     armazem: 'Armazém',
+    pedidos: 'Pedidos',
     'admin-usuarios': 'Administração de Usuários',
-    configuracao: 'Configuração',
-    status: 'Status',
-    rotina: 'Rotina'
+    status: 'Status'
   };
   return titulos[pagina] || 'Dashboard';
 }
@@ -61,14 +61,12 @@ function renderizarConteudo(pagina, usuario) {
       return <Armazem usuario={usuario} />;
     case 'admin-usuarios':
       return <AdminUsuarios usuario={usuario} />;
+    case 'pedidos':
+      return <Pedidos usuario={usuario} />;
     case 'status':
       return <Status usuario={usuario} />;
     case 'analise':
       return <Analise usuario={usuario} />;
-    case 'configuracao':
-      return <div className="p-6">Conteúdo da Configuração</div>;
-    case 'rotina':
-      return <div className="p-6">Conteúdo da Rotina</div>;
     default:
       return <div className="p-6">Página não encontrada</div>;
   }

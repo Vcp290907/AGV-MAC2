@@ -45,7 +45,7 @@ HARDWARE_CONFIG = {
         'acceleration': 50,  # Aceleração (%)
         'deceleration': 50,   # Desaceleração (%)
         # Inverter comandos de giro (se a fiação/firmware estiver invertida)
-        'invert_turn_commands': True
+        'invert_turn_commands': False
     },
     'sensors': {
         'ultrasonic': {
@@ -56,10 +56,11 @@ HARDWARE_CONFIG = {
         },
         'imu': {
             'enabled': False,  # MPU6050
-            'address': 0x68
+            'use_legacy': True
         }
     }
 }
+
 
 # Configurações do sistema
 SYSTEM_CONFIG = {
@@ -97,7 +98,7 @@ NAVIGATION_CONFIG = {
     },
     # Estratégia ao sair do subcorredor após coletar o item
     'subcorredor_exit': {
-        'strategy': 'turn_until_green',     # 'turn_until_green' | 'turn_only' | 'back_and_turn'
+        'strategy': 'turn_until_blue',     # 'turn_until_blue' | 'turn_until_green' | 'turn_only' | 'back_and_turn'
         'back_distance_cm': 30,      # usado se strategy = 'back_and_turn'
         'turn_direction': 'esquerda' # direção padrão da saída
     },
@@ -118,7 +119,7 @@ NAVIGATION_CONFIG = {
     'turn': {
     'strategy': 'vision_center',   # 'vision_center' | 'gyro' | 'time'
         # Inverter comandos de curva globalmente (alternativo ao hardware.motors)
-        'invert_commands': True,
+    'invert_commands': False,
         'simple_mode': True,          # modo simples: rápido até faltar X graus, depois desacelera
         'slowdown_start_deg': 10.0,   # começa a desacelerar faltando X graus (modo simples)
         'simple_rate_brake_thresh': 25.0, # se a taxa for maior que isso ao entrar na zona lenta, dá um breve freio
@@ -162,45 +163,74 @@ NAVIGATION_CONFIG = {
             'speed': 20
         }
     },
+    # Parâmetros do quadrado verde
+    'green_square': {
+        'method': 'norm_rgb',   # 'norm_rgb' | 'hsv'
+        'debug': True,
+        'min_area': 800,
+        'min_size_px': 40,
+        'aspect_min': 0.6,
+        'aspect_max': 1.6,
+        'extent_min': 0.45,
+        # HSV fallback
+        'h_low': 30, 'h_high': 90, 's_min': 30, 'v_min': 30,
+        # norm_rgb
+        'nrgb_g_min': 0.36,
+        'nrgb_r_max': 0.35,
+        'nrgb_b_max': 0.35,
+        'nrgb_g_minus_maxrb_min': 0.06
+    },
     # Marcadores visuais (tuning de cores/ROI)
     'markers': {
-        'active': 'red',
+        'active': 'blue',
         'blue': {
             # Alternar entre detecção legada (BGR->HSV) e a nova (RGB->HSV + ROI/gates)
             'use_legacy': True,
+            # Método na detecção nova: 'hsv' | 'norm_rgb' | 'lab' | 'auto'
+            'method': 'hsv',
             'apply_gates_after_legacy': False,
-            'h_low': 95,
-            'h_high': 135,
-            's_min': 70,
-            'v_min': 60,
+            # Faixa HSV (OpenCV) confiável para AZUL (quando usar legado BGR->HSV)
+            'h_low': 0,
+            'h_high': 7,
+            's_min': 140,
+            'v_min': 150,
             'debug': True,
             # Considerar apenas a metade inferior da imagem para evitar detectar estante/parede
             'roi_y_start_frac': 0.45,
             # Exigir que o topo do bbox não esteja muito alto (evita objetos na parede)
             'min_y_frac': 0.40,
             # Filtros geométricos
-            'min_area': 500,
+            'min_area': 250,
             'min_size_px': 30,
-            'aspect_min': 0.7,
-            'aspect_max': 1.4,
-            'extent_min': 0.50,
+            'aspect_min': 0.6,
+            'aspect_max': 1.8,
+            'extent_min': 0.40,
             # Ignorar áreas enormes (provável estante/parede)
-            'max_frame_area_frac': 0.12,
+            'max_frame_area_frac': 0.50,
             # Exigir que a base do bbox esteja abaixo deste frac (evitar objetos altos)
-            'bbox_bottom_min_frac': 0.55,
+            'bbox_bottom_min_frac': 0.45,
             # Margem para ignorar detecções tocando bordas laterais
-            'edge_margin_px': 10,
+            'edge_margin_px': 0,
             # Janelamento horizontal pelo centro da imagem (para evitar falsas bordas/parede)
-            'center_x_min_frac': 0.20,
-            'center_x_max_frac': 0.80,
+            'center_x_min_frac': 0.05,
+            'center_x_max_frac': 0.95,
             # Porta com a linha preta: requer fração mínima de pixels pretos logo abaixo do azul
-            'line_gate_min_black_frac': 0.12,
+            'line_gate_min_black_frac': 0.0,
             # Altura do strip abaixo do bbox para checar a linha (fração da altura do bbox)
-            'line_gate_strip_h_frac': 0.18
+            'line_gate_strip_h_frac': 0.18,
+            # Parâmetros do modo norm_rgb
+            'nrgb_b_min': 0.38,
+            'nrgb_r_max': 0.35,
+            'nrgb_g_max': 0.35,
+            'nrgb_b_minus_maxrg_min': 0.06,
+            # Parâmetros do modo Lab
+            'lab_target': [32, 20, 200],
+            'lab_delta_e_max': 30.0
         },
         'red': {
-            # Detecção de vermelho; por padrão usa legado BGR->HSV com duas faixas de H
-            'use_legacy': True,
+            # Detecção de vermelho; pode usar legado BGR->HSV (duas faixas) ou novos métodos
+            'use_legacy': False,
+            'method': 'norm_rgb',
             'apply_gates_after_legacy': True,
             'debug': True,
             # Faixas HSV para vermelho (duas bandas por wrap do H)
@@ -208,8 +238,8 @@ NAVIGATION_CONFIG = {
             'h1_high': 10,
             'h2_low': 170,
             'h2_high': 180,
-            's_min': 70,
-            'v_min': 60,
+            's_min': 60,
+            'v_min': 50,
             # ROI inferior
             'roi_y_start_frac': 0.45,
             # Portas geométricas
@@ -226,8 +256,24 @@ NAVIGATION_CONFIG = {
             'center_x_max_frac': 0.80,
             # Porta com a linha preta abaixo
             'line_gate_min_black_frac': 0.15,
-            'line_gate_strip_h_frac': 0.20
+            'line_gate_strip_h_frac': 0.20,
+            # norm_rgb params for red
+            'nrgb_r_min': 0.38,
+            'nrgb_g_max': 0.40,
+            'nrgb_b_max': 0.40,
+            'nrgb_r_minus_maxgb_min': 0.06,
+            # Lab target for red (tunable); example target
+            'lab_target': [136, 196, 180],
+            'lab_delta_e_max': 32.0
         }
+    },
+    'blue_turn': {
+        'tolerance_px': 22,
+        'persist_frames': 2,
+        'min_area': 800,
+        'timeout_s': 10.0,
+        'speed': 8,
+        'pulse_s': 0.06
     }
 }
 

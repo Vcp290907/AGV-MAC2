@@ -45,7 +45,7 @@ class BasicNavigation:
         print("=" * 40)
 
         if not self.mpu.conectar_esp32():
-            print("Falha ao conectar ESP32")
+            print("Erro ao conectar ESP32: module 'serial' has no attribute 'Serial'")
             return False
 
         if not self.mpu.calibrar_sensor():

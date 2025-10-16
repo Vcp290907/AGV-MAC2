@@ -5,22 +5,20 @@ export default function Sidebar({ usuario, paginaAtiva, setPaginaAtiva, onLogout
     { id: 'controle', nome: 'Controle', icone: '📱' },
     { id: 'analise', nome: 'Análise', icone: '📊' },
     { id: 'armazem', nome: 'Armazém', icone: '📦' },
+    { id: 'pedidos', nome: 'Pedidos', icone: '🧾' },
     { id: 'admin-usuarios', nome: 'Usuários', icone: '👥' },
-    { id: 'configuracao', nome: 'Configuração', icone: '⚙️' },
-    { id: 'status', nome: 'Status', icone: 'ℹ️' },
-    { id: 'rotina', nome: 'Rotina', icone: '🔄' }
+    { id: 'status', nome: 'Status', icone: 'ℹ️' }
   ];
 
   const menusFuncionario = [
     { id: 'controle', nome: 'Controle', icone: '📱' },
-    { id: 'status', nome: 'Status', icone: 'ℹ️' },
-    { id: 'rotina', nome: 'Rotina', icone: '🔄' }
+    { id: 'status', nome: 'Status', icone: 'ℹ️' }
   ];
 
   const menus = usuario.perfil === 'gerente' ? menusGerente : menusFuncionario;
 
   return (
-    <div className="w-64 bg-white dark:bg-gray-800 shadow-lg transition-colors relative">
+    <div className="w-64 bg-white dark:bg-gray-800 shadow-lg transition-colors flex flex-col min-h-screen">
       {/* Header */}
       <div className="p-4 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center">
@@ -34,7 +32,7 @@ export default function Sidebar({ usuario, paginaAtiva, setPaginaAtiva, onLogout
       </div>
 
       {/* Páginas */}
-      <div className="p-4">
+      <div className="p-4 flex-1 overflow-auto">
         <h3 className="text-gray-400 dark:text-gray-500 text-sm font-medium mb-4 uppercase">
           Páginas
         </h3>
@@ -58,7 +56,7 @@ export default function Sidebar({ usuario, paginaAtiva, setPaginaAtiva, onLogout
       </div>
 
       {/* Botões no rodapé */}
-      <div className="absolute bottom-4 left-4 flex space-x-2">
+      <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex space-x-2">
         {/* Botão Dark Mode */}
         <button
           onClick={toggleDarkMode}

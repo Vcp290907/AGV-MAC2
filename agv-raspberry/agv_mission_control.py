@@ -565,8 +565,8 @@ def main():
     pc_port = get_config('backend.port')
     esp32_port = get_config('esp32.port')
 
-    print(f"📡 Backend: {pc_ip}:{pc_port}")
-    print(f"🤖 ESP32: {esp32_port}")
+    print(f"Backend: {pc_ip}:{pc_port}")
+    print(f"ESP32: {esp32_port}")
 
     # Criar controle de missões
     agv = AGVMissionControl(pc_ip=pc_ip, pc_port=pc_port, esp32_port=esp32_port)
