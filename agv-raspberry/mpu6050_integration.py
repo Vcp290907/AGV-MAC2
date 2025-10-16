@@ -10,6 +10,7 @@ try:
 except Exception:
     serial = None
     HAVE_PYSERIAL = False
+    print("pyserial nao disponivel - usando simulacao")
 import time
 import json
 import math
@@ -47,7 +48,9 @@ class MPU6050Integration:
         """Conectar ao ESP32 via serial"""
         try:
             if not HAVE_PYSERIAL:
-                raise RuntimeError("pyserial não está instalado/disponível")
+                print("pyserial nao disponivel - simulando conexao ESP32")
+                self.serial_conn = None  # Simulação
+                return True
             self.serial_conn = serial.Serial(
                 self.esp32_port,
                 self.baudrate,
@@ -55,7 +58,7 @@ class MPU6050Integration:
             )
             time.sleep(2)  # Aguardar inicialização
 
-            print(f"✅ Conectado ao ESP32: {self.esp32_port}")
+            print(f"Conectado ao ESP32: {self.esp32_port}")
             return True
 
         except Exception as e:
@@ -65,10 +68,14 @@ class MPU6050Integration:
     def enviar_comando(self, comando, dados=None):
         """Enviar comando para ESP32"""
         try:
+            if not HAVE_PYSERIAL or self.serial_conn is None:
+                print(f"(simulacao) comando enviado: {comando}")
+                return '{"status": "ok"}'
+
             # Limpar buffer de entrada
             if self.serial_conn:
                 self.serial_conn.reset_input_buffer()
-            
+
             mensagem = {'comando': comando}
             if dados:
                 mensagem.update(dados)
@@ -81,7 +88,7 @@ class MPU6050Integration:
             return resposta
 
         except Exception as e:
-            print(f"❌ Erro ao enviar comando: {e}")
+            print(f"Erro ao enviar comando: {e}")
             return None
 
     def calibrar_sensor(self, amostras=10):
@@ -92,6 +99,13 @@ class MPU6050Integration:
 
     def ler_dados_brutos(self):
         """Ler dados brutos do MPU6050 via ESP32 - ângulos"""
+        if not HAVE_PYSERIAL or self.serial_conn is None:
+            # Simulação
+            return {
+                'angulos': {'pitch': 0.0, 'roll': 0.0, 'yaw': 0.0},
+                'calibrado': True
+            }
+
         resposta = self.enviar_comando('ler_mpu6050')
 
         if resposta:

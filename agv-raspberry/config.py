@@ -100,7 +100,9 @@ NAVIGATION_CONFIG = {
     'subcorredor_exit': {
         'strategy': 'turn_until_blue',     # 'turn_until_blue' | 'turn_until_green' | 'turn_only' | 'back_and_turn'
         'back_distance_cm': 30,      # usado se strategy = 'back_and_turn'
-        'turn_direction': 'esquerda' # direção padrão da saída
+        'turn_direction': 'direita', # direção padrão da saída
+        'ignore_blue_seconds': 2.5,  # ignorar azul por 2.5 segundos (mais tempo) após coleta
+        'ignore_blue_after_qr_seconds': 2.0  # ignorar azul por 2 segundos após detectar QR correto
     },
     'qr_centering': {
         'enabled': False,
@@ -113,7 +115,7 @@ NAVIGATION_CONFIG = {
     },
     # Avanço após leitura de QR (durante o follow-line em verde)
     'qr_post_read': {
-        'forward_seconds': 0.5,    # antes 2.0s; reduzido para parar mais cedo após QR
+        'forward_seconds': 2.0,    # aumentado para 2 segundos após detectar QR correto
         'forward_speed': 30        # ajuste a velocidade aqui, se necessário
     },
     'turn': {
@@ -191,9 +193,9 @@ NAVIGATION_CONFIG = {
             'apply_gates_after_legacy': False,
             # Faixa HSV (OpenCV) confiável para AZUL (quando usar legado BGR->HSV)
             'h_low': 0,
-            'h_high': 7,
-            's_min': 140,
-            'v_min': 150,
+            'h_high': 130,
+            's_min': 170,
+            'v_min': 80,
             'debug': True,
             # Considerar apenas a metade inferior da imagem para evitar detectar estante/parede
             'roi_y_start_frac': 0.45,
@@ -272,7 +274,7 @@ NAVIGATION_CONFIG = {
         'persist_frames': 2,
         'min_area': 800,
         'timeout_s': 10.0,
-        'speed': 8,
+        'speed': 35,
         'pulse_s': 0.06
     }
 }

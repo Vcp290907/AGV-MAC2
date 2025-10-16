@@ -61,8 +61,8 @@ const int SERVO_NEUTRO = 90;
 // Defina aqui de forma explícita para evitar confusão:
 const int LEFT_FORWARD_VAL = 180;   // esquerda indo para frente
 const int LEFT_BACKWARD_VAL = 0;    // esquerda indo para trás
-const int RIGHT_FORWARD_VAL = 0;    // direita indo para frente (se seu servo for espelhado, troque para 180)
-const int RIGHT_BACKWARD_VAL = 180; // direita indo para trás (se trocar o FORWARD_VAL, troque este também)
+const int RIGHT_FORWARD_VAL = 0;    // direita indo para frente (servos espelhados ao contrário)
+const int RIGHT_BACKWARD_VAL = 180; // direita indo para trás (servos espelhados ao contrário)
 
 int velocidade_esquerda = SERVO_NEUTRO; // 90 = parado
 int velocidade_direita = SERVO_NEUTRO;  // 90 = parado

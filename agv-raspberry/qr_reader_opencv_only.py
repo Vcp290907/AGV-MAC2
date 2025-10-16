@@ -59,7 +59,7 @@ class CameraManager:
                 print(f"📷 Camera Manager inicializado (câmera {self.camera_id})")
                 return True
             except Exception as e:
-                print(f"❌ Erro ao inicializar Camera Manager: {e}")
+                print(f"Erro ao inicializar Camera Manager: {e}")
                 return False
     
     def capture_frame(self):

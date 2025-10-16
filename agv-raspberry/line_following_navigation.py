@@ -1450,9 +1450,9 @@ class LineFollowingNavigation:
             invert = bool(invert_turn or inv_cfg)
         except Exception:
             invert = bool(invert_turn)
-        cmd_turn = 'virar_direita' if str(turn_direction).lower() == 'direita' else 'virar_esquerda'
+        cmd_turn = 'virar_esquerda' if str(turn_direction).lower() == 'direita' else 'virar_direita'
         if invert:
-            cmd_turn = 'virar_esquerda' if cmd_turn == 'virar_direita' else 'virar_direita'
+            cmd_turn = 'virar_direita' if cmd_turn == 'virar_esquerda' else 'virar_esquerda'
         print(f"↪️ Direção física desejada: {turn_direction} | comando enviado: {cmd_turn}{' (invertido)' if invert else ''}")
         if getattr(self.basic_nav, 'mpu', None) and getattr(self.basic_nav.mpu, 'serial_conn', None):
             self.basic_nav.mpu.enviar_comando(cmd_turn, {'velocidade': turn_speed_fast})
@@ -1637,7 +1637,7 @@ class LineFollowingNavigation:
 
         # Inicializar detector de linha
         if not self.line_detector.initialize():
-            print("❌ Falha no detector de linha")
+            print("Falha no detector de linha")
             success = False
         else:
             # Entregar detector compartilhado para a navegação básica
@@ -1650,7 +1650,7 @@ class LineFollowingNavigation:
         # Inicializar detector QR (opcional - usa pyzbar diretamente)
         try:
             import pyzbar
-            print("✅ pyzbar disponível para leitura de QR codes")
+            print("pyzbar disponivel para leitura de QR codes")
         except ImportError:
             print("⚠️ pyzbar não disponível - leitura de QR codes desabilitada")
 
@@ -1659,7 +1659,7 @@ class LineFollowingNavigation:
             if system == 'windows':
                 print("💡 Modo Windows: Use para testes visuais e simulação")
         else:
-            print("❌ Falha na inicialização")
+            print("Falha na inicializacao")
 
         return success
 
@@ -2279,6 +2279,14 @@ class LineFollowingNavigation:
         strategy = str(exit_cfg.get('strategy', 'turn_until_green')).lower()
         turn_dir = str(exit_cfg.get('turn_direction', 'esquerda')).lower()
         back_dist = int(exit_cfg.get('back_distance_cm', 30))
+        ignore_blue_seconds = float(exit_cfg.get('ignore_blue_seconds', 2.5))
+        ignore_blue_after_qr_seconds = float(exit_cfg.get('ignore_blue_after_qr_seconds', 2.0))
+        streak = 0
+        t_start = time.time()
+        last_cmd_time = 0.0
+        cmd_interval = 0.25
+        ignore_blue_until = t_start + ignore_blue_seconds  # Ignorar azul por X segundos após coleta
+        ignore_blue_after_qr_until = 0.0  # Será definido quando QR for detectado
 
         if strategy == 'back_and_turn':
             # Comportamento antigo: ré e virar
@@ -2394,6 +2402,18 @@ class LineFollowingNavigation:
                     use_legacy = False
                 frame_for = cv2.cvtColor(f, cv2.COLOR_RGB2BGR) if use_legacy else f
                 det = self._detect_blue_square(frame_for, force_color=active_marker)
+                current_time = time.time()
+                # Verificar se deve ignorar azul (período inicial ou após QR)
+                should_ignore_blue = (current_time < ignore_blue_until) or (ignore_blue_after_qr_until > 0 and current_time < ignore_blue_after_qr_until)
+                if should_ignore_blue:
+                    if current_time < ignore_blue_until:
+                        remaining = ignore_blue_until - current_time
+                        print(f"⏳ Ignorando azul (período inicial): {remaining:.1f}s restantes")
+                    elif ignore_blue_after_qr_until > 0:
+                        remaining = ignore_blue_after_qr_until - current_time
+                        print(f"⏳ Ignorando azul (após QR): {remaining:.1f}s restantes")
+                    time.sleep(0.05)
+                    continue
                 if det.get('detected') and det.get('area', 0) >= min_area:
                     h, w = f.shape[:2]
                     cx_img = w // 2

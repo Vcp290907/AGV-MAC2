@@ -86,8 +86,8 @@ class LineDetector:
 
     def initialize(self):
         """Inicializar câmera usando CameraManager para evitar conflitos"""
-        print("Inicializando Picamera2 para detecção de linha...")
-        print(f"🎛️ Índice de câmera solicitado: {self.camera_index}")
+        print("Inicializando Picamera2 para deteccao de linha...")
+        print(f"Indice de camera solicitado: {self.camera_index}")
 
         if CAMERA_MANAGER_AVAILABLE:
             # Usar CameraManager para evitar conflitos
@@ -97,7 +97,7 @@ class LineDetector:
                 print("✅ Picamera2 inicializada para detecção de linha!")
                 return True
             else:
-                print("❌ Falha na inicialização do Camera Manager")
+                print("Falha na inicializacao do Camera Manager")
                 return False
         else:
             # Fallback para inicialização direta (não recomendado)

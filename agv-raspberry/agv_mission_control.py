@@ -67,7 +67,7 @@ class AGVMissionControl:
 
         # Inicializar navegação por linha
         if not self.line_navigation.initialize():
-            print("❌ Falha na inicialização da navegação por linha")
+            print("Falha na inicializacao da navegacao por linha")
             return False
 
         # Inicializar detector QR (opcional - continua se falhar)
