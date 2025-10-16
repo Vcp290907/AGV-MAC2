@@ -1,21 +1,90 @@
 #!/usr/bin/env python3
 """
-Leitor de QR Codes - APENAS OpenCV (Funciona Sempre)
-Versão que não depende do picamera2 problemático
+Leitor de QR Codes - Picamera2 Only
+Versão que usa apenas Picamera2 para consistência
 """
 
 import cv2
 from pyzbar.pyzbar import decode
 import time
 import sys
+import threading
+
+# Gerenciador global de câmera para evitar conflitos
+_camera_managers = {}  # Dicionário por camera_id
+_camera_lock = threading.Lock()
+
+def get_camera_manager(camera_id=1):
+    """Obter instância singleton do gerenciador de câmera por camera_id"""
+    global _camera_managers
+    with _camera_lock:
+        if camera_id not in _camera_managers:
+            _camera_managers[camera_id] = CameraManager(camera_id)
+        return _camera_managers[camera_id]
+
+class CameraManager:
+    """Gerenciador singleton para Picamera2"""
+    
+    def __init__(self, camera_id=1):
+        self.camera_id = camera_id
+        self.picam2 = None
+        self.initialized = False
+        self.lock = threading.Lock()
+        
+    def initialize(self):
+        """Inicializar câmera se ainda não foi inicializada"""
+        with self.lock:
+            if self.initialized:
+                return True
+                
+            try:
+                from picamera2 import Picamera2
+                self.picam2 = Picamera2(self.camera_id)
+                # Definir resolução por câmera: cam 0 (shelf/QR) em alta resolução 3280x2464
+                # Observação: Picamera2 usa (width, height). Mantemos cam 1 no padrão atual.
+                desired_sizes = {
+                    0: (3280, 2464),  # Cam 0: alta resolução (IMX219 full)
+                }
+                size = desired_sizes.get(int(self.camera_id), (720, 1024))
+                # Garantir tupla (w,h)
+                if isinstance(size, (list, tuple)) and len(size) == 2:
+                    w, h = int(size[0]), int(size[1])
+                else:
+                    w, h = 720, 1024
+                config = self.picam2.create_still_configuration(
+                    main={"format": 'RGB888', "size": (w, h)}
+                )
+                self.picam2.configure(config)
+                self.initialized = True
+                print(f"📷 Camera Manager inicializado (câmera {self.camera_id})")
+                return True
+            except Exception as e:
+                print(f"❌ Erro ao inicializar Camera Manager: {e}")
+                return False
+    
+    def capture_frame(self):
+        """Capturar um frame da câmera"""
+        if not self.initialized:
+            return None
+            
+        with self.lock:
+            try:
+                self.picam2.start()
+                frame = self.picam2.capture_array()
+                self.picam2.stop()
+                return frame
+            except Exception as e:
+                print(f"❌ Erro ao capturar frame: {e}")
+                return None
 
 class OpenCVOnlyQRReader:
-    """Leitor que usa apenas OpenCV - funciona sempre"""
+    """Leitor que usa apenas Picamera2 para consistência"""
 
     def detectar_qr_code(self):
         """Detectar um único QR code para navegação"""
         try:
-            if not self.cap or not self.cap.isOpened():
+            # Verificar se a câmera está inicializada
+            if self.camera_manager is None:
                 if not self.initialize():
                     return {
                         'detectado': False,
@@ -24,13 +93,23 @@ class OpenCVOnlyQRReader:
                         'timestamp': time.time()
                     }
 
-            # Capturar frame
-            ret, frame = self.cap.read()
-            if not ret or frame is None:
+            # Usar CameraManager para capturar frame
+            try:
+                frame = self.camera_manager.capture_frame()
+                if frame is None:
+                    return {
+                        'detectado': False,
+                        'codigo': None,
+                        'erro': 'Falha ao capturar frame',
+                        'timestamp': time.time()
+                    }
+                # Converter RGB para BGR para compatibilidade com pyzbar
+                frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+            except Exception as e:
                 return {
                     'detectado': False,
                     'codigo': None,
-                    'erro': 'Falha ao capturar frame',
+                    'erro': f'Falha CameraManager: {e}',
                     'timestamp': time.time()
                 }
 
@@ -62,71 +141,32 @@ class OpenCVOnlyQRReader:
             }
 
     def __init__(self, camera_id=0):
+        # Usar CameraManager para evitar conflitos
         self.camera_id = camera_id
-        self.cap = None
+        self.cap = None  # Não usar OpenCV
+        self.camera_manager = None  # Usar CameraManager
         self.qr_codes_detectados = set()
 
     def initialize(self):
-        """Inicializar câmera OpenCV"""
-        print(f"Inicializando camera OpenCV {self.camera_id}...")
+        """Inicializar câmera usando CameraManager"""
+        print(f"Inicializando camera Picamera2 {self.camera_id}...")
 
-        # Tentar diferentes backends dependendo do sistema operacional
-        import platform
-        system = platform.system().lower()
-        
-        if system == 'windows':
-            # Backends para Windows
-            backends = [
-                cv2.CAP_DSHOW,   # DirectShow (Windows)
-                cv2.CAP_MSMF,    # Media Foundation (Windows)
-                cv2.CAP_ANY      # Qualquer backend
-            ]
-        else:
-            # Backends para Raspberry Pi/Linux
-            backends = [
-                cv2.CAP_V4L2,    # Video4Linux2 (Raspberry Pi)
-                cv2.CAP_GSTREAMER,  # GStreamer
-                cv2.CAP_ANY      # Qualquer backend
-            ]
-
-        for backend in backends:
-            try:
-                print(f"Tentando backend: {backend}")
-                self.cap = cv2.VideoCapture(self.camera_id, backend)
-
-                if self.cap.isOpened():
-                    print(f"Backend {backend} funcionou!")
-                    break
-                else:
-                    self.cap.release()
-            except Exception as e:
-                print(f"Erro com backend {backend}: {e}")
-                continue
-
-        if not self.cap or not self.cap.isOpened():
-            print(f"Nao foi possivel abrir camera {self.camera_id}")
+        try:
+            # Usar CameraManager para evitar conflitos
+            self.camera_manager = get_camera_manager(self.camera_id)
+            success = self.camera_manager.initialize()
+            
+            if success:
+                print("Camera Picamera2 inicializada com sucesso!")
+                return True
+            else:
+                print("Falha ao inicializar Camera Manager")
+                return False
+                
+        except Exception as e:
+            print(f"❌ Erro ao inicializar Picamera2: {e}")
             print("Sistema continuara sem camera - use apenas navegacao basica")
             return False
-
-        # Configurar resolução (menor para Raspberry Pi)
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-
-        # Testar captura com timeout
-        import time
-        timeout = 5  # segundos
-        start_time = time.time()
-
-        while time.time() - start_time < timeout:
-            ret, frame = self.cap.read()
-            if ret and frame is not None and frame.size > 0:
-                print("Camera OpenCV inicializada com sucesso!")
-                return True
-            time.sleep(0.1)
-
-        print("Falha ao capturar frame de teste")
-        self.cap.release()
-        return False
 
     def detectar_qr_codes(self, frame):
         """Detectar QR codes no frame"""
@@ -165,23 +205,37 @@ class OpenCVOnlyQRReader:
                 print(f"🔄 QR {i}: {data} (já detectado)")
 
     def ler_qr_codes_opencv(self, modo_visual=True):
-        """Ler QR codes usando apenas OpenCV"""
-        print("🔍 LEITOR OPENCV DE QR CODES (FUNCIONA SEMPRE)")
-        print("=" * 50)
-        print("📷 Usando câmera OpenCV (webcam/USB)")
+        """Ler QR codes usando OpenCV ou Picamera2"""
+        print("🔍 LEITOR DE QR CODES (OpenCV + Picamera2 fallback)")
+        print("=" * 55)
+        print("📷 Usando câmera OpenCV ou Picamera2")
         print("Pressione 'q' para sair, 'r' para resetar lista")
 
         if not self.initialize():
-            print("❌ Falha ao inicializar câmera OpenCV")
+            print("❌ Falha ao inicializar câmera")
             return
 
         try:
             while True:
                 # Capturar frame
-                ret, frame = self.cap.read()
-
-                if not ret or frame is None:
-                    print("⚠️ Frame vazio, tentando novamente...")
+                if self.cap and self.cap.isOpened():
+                    ret, frame = self.cap.read()
+                    if not ret or frame is None:
+                        print("⚠️ Frame vazio, tentando novamente...")
+                        time.sleep(0.1)
+                        continue
+                elif self.picam2:
+                    try:
+                        self.picam2.start()
+                        frame = self.picam2.capture_array()
+                        self.picam2.stop()
+                        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                    except Exception as e:
+                        print(f"⚠️ Erro Picamera2: {e}")
+                        time.sleep(0.1)
+                        continue
+                else:
+                    print("⚠️ Nenhuma câmera disponível")
                     time.sleep(0.1)
                     continue
 
@@ -192,7 +246,7 @@ class OpenCVOnlyQRReader:
                 if qr_codes:
                     self.mostrar_qr_codes(qr_codes)
 
-                # Modo visual (sempre ligado para OpenCV)
+                # Modo visual
                 if modo_visual:
                     # Desenhar detecções
                     for qr in qr_codes:
@@ -207,11 +261,12 @@ class OpenCVOnlyQRReader:
                                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
 
                     # Mostrar estatísticas
-                    info_text = f"OpenCV Camera | QR: {len(qr_codes)} | Unicos: {len(self.qr_codes_detectados)}"
+                    camera_type = "OpenCV" if self.cap and self.cap.isOpened() else "Picamera2"
+                    info_text = f"{camera_type} Camera | QR: {len(qr_codes)} | Unicos: {len(self.qr_codes_detectados)}"
                     cv2.putText(frame, info_text, (10, 30),
                               cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
 
-                    cv2.imshow("QR Code Reader - OpenCV Only", frame)
+                    cv2.imshow("QR Code Reader - OpenCV + Picamera2", frame)
 
                 # Verificar teclas
                 key = cv2.waitKey(1) & 0xFF
@@ -234,6 +289,12 @@ class OpenCVOnlyQRReader:
             if self.cap:
                 self.cap.release()
                 print("🛑 Câmera OpenCV liberada")
+            if self.picam2:
+                try:
+                    self.picam2.stop()
+                except:
+                    pass
+                print("🛑 Câmera Picamera2 liberada")
 
             # Resumo final
             print(f"\n📊 RESUMO FINAL:")
@@ -245,9 +306,9 @@ class OpenCVOnlyQRReader:
 
 def main():
     """Função principal"""
-    print("🎯 LEITOR OPENCV DE QR CODES")
-    print("=" * 35)
-    print("Funciona com webcam/USB - sem picamera2")
+    print("🎯 LEITOR DE QR CODES (OpenCV + Picamera2)")
+    print("=" * 45)
+    print("Funciona com webcam/USB ou câmera CSI - com fallback")
 
     # Verificar argumentos
     camera_id = 0
@@ -256,7 +317,7 @@ def main():
 
     print(f"📷 Usando câmera ID: {camera_id}")
 
-    # Criar leitor OpenCV
+    # Criar leitor com fallback
     qr_reader = OpenCVOnlyQRReader(camera_id=camera_id)
 
     # Executar leitura

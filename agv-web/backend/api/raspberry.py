@@ -222,6 +222,7 @@ def get_next_command():
                 GROUP_CONCAT(i.corredor) as corredores,
                 GROUP_CONCAT(i.sub_corredor) as sub_corredores,
                 GROUP_CONCAT(i.posicao_x) as posicoes_x,
+                GROUP_CONCAT(i.tag) as tags,
                 COUNT(pi.id) as total_itens
             FROM pedidos p
                 LEFT JOIN usuarios u ON p.usuario_id = u.id
@@ -267,11 +268,13 @@ def get_next_command():
                 corredores = pending_order['corredores'].split(',')
                 sub_corredores = pending_order['sub_corredores'].split(',')
                 posicoes_x = pending_order['posicoes_x'].split(',')
+                tags = pending_order['tags'].split(',') if pending_order['tags'] else []
 
                 for i, item_id in enumerate(item_ids):
                     command_data['items'].append({
                         'id': int(item_id),
                         'name': item_names[i] if i < len(item_names) else 'Unknown',
+                        'tag': tags[i] if i < len(tags) else None,
                         'location': {
                             'corredor': int(corredores[i]) if i < len(corredores) else 1,
                             'sub_corredor': int(sub_corredores[i]) if i < len(sub_corredores) else 1,

@@ -95,6 +95,12 @@ NAVIGATION_CONFIG = {
         'turn_direction': 'direita', # 'direita' ou 'esquerda'
         'turn_angle_deg': 90         # ângulo da curva
     },
+    # Estratégia ao sair do subcorredor após coletar o item
+    'subcorredor_exit': {
+        'strategy': 'turn_until_green',     # 'turn_until_green' | 'turn_only' | 'back_and_turn'
+        'back_distance_cm': 30,      # usado se strategy = 'back_and_turn'
+        'turn_direction': 'esquerda' # direção padrão da saída
+    },
     'qr_centering': {
         'enabled': False,
         'timeout_s': 4.0,
@@ -103,6 +109,11 @@ NAVIGATION_CONFIG = {
         'rotate_pulse_s': 0.08,   # duração do pulso de rotação
         'forward_speed': None,    # se None, usa speed_base
         'forward_pulse_s': 0.10   # pequeno avanço para manter QR visível
+    },
+    # Avanço após leitura de QR (durante o follow-line em verde)
+    'qr_post_read': {
+        'forward_seconds': 0.5,    # antes 2.0s; reduzido para parar mais cedo após QR
+        'forward_speed': 30        # ajuste a velocidade aqui, se necessário
     },
     'turn': {
     'strategy': 'vision_center',   # 'vision_center' | 'gyro' | 'time'
@@ -149,6 +160,73 @@ NAVIGATION_CONFIG = {
             'seconds_right': 1.2,
             'seconds_left': 1.2,
             'speed': 20
+        }
+    },
+    # Marcadores visuais (tuning de cores/ROI)
+    'markers': {
+        'active': 'red',
+        'blue': {
+            # Alternar entre detecção legada (BGR->HSV) e a nova (RGB->HSV + ROI/gates)
+            'use_legacy': True,
+            'apply_gates_after_legacy': False,
+            'h_low': 95,
+            'h_high': 135,
+            's_min': 70,
+            'v_min': 60,
+            'debug': True,
+            # Considerar apenas a metade inferior da imagem para evitar detectar estante/parede
+            'roi_y_start_frac': 0.45,
+            # Exigir que o topo do bbox não esteja muito alto (evita objetos na parede)
+            'min_y_frac': 0.40,
+            # Filtros geométricos
+            'min_area': 500,
+            'min_size_px': 30,
+            'aspect_min': 0.7,
+            'aspect_max': 1.4,
+            'extent_min': 0.50,
+            # Ignorar áreas enormes (provável estante/parede)
+            'max_frame_area_frac': 0.12,
+            # Exigir que a base do bbox esteja abaixo deste frac (evitar objetos altos)
+            'bbox_bottom_min_frac': 0.55,
+            # Margem para ignorar detecções tocando bordas laterais
+            'edge_margin_px': 10,
+            # Janelamento horizontal pelo centro da imagem (para evitar falsas bordas/parede)
+            'center_x_min_frac': 0.20,
+            'center_x_max_frac': 0.80,
+            # Porta com a linha preta: requer fração mínima de pixels pretos logo abaixo do azul
+            'line_gate_min_black_frac': 0.12,
+            # Altura do strip abaixo do bbox para checar a linha (fração da altura do bbox)
+            'line_gate_strip_h_frac': 0.18
+        },
+        'red': {
+            # Detecção de vermelho; por padrão usa legado BGR->HSV com duas faixas de H
+            'use_legacy': True,
+            'apply_gates_after_legacy': True,
+            'debug': True,
+            # Faixas HSV para vermelho (duas bandas por wrap do H)
+            'h1_low': 0,
+            'h1_high': 10,
+            'h2_low': 170,
+            'h2_high': 180,
+            's_min': 70,
+            'v_min': 60,
+            # ROI inferior
+            'roi_y_start_frac': 0.45,
+            # Portas geométricas
+            'min_area': 800,
+            'min_size_px': 40,
+            'aspect_min': 0.6,
+            'aspect_max': 1.6,
+            'extent_min': 0.45,
+            'max_frame_area_frac': 0.12,
+            'bbox_bottom_min_frac': 0.55,
+            'min_y_frac': 0.40,
+            'edge_margin_px': 10,
+            'center_x_min_frac': 0.20,
+            'center_x_max_frac': 0.80,
+            # Porta com a linha preta abaixo
+            'line_gate_min_black_frac': 0.15,
+            'line_gate_strip_h_frac': 0.20
         }
     }
 }

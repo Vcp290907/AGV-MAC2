@@ -4,6 +4,14 @@ Controle de Missões do AGV - Sistema Completo de Navegação
 Coordena navegação, detecção de QR codes e execução de pedidos
 """
 
+import os
+import sys
+
+# Configurar PYTHONPATH para acessar bibliotecas do sistema (necessário para Picamera2)
+system_python_path = '/usr/lib/python3/dist-packages'
+if system_python_path not in sys.path:
+    sys.path.insert(0, system_python_path)
+
 import time
 import threading
 import json
@@ -11,23 +19,23 @@ import requests
 from datetime import datetime
 from navigation_basic import BasicNavigation
 from line_following_navigation import LineFollowingNavigation
-# from qr_reader_with_api import QRReaderWithAPI  # Desabilitado - usa picamera2
 from qr_reader_opencv_only import OpenCVOnlyQRReader
-from config import get_esp32_port
+from config_manager import get_config, get_backend_url
 
 class AGVMissionControl:
     """Sistema completo de controle de missões do AGV"""
 
-    def __init__(self, pc_ip="192.168.0.120", pc_port=5000, esp32_port=None):
-        self.pc_ip = pc_ip
-        self.pc_port = pc_port
-        self.base_url = f"http://{pc_ip}:{pc_port}"
-        
+    def __init__(self, pc_ip=None, pc_port=None, esp32_port=None):
+        # Usar configurações do config.json se não especificadas
+        self.pc_ip = pc_ip or get_config('backend.ip', '192.168.0.120')
+        self.pc_port = pc_port or get_config('backend.port', 5000)
+        self.base_url = get_backend_url()
+
         # Usar porta do config se não especificada
-        esp32_port = esp32_port or get_esp32_port()
+        esp32_port = esp32_port or get_config('esp32.port', '/dev/ttyACM0')
         self.pc_ip = pc_ip
         self.pc_port = pc_port
-        self.base_url = f"http://{pc_ip}:{pc_port}"
+        self.base_url = f"http://{self.pc_ip}:{self.pc_port}"
 
         # Componentes do sistema
         self.navigation = BasicNavigation(esp32_port=esp32_port)
@@ -41,9 +49,8 @@ class AGVMissionControl:
         self.posicao_atual = {'x': 0, 'y': 0, 'angulo': 0}
 
         # Configurações
-        self.distancia_ate_prateleira = 30  # cm até a prateleira após curva
         self.tempo_busca_item = 5  # segundos para "pegar" item
-        self.agv_id = 'agv_1'
+        self.agv_id = get_config('agv.id', 'agv_1')
         # Controle do loop de missões
         self._mission_loop_stop = threading.Event()
         self._mission_loop_thread = None
@@ -157,6 +164,9 @@ class AGVMissionControl:
             itens_lista = pedido['itens'].split(',')
             corredores = pedido.get('corredores', '').split(',') if pedido.get('corredores') else []
             subcorredores = pedido.get('sub_corredores', '').split(',') if pedido.get('sub_corredores') else []
+            # Alguns endpoints retornam as TAGs agregadas também
+            tags_agregadas = pedido.get('tag') or pedido.get('tags')  # compat possível
+            tags_lista = tags_agregadas.split(',') if tags_agregadas else []
 
             for i, item_nome in enumerate(itens_lista):
                 corredor = corredores[i] if i < len(corredores) else '1'
@@ -170,7 +180,8 @@ class AGVMissionControl:
                 itens_por_subcorredor[chave].append({
                     'nome': item_nome.strip(),
                     'corredor': corredor,
-                    'subcorredor': subcorredor
+                    'subcorredor': subcorredor,
+                    'tag': (tags_lista[i].strip() if i < len(tags_lista) else None)
                 })
 
         return itens_por_subcorredor
@@ -268,8 +279,12 @@ class AGVMissionControl:
             shelf_scan_time_s=3.0,
             shelf_scan_debug=False,
             shelf_expected_qr=destino_label,
-            post_match_forward_s=3.0,
-            post_match_forward_speed=22,
+            # Não avançar após verde/QR e não alinhar: parar já quando verde estiver centralizado
+            align_after_turn=False,
+            post_match_forward_s=0.0,
+            post_match_forward_speed=0,
+            require_centered_green=True,
+            green_center_tol_px=40,
         )
         if not ok:
             print("❌ Falha na rotina azul→verde para entrar no subcorredor")
@@ -350,9 +365,9 @@ class AGVMissionControl:
         for item in itens_subcorredor:
             print(f"📦 Procurando item: {item['nome']}")
 
-            # Usar câmera superior para detectar QR do item
-            qr_item_esperado = f"TAG{item['nome'].replace(' ', '')[:4].upper()}"
-            print(f"🔍 Procurando QR code do item: {qr_item_esperado}")
+            # Definir QR esperado do item com base em TAG numérica do cadastro (formato TAG0001)
+            qr_item_esperado = self._format_expected_item_tag(item.get('tag'), item['nome'])
+            print(f"🔍 Procurando QR code do item (esperado): {qr_item_esperado}")
 
             qr_detectado = None
             tentativas_item = 0
@@ -360,22 +375,55 @@ class AGVMissionControl:
 
             while qr_detectado != qr_item_esperado and tentativas_item < max_tentativas_item:
                 try:
-                    qr_resultado = self.qr_detector.detectar_qr_code()
-                    if qr_resultado and qr_resultado['detectado']:
-                        qr_detectado = qr_resultado['codigo']
-                        print(f"📷 QR code detectado: {qr_detectado}")
+                    # Preferir uma varredura de múltiplos QRs com a câmera 0 (mesma rotina da estante)
+                    results = []
+                    try:
+                        results = self.line_navigation._scan_shelf_qr_secondary_camera(
+                            camera_index=0,
+                            duration_s=1.5,
+                            debug=False,
+                            debug_dir=None,
+                            debug_prefix='item_qr'
+                        ) or []
+                    except Exception as e_scan:
+                        print(f"⚠️ Falha no scan multi-QR: {e_scan}")
 
+                    # Tentar casar o esperado entre os encontrados
+                    if results:
+                        encontrados = []
+                        for r in results:
+                            data_raw = r.get('data')
+                            if not data_raw:
+                                continue
+                            norm = self._normalize_qr_code(data_raw)
+                            encontrados.append(norm)
+                            if norm == qr_item_esperado:
+                                qr_detectado = norm
+                                print(f"✅ Item encontrado na varredura: {norm}")
+                                break
                         if qr_detectado == qr_item_esperado:
-                            print("✅ Item encontrado!")
                             break
                         else:
-                            print(f"⚠️ QR code errado: {qr_detectado} (esperado: {qr_item_esperado})")
+                            print(f"⚠️ QRs visíveis: {', '.join(encontrados)} — ainda não achou {qr_item_esperado}")
                     else:
-                        print("📷 Nenhum QR code detectado, ajustando posição...")
+                        print("📷 Nenhum QR code na varredura atual")
 
-                        # Pequeno movimento para procurar melhor
-                        if not self.navigation.mover_em_linha_reta(5, 'frente'):
+                    # Se não encontrou na varredura, tentar leitura única como fallback
+                    qr_resultado = self.qr_detector.detectar_qr_code()
+                    if qr_resultado and qr_resultado.get('detectado'):
+                        raw = qr_resultado.get('codigo')
+                        norm = self._normalize_qr_code(raw)
+                        print(f"📷 (fallback) QR detectado: {raw} (normalizado: {norm})")
+                        if norm == qr_item_esperado:
+                            qr_detectado = norm
+                            print("✅ Item encontrado no fallback!")
                             break
+                        else:
+                            print(f"⚠️ (fallback) QR errado: {norm} (esperado: {qr_item_esperado})")
+
+                    # Pequeno movimento para procurar melhor enquadramento
+                    if not self.navigation.mover_em_linha_reta(5, 'frente'):
+                        break
 
                 except Exception as e:
                     print(f"⚠️ Erro na detecção: {e}")
@@ -408,6 +456,36 @@ class AGVMissionControl:
             return False
 
         return True
+
+    def _format_expected_item_tag(self, raw_tag, item_nome: str) -> str:
+        """Formata a TAG esperada no padrão 'TAG' + dígitos (mín. 4 com zero à esquerda).
+        Se não houver tag no cadastro, utiliza fallback antigo baseado no nome.
+        """
+        if raw_tag is not None:
+            s = str(raw_tag).strip().upper()
+            # Extrair apenas dígitos da tag (suporta cases como 'TAG12', '0012', '12')
+            digits = ''.join(ch for ch in s if ch.isdigit())
+            if digits:
+                # Preencher para pelo menos 4 dígitos sem cortar números maiores
+                digits_padded = digits if len(digits) >= 4 else digits.zfill(4)
+                return f"TAG{digits_padded}"
+        # Fallback: manter compatibilidade antiga (não numérico)
+        print("⚠️ Tag numérica ausente/indefinida no item; usando fallback baseado no nome.")
+        return f"TAG{item_nome.replace(' ', '')[:4].upper()}"
+
+    def _normalize_qr_code(self, code: str) -> str:
+        """Normaliza qualquer leitura de QR para o padrão TAG + dígitos (mín. 4).
+        Exemplos: '123' -> 'TAG0123'; 'TAG7' -> 'TAG0007'; 'tag-1234' -> 'TAG1234'.
+        Se não achar dígitos, retorna o texto original upper.
+        """
+        if code is None:
+            return ''
+        s = str(code).strip().upper()
+        digits = ''.join(ch for ch in s if ch.isdigit())
+        if digits:
+            digits_padded = digits if len(digits) >= 4 else digits.zfill(4)
+            return f"TAG{digits_padded}"
+        return s
 
     def _ir_ate_entrega(self):
         """Ir até o ponto de entrega usando navegação por linha"""
@@ -482,10 +560,13 @@ def main():
     print("AGV MISSION CONTROL")
     print("=" * 25)
 
-    # Configurações
-    pc_ip = "192.168.0.120"
-    pc_port = 5000
-    esp32_port = get_esp32_port()
+    # Configurações do config.json
+    pc_ip = get_config('backend.ip')
+    pc_port = get_config('backend.port')
+    esp32_port = get_config('esp32.port')
+
+    print(f"📡 Backend: {pc_ip}:{pc_port}")
+    print(f"🤖 ESP32: {esp32_port}")
 
     # Criar controle de missões
     agv = AGVMissionControl(pc_ip=pc_ip, pc_port=pc_port, esp32_port=esp32_port)

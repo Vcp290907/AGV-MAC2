@@ -1,0 +1,31 @@
+{
+  "backend": {
+    "ip": "192.168.0.120",
+    "port": 5000,
+    "timeout": 5
+  },
+  "agv": {
+    "id": "agv_1",
+    "name": "AGV-001",
+    "version": "1.0.0"
+  },
+  "camera": {
+    "primary": "picamera2",
+    "fallback": "opencv",
+    "resolution": [
+      640,
+      480
+    ],
+    "fps": 30
+  },
+  "esp32": {
+    "port": "/dev/ttyACM0",
+    "baudrate": 115200,
+    "timeout": 2
+  },
+  "navigation": {
+    "line_following_speed": 50,
+    "qr_detection_enabled": true,
+    "obstacle_detection_enabled": false
+  }
+}

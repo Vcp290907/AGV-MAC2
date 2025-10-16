@@ -17,7 +17,7 @@ from datetime import datetime
 class QRReaderWithAPI:
     """Leitor de QR codes que se conecta à API do PC"""
 
-    def __init__(self, pc_ip="192.168.0.100", pc_port=5000):
+    def __init__(self, pc_ip="192.168.0.120", pc_port=5000):
         self.pc_ip = pc_ip
         self.pc_port = pc_port
         self.base_url = f"http://{pc_ip}:{pc_port}"
@@ -117,7 +117,7 @@ class QRReaderWithAPI:
                 'qr_data': qr_data,
                 'info': info,
                 'timestamp': datetime.now().isoformat(),
-                'raspberry_ip': '192.168.0.200'  # IP do Raspberry
+                'raspberry_ip': '192.168.0.18'  # IP do Raspberry
             }
 
             # Tentar enviar para endpoint de status (se existir)
@@ -290,7 +290,7 @@ def main():
     print("=" * 30)
 
     # Configurações padrão
-    pc_ip = "192.168.0.100"  # IP do PC
+    pc_ip = "192.168.0.120"  # IP do PC
     pc_port = 5000
 
     # Verificar argumentos

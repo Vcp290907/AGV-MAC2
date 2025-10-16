@@ -23,15 +23,24 @@ try:
 except Exception:
     DEFAULT_CAM_INDEX = 0
 
+# Importar CameraManager para evitar conflitos
+try:
+    from qr_reader_opencv_only import get_camera_manager
+    CAMERA_MANAGER_AVAILABLE = True
+    print("✅ CameraManager importado com sucesso")
+except ImportError as e:
+    CAMERA_MANAGER_AVAILABLE = False
+    print(f"❌ Falha ao importar CameraManager: {e}")
+
 class LineDetector:
     """Detector de linha preta usando Picamera2"""
 
     def __init__(self, width=None, height=None, camera_index=None):
         # Ler resolução do config se não fornecida
         try:
-            cfg_res = HARDWARE_CONFIG.get('camera', {}).get('resolution', (640, 480))
+            cfg_res = HARDWARE_CONFIG.get('camera', {}).get('resolution', (720, 1024))
         except Exception:
-            cfg_res = (640, 480)
+            cfg_res = (720, 1024)
         self.width = width or int(cfg_res[0])
         self.height = height or int(cfg_res[1])
         self.picam2 = None
@@ -41,17 +50,17 @@ class LineDetector:
         self.camera_index = (
             int(camera_index)
             if camera_index is not None
-            else (int(env_idx) if env_idx is not None and env_idx.isdigit() else int(DEFAULT_CAM_INDEX))
+            else (int(env_idx) if env_idx is not None and env_idx.isdigit() else 1)  # Usar câmera 1
         )
 
-        # Configurações de processamento de imagem - MAIS TOLERANTE
+        # Configurações de processamento de imagem - MAIS TOLERANTE PARA DIFERENTES CONDIÇÕES DE ILUMINAÇÃO
         self.lower_black = np.array([0, 0, 0])
-        self.upper_black = np.array([180, 255, 120])  # Mais tolerante
+        self.upper_black = np.array([180, 255, 200])  # Muito mais tolerante - detecta pixels mais claros como pretos
 
-        # Configurações de detecção de linha - MAIS TOLERANTE PARA QR CODES
-        self.min_line_width = 3   # Menor largura mínima
-        self.max_line_width = 600 # Maior largura máxima (para QR codes grandes)
-        self.max_qr_width = 500  # Largura máxima provável para QR codes
+        # Configurações de detecção de linha - MAIS TOLERANTE PARA DIFERENTES CONDIÇÕES
+        self.min_line_width = 2   # Largura mínima muito pequena
+        self.max_line_width = 800 # Maior largura máxima
+        self.max_qr_width = 600  # Largura máxima para QR codes
         self.line_center_offset = 0  # Offset do centro da linha
 
         # ROI (Region of Interest) - área inferior da imagem (configurável)
@@ -76,114 +85,77 @@ class LineDetector:
         self.line_confidence = 0
 
     def initialize(self):
-        """Inicializar Picamera2 para detecção de linha - versão simplificada"""
+        """Inicializar câmera usando CameraManager para evitar conflitos"""
         print("Inicializando Picamera2 para detecção de linha...")
         print(f"🎛️ Índice de câmera solicitado: {self.camera_index}")
 
-        if PICAMERA2_AVAILABLE:
-            try:
-                # Verificar câmeras disponíveis primeiro
-                cameras = Picamera2.global_camera_info()
-                if not cameras:
-                    print("❌ Nenhuma câmera encontrada")
-                    return False
-
-                print(f"📷 {len(cameras)} câmera(s) encontrada(s)")
-                for idx, info in enumerate(cameras):
-                    try:
-                        model = info.get('Model', 'Desconhecido')
-                    except Exception:
-                        model = 'Desconhecido'
-                    print(f"   - Câmera {idx}: {model}")
-
-                # Usar câmera selecionada
-                chosen = self.camera_index if 0 <= self.camera_index < len(cameras) else 0
-                if chosen != self.camera_index:
-                    print(f"⚠️ Índice {self.camera_index} indisponível. Usando {chosen}")
-                else:
-                    print(f"✅ Usando câmera {chosen}")
-                self.picam2 = Picamera2(chosen)
-
-                # Configuração ainda mais simples
-                config = self.picam2.create_still_configuration(
-                    main={"format": 'RGB888', "size": (self.width, self.height)}
-                )
-
-                self.picam2.configure(config)
-                print("✅ Câmera configurada")
-
-                # Preparar controles de exposição/ganho (simular 'abertura' maior)
-                try:
-                    cam_cfg = HARDWARE_CONFIG.get('camera', {})
-                    exp_cfg = cam_cfg.get('exposure', {})
-                    controls = {}
-                    # Auto exposure e AWB
-                    if 'auto' in exp_cfg:
-                        controls['AeEnable'] = bool(exp_cfg.get('auto', True))
-                    if 'awb_auto' in exp_cfg:
-                        controls['AwbEnable'] = bool(exp_cfg.get('awb_auto', True))
-                    # Manual exposure/ganho (aplicado somente se auto=False)
-                    if exp_cfg.get('auto') is False:
-                        if exp_cfg.get('exposure_time'):
-                            controls['ExposureTime'] = int(exp_cfg['exposure_time'])  # microssegundos
-                        if exp_cfg.get('analogue_gain'):
-                            controls['AnalogueGain'] = float(exp_cfg['analogue_gain'])
-                    # Armazenar para aplicar após iniciar a câmera
-                    if controls:
-                        self.camera_controls = controls
-                        print(f"🛠️ Controles de câmera preparados: {controls}")
-                except Exception as e:
-                    print(f"⚠️ Não foi possível preparar controles de exposição: {e}")
-
-                # NÃO iniciar automaticamente - vamos iniciar sob demanda
-                # self.picam2.start()
-
-                print("✅ Picamera2 inicializada (modo sob demanda)!")
+        if CAMERA_MANAGER_AVAILABLE:
+            # Usar CameraManager para evitar conflitos
+            self.camera_manager = get_camera_manager(self.camera_index)
+            success = self.camera_manager.initialize()
+            if success:
+                print("✅ Picamera2 inicializada para detecção de linha!")
                 return True
-
-            except Exception as e:
-                print(f"❌ Erro ao inicializar Picamera2: {e}")
-                print("💡 Dica: Verifique se a câmera não está sendo usada por outro processo")
+            else:
+                print("❌ Falha na inicialização do Camera Manager")
                 return False
         else:
-            print("⚠️ Picamera2 não disponível - modo simulação ativado")
-            print("✅ Detector de linha inicializado (simulação)")
-            return True
+            # Fallback para inicialização direta (não recomendado)
+            print("⚠️ CameraManager não disponível, usando inicialização direta")
+            if PICAMERA2_AVAILABLE:
+                try:
+                    self.picam2 = Picamera2(self.camera_index)
+                    config = self.picam2.create_still_configuration(
+                        main={"format": 'RGB888', "size": (self.width, self.height)}
+                    )
+                    self.picam2.configure(config)
+                    print("✅ Picamera2 inicializada (fallback)!")
+                    return True
+                except Exception as e:
+                    print(f"❌ Erro ao inicializar Picamera2: {e}")
+                    return False
+            else:
+                print("❌ Picamera2 não disponível")
+                return False
 
     def capture_frame(self):
         """Capturar frame da câmera sob demanda"""
-        if not PICAMERA2_AVAILABLE or self.picam2 is None:
-            return None
-
-        try:
-            # Iniciar câmera se não estiver rodando
-            if not self.picam2.started:
-                self.picam2.start()
-                time.sleep(0.1)  # Pequena pausa para estabilizar
-                # Aplicar controles após iniciar
-                if self.camera_controls:
-                    try:
-                        self.picam2.set_controls(self.camera_controls)
-                        # Pequena espera para exposição estabilizar
-                        time.sleep(0.05)
-                    except Exception as e:
-                        print(f"⚠️ Falha ao aplicar controles: {e}")
-
-            # Capturar frame
-            frame = self.picam2.capture_array()
-
-            # Parar câmera imediatamente para liberar recursos
-            self.picam2.stop()
-
-            return frame
-
-        except Exception as e:
-            print(f"❌ Erro ao capturar frame: {e}")
+        if CAMERA_MANAGER_AVAILABLE and hasattr(self, 'camera_manager'):
+            # Usar CameraManager para evitar conflitos
+            return self.camera_manager.capture_frame()
+        elif PICAMERA2_AVAILABLE and self.picam2 is not None:
+            # Fallback para modo direto
             try:
-                if self.picam2.started:
-                    self.picam2.stop()
-            except:
-                pass
+                # Iniciar câmera se não estiver rodando
+                if not self.picam2.started:
+                    self.picam2.start()
+                    time.sleep(0.1)  # Pequena pausa para estabilizar
+                    # Aplicar controles após iniciar
+                    if self.camera_controls:
+                        try:
+                            self.picam2.set_controls(self.camera_controls)
+                            # Pequena espera para exposição estabilizar
+                            time.sleep(0.05)
+                        except Exception as e:
+                            print(f"⚠️ Falha ao aplicar controles: {e}")
+
+                # Capturar frame
+                frame = self.picam2.capture_array()
+
+                # Parar câmera imediatamente para liberar recursos
+                self.picam2.stop()
+
+                return frame
+
+            except Exception as e:
+                print(f"❌ Erro ao capturar frame: {e}")
+                try:
+                    if self.picam2.started:
+                        self.picam2.stop()
+                except:
+                    pass
+                return None
+        else:
             return None
 
     def preprocess_image(self, frame):
@@ -320,7 +292,7 @@ class LineDetector:
     def process_frame(self, frame=None):
         """Processar um frame completo"""
         try:
-            if frame is None and self.picam2:
+            if frame is None:
                 frame = self.capture_frame()
 
             if frame is None:
