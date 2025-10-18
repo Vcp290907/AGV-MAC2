@@ -22,8 +22,9 @@ IMPORTANTE:
 - Comunicação JSON via serial
 */
 
+#define ENABLE_MIN_AND_MAX_CONSTRAINTS
+#include "ServoEasing.hpp"
 #include <Wire.h>
-#include <MPU6050_light.h>
 #include <ESP32Servo.h>
 #include <ArduinoJson.h>
 
@@ -31,34 +32,26 @@ IMPORTANTE:
 #define MOTOR_LEFT_PIN 1  // GPIO 1 - Servo Motor Esquerdo
 #define MOTOR_RIGHT_PIN 3 // GPIO 3 - Servo Motor Direito
 #define BUZZER_PIN 4      // GPIO 4 - Buzzer
-#define MPU6050_SDA 10    // GPIO 10 - SDA do MPU6050
-#define MPU6050_SCL 9     // GPIO 9 - SCL do MPU6050
 
-// Configurações MPU6050_light
-MPU6050 mpu(Wire);
-bool mpu6050_presente = false;
-
-// Variáveis para MPU6050_light (dados em unidades SI)
-float ax, ay, az, gx, gy, gz;
-float temperature;
-
-// Calibração MPU6050_light (automática pela biblioteca)
-bool calibrado = false;
-
-// Offsets para ângulos (para reset após calibração)
-float angulo_offset_x = 0;
-float angulo_offset_y = 0;
-float angulo_offset_z = 0;
+#define PIN_SERVO_GIRO_GARRA 2
+#define PIN_SERVO_SERVO_UM 6
+#define PIN_SERVO_SERVO_DOIS 7
+#define PIN_SERVO_TRES 8
+#define PIN_SERVO_GARRA 5
 
 // Controle de motores com Servo
 Servo servoEsquerdo;
 Servo servoDireito;
 
+// Controle de motores com ServoEasing
+ServoEasing motorGiroGarra;
+ServoEasing motorUm;
+ServoEasing motorDois;
+ServoEasing motorGarra;
+ServoEasing motorTres;
+
 // Constantes de servo (contínuo): 90=parado, >90 um sentido, <90 outro
 const int SERVO_NEUTRO = 90;
-// Valores de avanço/re quando mapeados a 100% (ajuste conforme seu hardware)
-// Observação: muitos kits usam servos espelhados, então esquerda e direita podem ter "frente" opostos
-// Defina aqui de forma explícita para evitar confusão:
 const int LEFT_FORWARD_VAL = 180;   // esquerda indo para frente
 const int LEFT_BACKWARD_VAL = 0;    // esquerda indo para trás
 const int RIGHT_FORWARD_VAL = 0;    // direita indo para frente (servos espelhados ao contrário)
@@ -71,33 +64,59 @@ int velocidade_direita = SERVO_NEUTRO;  // 90 = parado
 String comando_recebido = "";
 bool comando_completo = false;
 
+// Forward declaration para comandos de texto (não-JSON)
+void processarComandoTexto(String cmd);
+
+// Estado de calibração (usado em enviarStatus)
+bool calibrado = false;
+
 void setup()
 {
-  // Inicializar serial
+
   Serial.begin(115200);
   while (!Serial)
   {
     delay(10);
   }
 
-  // Configurar pinos
   pinMode(BUZZER_PIN, OUTPUT);
 
   // Inicializar servos
   servoEsquerdo.attach(MOTOR_LEFT_PIN);
   servoDireito.attach(MOTOR_RIGHT_PIN);
 
-  // Inicializar motores no estado parado
   pararMotores();
 
-  // Buzzer de inicialização
+  motorGarra.attach(PIN_SERVO_GARRA);
+  motorTres.attach(PIN_SERVO_TRES);
+  motorDois.attach(PIN_SERVO_SERVO_DOIS);
+  motorUm.attach(PIN_SERVO_SERVO_UM);
+  motorGiroGarra.attach(PIN_SERVO_GIRO_GARRA);
+
+  motorUm.setMinMaxConstraint(15, 165);
+  motorDois.setMinMaxConstraint(15, 165);
+  motorGarra.setMinMaxConstraint(30, 73);
+
+  motorGiroGarra.setEasingType(EASE_CUBIC_IN_OUT);
+  motorUm.setEasingType(EASE_QUARTIC_IN_OUT);
+  motorDois.setEasingType(EASE_CUBIC_IN_OUT);
+  motorGarra.setEasingType(EASE_CUBIC_IN_OUT);
+  motorTres.setEasingType(EASE_CUBIC_IN_OUT);
+
+  motorGiroGarra.setSpeed(60);
+  motorUm.setSpeed(10);
+  motorDois.setSpeed(60);
+  motorTres.setSpeed(60);
+  motorGarra.setSpeed(80);
+
+  motorGarra.easeTo(73);
+  motorTres.easeTo(90);
+  motorDois.easeTo(90);
+  motorUm.easeTo(50);
+  motorGiroGarra.easeTo(30);
+  delay(3000);
+
   beepBuzzer();
-
-  // Inicializar I2C com pinos customizados
-  Wire.begin(MPU6050_SDA, MPU6050_SCL);
-
-  // Inicializar MPU6050
-  inicializarMPU6050();
 
   Serial.println("{\"status\": \"ESP32 inicializado\"}");
 }
@@ -118,75 +137,46 @@ void loop()
   delay(10);
 }
 
-void inicializarMPU6050()
-{
-  Serial.println("{\"status\": \"Inicializando MPU6050_light...\"}");
-
-  // Aguardar I2C estabilizar
-  delay(500);
-
-  // MPU6050_light: inicialização e teste de conexão simplificados
-  byte status = mpu.begin();
-  delay(100);
-
-  if (status == 0)
-  {
-    mpu6050_presente = true;
-    Serial.println("{\"status\": \"MPU6050_light conectado\"}");
-
-    // Aguardar estabilização
-    delay(500);
-
-    // Auto-calibração da biblioteca
-    calibrarMPU6050();
-  }
-  else
-  {
-    mpu6050_presente = false;
-    Serial.printf("{\"status\": \"MPU6050_light erro: %d - verificar conexões I2C\"}\n", status);
-    Serial.println("{\"status\": \"SDA=GPIO10, SCL=GPIO9\"}");
-  }
-}
-
-void calibrarMPU6050()
-{
-  Serial.println("{\"status\": \"Calibrando MPU6050_light...\"}");
-
-  // Calibração automática da MPU6050_light
-  mpu.calcOffsets(true, true); // Calibra acel (true) e giro (true)
-
-  // Aguardar calibração completar
-  delay(1000);
-
-  // Atualizar MPU e capturar ângulos atuais como offsets
-  mpu.update();
-  angulo_offset_x = mpu.getAngleX();
-  angulo_offset_y = mpu.getAngleY();
-  angulo_offset_z = mpu.getAngleZ();
-
-  calibrado = true;
-  Serial.println("{\"status\": \"MPU6050_light calibrado e offsets definidos\"}");
-}
-
 void processarComandosSeriais()
 {
   while (Serial.available())
   {
     char caractere = Serial.read();
 
-    if (caractere == '\n')
+    if (caractere == '\n' || caractere == '\r')
     {
-      comando_completo = true;
+      if (comando_recebido.length() > 0)
+      {
+        comando_completo = true;
+      }
     }
     else
     {
       comando_recebido += caractere;
+      // proteção contra linhas muito longas
+      if (comando_recebido.length() > 200)
+      {
+        Serial.println("ERR: line too long");
+        comando_recebido = "";
+      }
     }
   }
 
   if (comando_completo)
   {
-    processarComando(comando_recebido);
+    String linha = comando_recebido;
+    linha.trim();
+
+    // Se começar com '{', tratar como JSON; senão, tratar como comando de texto
+    if (linha.startsWith("{"))
+    {
+      processarComando(linha);
+    }
+    else if (linha.length() > 0)
+    {
+      processarComandoTexto(linha);
+    }
+
     comando_recebido = "";
     comando_completo = false;
   }
@@ -194,10 +184,6 @@ void processarComandosSeriais()
 
 void processarComando(String comando)
 {
-  // Buzzer curto para indicar comando recebido
-  // beepBuzzer();  // Desabilitado para evitar beeps constantes
-
-  // Parse do JSON
   DynamicJsonDocument doc(1024);
   DeserializationError error = deserializeJson(doc, comando);
 
@@ -209,14 +195,10 @@ void processarComando(String comando)
 
   String tipo_comando = doc["comando"];
 
-  if (tipo_comando == "ler_mpu6050")
-  {
-    lerDadosMPU6050();
-  }
-  else if (tipo_comando == "mover_frente")
+  if (tipo_comando == "mover_frente")
   {
     int velocidade = doc["velocidade"] | 50; // Velocidade padrão menor
-    moverFrente(velocidade);
+    moverFrente(velocidade)
   }
   else if (tipo_comando == "mover_tras")
   {
@@ -249,6 +231,73 @@ void processarComando(String comando)
   {
     beepBuzzer();
   }
+  else if (tipo_comando == "move_text")
+  {
+    // Encaminha uma linha de texto (ex: "MOVE a b c d [e]") para o parser textual
+    String linha = doc["linha"] | "";
+    if (linha.length() == 0)
+    {
+      Serial.println("{\"erro\": \"linha vazia em move_text\"}");
+    }
+    else
+    {
+      processarComandoTexto(linha);
+    }
+  }
+  else if (tipo_comando == "move_servos")
+  {
+    // Move os 4 ou 5 servos (giro, um, dois, garra [, tres]) via JSON
+    // Formatos aceitos:
+    // 1) {"comando":"move_servos", "angles":[a,b,c,d]}  // [e] opcional
+    // 2) {"comando":"move_servos", "a":..., "b":..., "c":..., "d":..., "e":...}
+
+    int a = -1, b = -1, c = -1, d = -1, e = -1000;
+
+    if (doc.containsKey("angles"))
+    {
+      JsonArray arr = doc["angles"].as<JsonArray>();
+      if (arr.size() < 4)
+      {
+        Serial.println("{\"erro\": \"angles requer ao menos 4 valores\"}");
+        return;
+      }
+      a = arr[0];
+      b = arr[1];
+      c = arr[2];
+      d = arr[3];
+      if (arr.size() >= 5)
+        e = arr[4];
+    }
+    else if (doc.containsKey("a") && doc.containsKey("b") && doc.containsKey("c") && doc.containsKey("d"))
+    {
+      a = doc["a"].as<int>();
+      b = doc["b"].as<int>();
+      c = doc["c"].as<int>();
+      d = doc["d"].as<int>();
+      if (doc.containsKey("e"))
+        e = doc["e"].as<int>();
+    }
+    else
+    {
+      Serial.println("{\"erro\": \"parametros ausentes: use angles[4-5] ou campos a,b,c,d[,e]\"}");
+      return;
+    }
+
+    // Executa movimentos
+    motorGiroGarra.easeTo(a);
+    motorUm.easeTo(b);
+    motorDois.easeTo(c);
+    motorGarra.easeTo(d);
+    if (e != -1000)
+    {
+      motorTres.easeTo(e);
+    }
+
+    DynamicJsonDocument resposta(128);
+    resposta["status"] = "success";
+    serializeJson(resposta, Serial);
+    Serial.println();
+  }
   else if (tipo_comando == "move")
   {
     String direction = doc["direction"];
@@ -275,49 +324,6 @@ void processarComando(String comando)
   {
     Serial.println("{\"erro\": \"Comando desconhecido\"}");
   }
-}
-
-void lerDadosMPU6050()
-{
-  if (!mpu6050_presente)
-  {
-    Serial.println("{\"erro\": \"MPU6050 não disponível\"}");
-    return;
-  }
-
-  // Aguardar estabilização
-  delay(10);
-
-  // MPU6050_light: update e leitura dos ângulos
-  mpu.update();
-
-  float angX = mpu.getAngleX() - angulo_offset_x; // Pitch
-  float angY = mpu.getAngleY() - angulo_offset_y; // Roll
-  float angZ = mpu.getAngleZ() - angulo_offset_z; // Yaw
-
-  // Normalizar ângulos para 0-360°
-  angX = fmod(angX, 360.0);
-  if (angX < 0)
-    angX += 360.0;
-
-  angY = fmod(angY, 360.0);
-  if (angY < 0)
-    angY += 360.0;
-
-  angZ = fmod(angZ, 360.0);
-  if (angZ < 0)
-    angZ += 360.0;
-
-  // JSON resposta com ângulos
-  DynamicJsonDocument resposta(256);
-  resposta["angulos"]["pitch"] = angX;
-  resposta["angulos"]["roll"] = angY;
-  resposta["angulos"]["yaw"] = angZ;
-  resposta["calibrado"] = calibrado;
-  resposta["biblioteca"] = "MPU6050_light";
-
-  serializeJson(resposta, Serial);
-  Serial.println();
 }
 
 void moverFrente(int velocidade)
@@ -401,22 +407,51 @@ void aplicarVelocidadeMotores()
                 LEFT_FORWARD_VAL, LEFT_BACKWARD_VAL, RIGHT_FORWARD_VAL, RIGHT_BACKWARD_VAL);
 }
 
+// Processamento de comandos de texto (apenas MOVE)
+void processarComandoTexto(String cmd)
+{
+  cmd.trim();
+  if (cmd.length() == 0)
+    return;
+
+  String up = cmd;
+  up.toUpperCase();
+
+  if (up.startsWith("MOVE "))
+  {
+    // Formato: MOVE a b c d [e]  -> (giro, um, dois, garra [, tres])
+    int a = 0, b = 0, c = 0, d = 0, e = 0;
+    int parsed = sscanf(cmd.c_str(), "MOVE %d %d %d %d %d", &a, &b, &c, &d, &e);
+    if (parsed == 5 || parsed == 4)
+    {
+      motorGiroGarra.easeTo(a);
+      motorUm.easeTo(b);
+      motorDois.easeTo(c);
+      motorGarra.easeTo(d);
+      if (parsed == 5)
+      {
+        motorTres.easeTo(e);
+      }
+      Serial.println("OK");
+    }
+    else
+    {
+      Serial.println("ERR: expected 'MOVE a b c d [e]'");
+    }
+    return;
+  }
+
+  Serial.println("ERR: unknown command");
+}
+
 void enviarStatus()
 {
   DynamicJsonDocument resposta(256);
   resposta["status"] = "online";
-  resposta["mpu6050"] = mpu6050_presente;
   resposta["calibrado"] = calibrado;
   resposta["buzzer_pin"] = BUZZER_PIN;
-  resposta["mpu6050_sda"] = MPU6050_SDA;
-  resposta["mpu6050_scl"] = MPU6050_SCL;
   resposta["motores"]["esquerdo"] = velocidade_esquerda;
   resposta["motores"]["direito"] = velocidade_direita;
-
-  if (mpu6050_presente)
-  {
-    resposta["sensores"]["temperatura"] = temperature;
-  }
 
   serializeJson(resposta, Serial);
   Serial.println();
