@@ -8,7 +8,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import logging
 import json
-from config import get_esp32_port
+from config import get_esp32_motor_port, get_esp32_motor_baudrate, get_esp32_motor_timeout
 from datetime import datetime
 import asyncio
 import threading
@@ -165,6 +165,64 @@ class RaspberryAPI:
                     'error': str(e)
                 }), 500
 
+        @self.app.route('/execute_sequence/<filename>', methods=['POST'])
+        def execute_sequence(filename):
+            """Executa uma sequência de movimentos da garra"""
+            try:
+                self.api_status['requests_count'] += 1
+
+                logger.info(f"Executando sequência: {filename}")
+
+                # Importar e executar sequência
+                from agv_mission_control import AGVMissionControl
+                from esp32_control import esp32_garra, connect_esp32_garra
+
+                # Criar instância do controlador de missão
+                mission_control = AGVMissionControl()
+
+                # Garantir conexão com ESP32 da garra antes de executar
+                try:
+                    if not esp32_garra or not esp32_garra.connected:
+                        logger.info("ESP32 Garra não conectado. Tentando conectar...")
+                        if not connect_esp32_garra():
+                            logger.error("Falha ao conectar ESP32 Garra antes da execução da sequência")
+                            return jsonify({
+                                'success': False,
+                                'error': 'ESP32 Garra não conectado'
+                            }), 500
+                except Exception as e:
+                    logger.error(f"Erro ao verificar/conectar ESP32 Garra: {e}")
+                    return jsonify({
+                        'success': False,
+                        'error': f'Erro ao conectar ESP32 Garra: {str(e)}'
+                    }), 500
+
+                # Executar a sequência
+                result = mission_control.executar_sequencia(filename)
+
+                if result:
+                    return jsonify({
+                        'success': True,
+                        'message': 'Sequência executada com sucesso',
+                        'filename': filename,
+                        'timestamp': datetime.now().isoformat()
+                    })
+                else:
+                    # Tentar informar um erro mais útil
+                    return jsonify({
+                        'success': False,
+                        'error': 'Falha ao executar sequência. Verifique se o arquivo existe no agv-raspberry e se a garra está conectada.',
+                        'filename': filename,
+                        'timestamp': datetime.now().isoformat()
+                    })
+
+            except Exception as e:
+                logger.error(f"Erro ao executar sequência {filename}: {e}")
+                return jsonify({
+                    'success': False,
+                    'error': str(e)
+                }), 500
+
         @self.app.route('/camera', methods=['GET'])
         def get_camera_status():
             """Retorna status da câmera"""
@@ -301,7 +359,12 @@ class RaspberryAPI:
             from esp32_control import ESP32Controller
 
             # Criar controlador com porta específica
-            esp32 = ESP32Controller(port=get_esp32_port())
+            esp32 = ESP32Controller(
+                port=get_esp32_motor_port(),
+                baudrate=get_esp32_motor_baudrate(),
+                timeout=get_esp32_motor_timeout(),
+                name="ESP32 Motor API"
+            )
 
             # Conectar ao ESP32
             logger.info("Conectando ao ESP32...")

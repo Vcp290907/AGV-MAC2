@@ -32,8 +32,8 @@ void setup() {
   motorGiroGarra.setMinMaxConstraint(0, 180);
   motorUm.setMinMaxConstraint(15, 165);
   motorDois.setMinMaxConstraint(15, 165);
-  motorGarra.setMinMaxConstraint(30, 73);
-  motorTres.setMinMaxConstraint(0, 180);
+  motorGarra.setMinMaxConstraint(0, 180);
+  motorTres.setMinMaxConstraint(30, 110);
 
   motorGiroGarra.setEasingType(EASE_CUBIC_IN_OUT);
   motorUm.setEasingType(EASE_QUARTIC_IN_OUT);

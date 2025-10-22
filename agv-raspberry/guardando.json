@@ -1,0 +1,142 @@
+[
+  {
+    "angles": {
+      "giro": 23,
+      "um": 51,
+      "dois": 136,
+      "garra": 129,
+      "servo3": 58
+    },
+    "pause_ms": 1000
+  },
+  {
+    "angles": {
+      "giro": 23,
+      "um": 58,
+      "dois": 136,
+      "garra": 129,
+      "servo3": 58
+    },
+    "pause_ms": 1000
+  },
+  {
+    "angles": {
+      "giro": 23,
+      "um": 61,
+      "dois": 136,
+      "garra": 129,
+      "servo3": 58
+    },
+    "pause_ms": 1000
+  },
+  {
+    "angles": {
+      "giro": 23,
+      "um": 61,
+      "dois": 149,
+      "garra": 129,
+      "servo3": 58
+    },
+    "pause_ms": 1000
+  },
+  {
+    "angles": {
+      "giro": 23,
+      "um": 81,
+      "dois": 149,
+      "garra": 129,
+      "servo3": 58
+    },
+    "pause_ms": 1000
+  },
+  {
+    "angles": {
+      "giro": 132,
+      "um": 81,
+      "dois": 149,
+      "garra": 129,
+      "servo3": 58
+    },
+    "pause_ms": 1000
+  },
+  {
+    "angles": {
+      "giro": 132,
+      "um": 93,
+      "dois": 149,
+      "garra": 129,
+      "servo3": 58
+    },
+    "pause_ms": 1000
+  },
+  {
+    "angles": {
+      "giro": 132,
+      "um": 93,
+      "dois": 149,
+      "garra": 89,
+      "servo3": 58
+    },
+    "pause_ms": 1000
+  },
+  {
+    "angles": {
+      "giro": 132,
+      "um": 98,
+      "dois": 149,
+      "garra": 89,
+      "servo3": 58
+    },
+    "pause_ms": 1000
+  },
+  {
+    "angles": {
+      "giro": 132,
+      "um": 98,
+      "dois": 154,
+      "garra": 89,
+      "servo3": 58
+    },
+    "pause_ms": 1000
+  },
+  {
+    "angles": {
+      "giro": 132,
+      "um": 103,
+      "dois": 158,
+      "garra": 89,
+      "servo3": 58
+    },
+    "pause_ms": 1000
+  },
+  {
+    "angles": {
+      "giro": 132,
+      "um": 102,
+      "dois": 158,
+      "garra": 89,
+      "servo3": 58
+    },
+    "pause_ms": 1000
+  },
+  {
+    "angles": {
+      "giro": 132,
+      "um": 102,
+      "dois": 158,
+      "garra": 89,
+      "servo3": 26
+    },
+    "pause_ms": 1000
+  },
+  {
+    "angles": {
+      "giro": 132,
+      "um": 102,
+      "dois": 124,
+      "garra": 89,
+      "servo3": 35
+    },
+    "pause_ms": 1000
+  }
+]

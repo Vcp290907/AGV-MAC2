@@ -15,7 +15,7 @@ import time
 import json
 import math
 from datetime import datetime
-from config import get_esp32_port, get_esp32_baudrate
+from config import get_esp32_motor_port as get_esp32_port, get_esp32_motor_baudrate as get_esp32_baudrate
 
 class MPU6050Integration:
     """Integração MPU6050 para navegação do AGV"""

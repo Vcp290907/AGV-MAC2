@@ -4,9 +4,9 @@
 
 //ESP32 01 - Coisas de baixo
 
-#define MOTOR_LEFT_PIN 14
-#define MOTOR_RIGHT_PIN 15
-#define BUZZER_PIN 27
+#define MOTOR_LEFT_PIN 5
+#define MOTOR_RIGHT_PIN 6
+#define BUZZER_PIN 4
 
 ServoEasing servoEsquerdo;
 ServoEasing servoDireito;
@@ -14,7 +14,7 @@ ServoEasing servoDireito;
 const int LEFT_DIR = +1;
 const int RIGHT_DIR = -1;
 int STOP_TRIM_LEFT = 0;
-int STOP_TRIM_RIGHT = 0;
+int STOP_TRIM_RIGHT = 4;
 const int MIN_PULSE_US = 544;
 const int MAX_PULSE_US = 2400;
 int velocidade_esquerda = 0;

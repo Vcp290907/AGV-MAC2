@@ -44,6 +44,15 @@ for %%f in (%FILES_TO_SYNC%) do (
     )
 )
 
+REM Sincronizar também arquivos de sequência (*.json)
+echo 📤 Enviando sequências (*.json)...
+for %%f in (*.json) do (
+    if exist "%%f" (
+        echo   ↗️  %%f
+        scp "%%f" "%RASPBERRY_HOST%:%RASPBERRY_PATH%/"
+    )
+)
+
 REM Verificar se os arquivos foram atualizados
 echo 🔍 Verificando sincronização...
 ssh "%RASPBERRY_HOST%" "cd %RASPBERRY_PATH% && ls -la config.py esp32_control.py"

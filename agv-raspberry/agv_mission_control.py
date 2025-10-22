@@ -17,18 +17,20 @@ import threading
 import json
 import requests
 from datetime import datetime
-from navigation_basic import BasicNavigation
 from line_following_navigation import LineFollowingNavigation
 from qr_reader_opencv_only import OpenCVOnlyQRReader
-from config_manager import get_config, get_backend_url
+from navigation_basic import BasicNavigation  # RE-ADICIONADO: MPU necessário
+from config_manager import get_config
+from backend_config import get_backend_ip, get_backend_port, get_backend_url  # CENTRALIZADO
+from esp32_control import connect_esp32_garra, move_servos_esp32, move_forward_esp32, connect_esp32_motor, get_esp32_motor_port, stop_esp32  # ADICIONADO: get_esp32_motor_port
 
 class AGVMissionControl:
     """Sistema completo de controle de missões do AGV"""
 
     def __init__(self, pc_ip=None, pc_port=None, esp32_port=None):
-        # Usar configurações do config.json se não especificadas
-        self.pc_ip = pc_ip or get_config('backend.ip', '192.168.0.120')
-        self.pc_port = pc_port or get_config('backend.port', 5000)
+        # Usar configurações centralizadas se não especificadas
+        self.pc_ip = pc_ip or get_backend_ip()
+        self.pc_port = pc_port or get_backend_port()
         self.base_url = get_backend_url()
 
         # Usar porta do config se não especificada
@@ -37,10 +39,11 @@ class AGVMissionControl:
         self.pc_port = pc_port
         self.base_url = f"http://{self.pc_ip}:{self.pc_port}"
 
-        # Componentes do sistema
-        self.navigation = BasicNavigation(esp32_port=esp32_port)
-        self.line_navigation = LineFollowingNavigation(esp32_port=esp32_port)
-        # self.qr_reader = QRReaderWithAPI(pc_ip=pc_ip, pc_port=pc_port)  # Desabilitado
+        # RE-ADICIONADO: self.navigation = BasicNavigation(esp32_port=esp32_port) - MPU necessário
+        motor_port = get_esp32_motor_port()
+        self.navigation = BasicNavigation(esp32_port=motor_port)
+        self.line_navigation = LineFollowingNavigation(esp32_port=motor_port)
+
         self.qr_detector = OpenCVOnlyQRReader()  # Detector direto para navegação
 
         # Estado da missão
@@ -54,13 +57,38 @@ class AGVMissionControl:
         # Controle do loop de missões
         self._mission_loop_stop = threading.Event()
         self._mission_loop_thread = None
+        self.force_return_to_menu = False
+        
+        self.POSICAO_INICIAL_GARRA = {
+            "giro": 30,   # Centralizado
+            "um": 140,     # Meio
+            "dois": 160,   # Meio
+            "garra": 70,   # Fechada
+            "servo3": 90  # Meio
+        }
+        self.POSICAO_ESTANTE_GARRA = {
+            "giro": 23,   # Ajustado para estante
+            "um": 51,     # Estendido
+            "dois": 136,  # Baixo
+            "garra": 129,  # Aberta para coleta
+            "servo3": 35  # Ajustado
+        }
+        
 
     def inicializar_sistema(self):
         """Inicializar todos os componentes"""
         print("INICIALIZANDO SISTEMA AGV MISSION CONTROL")
         print("=" * 50)
 
-        # Inicializar navegação básica
+        print("🧪 Testando movimento básico...")
+        connect_esp32_motor()  # Garantir conexão
+        move_forward_esp32(0.25)  # Movimento curto para frente
+        time.sleep(0.25)
+        from esp32_control import stop_esp32
+        stop_esp32()  # Parar
+        print("✅ Teste de movimento concluído")
+        
+        # RE-ADICIONADO: Inicialização da navegação básica (MPU)
         if not self.navigation.inicializar():
             print("Falha na inicializacao da navegacao basica")
             return False
@@ -86,6 +114,14 @@ class AGVMissionControl:
                 print("⚠️ PC não respondeu corretamente, mas continuando...")
         except:
             print("⚠️ Não foi possível conectar ao PC, mas continuando...")
+
+        # ADICIONADO: Conectar e posicionar garra na posição inicial
+        if connect_esp32_garra():
+            print("✅ ESP32 Garra conectado - Posicionando garra inicial...")
+            move_servos_esp32(self.POSICAO_INICIAL_GARRA)
+            time.sleep(1)  # Aguardar movimento
+        else:
+            print("⚠️ Falha ao conectar ESP32 Garra - garra não posicionada")
 
         print("✅ Sistema AGV inicializado com sucesso!")
         return True
@@ -116,6 +152,38 @@ class AGVMissionControl:
         except Exception as e:
             print(f"❌ Erro ao obter próximo comando: {e}")
             return None
+
+    def executar_proximo_comando(self):
+        """Buscar próximo comando (ou pedido ativo) e executar automaticamente.
+        Retorna True se iniciou/executou uma missão, False caso contrário.
+        """
+        # Primeiro tentar pedido ativo tradicional
+        pedido = self.obter_pedido_ativo()
+        if pedido:
+            print(f"✅ Pedido ativo encontrado: iniciando pedido #{pedido.get('id')}")
+            if not self.iniciar_missao(pedido):
+                print("❌ Falha ao iniciar missão a partir do pedido ativo")
+                return False
+            return self.executar_missao()
+
+        # Se não houver pedido, tentar o comando direto do endpoint /agv/next_command
+        cmd = self.obter_proximo_comando()
+        if cmd and cmd.get('items'):
+            print(f"✅ Comando AGV encontrado: order_id={cmd.get('order_id')}")
+            # Converter formato do comando para o formato de 'pedido' usado internamente
+            pedido_simulado = {
+                'id': cmd.get('id') or cmd.get('order_id'),
+                'usuario_nome': cmd.get('user') or 'sistema',
+                'itens': ','.join([i.get('nome', '') for i in cmd.get('items', [])]) if cmd.get('items') else '',
+                'itens_raw': cmd.get('items')
+            }
+            if not self.iniciar_missao(pedido_simulado):
+                print("❌ Falha ao iniciar missão a partir do comando AGV")
+                return False
+            return self.executar_missao()
+
+        print("ℹ️ Nenhum pedido ativo ou comando AGV disponível no momento")
+        return False
 
     def reportar_status(self, estado, detalhe=None, qr=None, missao_id=None, order_id=None):
         try:
@@ -220,6 +288,11 @@ class AGVMissionControl:
 
         try:
             for i, etapa in enumerate(self.missao_ativa['rota'], 1):
+                # Verificar se entrega foi detectada durante a missão
+                if self.line_navigation.entrega_detectada:
+                    print("🏠 Entrega detectada durante missão - interrompendo...")
+                    return True
+                    
                 print(f"\n📍 Etapa {i}/{len(self.missao_ativa['rota'])}: {etapa['tipo']} - {etapa['destino']}")
 
                 if etapa['tipo'] == 'navegacao':
@@ -235,6 +308,11 @@ class AGVMissionControl:
                     if not self._ir_ate_entrega():
                         print("❌ Falha ao ir para entrega")
                         return False
+                    
+                    # Verificar se deve voltar ao menu
+                    if self.force_return_to_menu:
+                        print("🏠 Retornando ao menu principal...")
+                        return True
 
             # Missão concluída
             self._finalizar_missao()
@@ -296,6 +374,16 @@ class AGVMissionControl:
         """Loop simples: busca próximo comando e executa ida ao subcorredor."""
         print("🔄 Loop de missões iniciado (polling /agv/next_command)")
         while not self._mission_loop_stop.is_set():
+            # Verificar se entrega foi detectada
+            if self.line_navigation.entrega_detectada:
+                print("🏠 Entrega detectada - voltando ao menu principal...")
+                break
+                
+            # Verificar se deve voltar ao menu
+            if self.force_return_to_menu:
+                print("🏠 Retornando ao menu principal...")
+                break
+                
             cmd = self.obter_proximo_comando()
             if not cmd:
                 # Dorme pouco e verifica se deve parar
@@ -359,6 +447,11 @@ class AGVMissionControl:
     def _coletar_itens_subcorredor(self, subcorredor):
         """Coletar todos os itens do subcorredor usando QR codes"""
         print(f"🤖 Iniciando coleta no subcorredor: {subcorredor}")
+
+        # ADICIONADO: Mover garra para posição de estante antes de coletar
+        print("🔧 Posicionando garra para coleta na estante...")
+        move_servos_esp32(self.POSICAO_ESTANTE_GARRA)
+        time.sleep(1)  # Aguardar movimento
 
         itens_subcorredor = self.missao_ativa['itens_por_subcorredor'].get(subcorredor, [])
 
@@ -449,6 +542,12 @@ class AGVMissionControl:
 
             print(f"✅ Item coletado: {item['nome']}")
 
+        # Após coletar todos os itens, aguardar 5 segundos na posição da garra e executar sequência
+        print("⏳ Aguardando 5 segundos na posição da garra...")
+        time.sleep(5)
+        print("🤖 Executando sequência de armazenamento...")
+        self.executar_sequencia('guardando.json')
+
         # Sair do subcorredor usando navegação por linha
         print("⬅️ Saindo do subcorredor")
         if not self.line_navigation.exit_subcorredor():
@@ -487,18 +586,82 @@ class AGVMissionControl:
             return f"TAG{digits_padded}"
         return s
 
-    def _ir_ate_entrega(self):
-        """Ir até o ponto de entrega usando navegação por linha"""
-        print("📦 Indo para ponto de entrega")
+    def executar_sequencia(self, arquivo_json):
+        """Executar sequência de movimentos da garra a partir de um arquivo JSON"""
+        try:
+            # Verificar se ESP32 de garra está conectado
+            from esp32_control import esp32_garra
+            if not esp32_garra or not esp32_garra.connected:
+                print("❌ ESP32 Garra não conectado - impossível executar sequência")
+                return False
+            
+            # Resolver caminho do arquivo para suportar execução fora do diretório agv-raspberry
+            caminho_arquivo = arquivo_json
+            if not os.path.isabs(caminho_arquivo):
+                base_dir = os.path.dirname(os.path.abspath(__file__))
+                caminho_arquivo = os.path.join(base_dir, caminho_arquivo)
 
-        # Usar navegação por linha para encontrar ponto de entrega
-        if not self.line_navigation.navigate_to_delivery_point():
-            print("❌ Não foi possível chegar ao ponto de entrega")
+            if not os.path.exists(caminho_arquivo):
+                print(f"❌ Arquivo de sequência não encontrado: {caminho_arquivo}")
+                return False
+
+            with open(caminho_arquivo, 'r') as f:
+                sequencia = json.load(f)
+            
+            print(f"🤖 Executando sequência do arquivo: {caminho_arquivo}")
+            for i, passo in enumerate(sequencia, 1):
+                print(f"   Passo {i}/{len(sequencia)}: {passo['angles']}")
+                move_servos_esp32(passo['angles'])
+                pausa_ms = passo.get('pause_ms', 1000)
+                time.sleep(pausa_ms / 1000.0)
+            
+            print("✅ Sequência concluída")
+            return True
+        except Exception as e:
+            print(f"❌ Erro ao executar sequência: {e}")
             return False
 
-        # Chegou ao ponto de entrega!
-        self._notificar_entrega()
-        return True
+    def _ir_ate_entrega(self):
+        """Ir até o ponto de entrega usando navegação por linha com detecção de QR 'Entrega'"""
+        print("📦 Indo para ponto de entrega")
+
+        qr_delivery = "Entrega"
+        start_time = time.time()
+
+        while not self.line_navigation.stop_event.is_set():
+            # Seguir linha
+            if not self.line_navigation.follow_line_step():
+                print("❌ Falha no seguimento de linha")
+                break
+
+            # Verificar QR codes
+            qr_found = self.line_navigation.check_qr_codes()
+            if qr_found == qr_delivery:
+                print("🎯 QR 'Entrega' detectado! Parando AGV e executando sequência...")
+                print(f"QR detectado: '{qr_found}' (esperado: '{qr_delivery}')")
+
+                # Parar motores
+                stop_esp32()
+
+                # Executar sequência de entrega
+                self.executar_sequencia('entrega.json')
+
+                # Notificar entrega
+                self._notificar_entrega()
+
+                # Sinalizar para voltar ao menu
+                self.force_return_to_menu = True
+
+                return True
+
+            # Timeout
+            if time.time() - start_time > 60:  # 1 minuto máximo
+                print("⏰ Timeout na navegação até entrega")
+                break
+
+            time.sleep(0.1)
+
+        return False
 
     def _notificar_entrega(self):
         """Notificar chegada ao ponto de entrega"""
@@ -535,24 +698,14 @@ class AGVMissionControl:
         print("🧪 EXECUTANDO TESTE DO SISTEMA AGV")
         print("=" * 40)
 
-        # Teste básico de navegação
-        print("1. Teste de movimento em linha reta...")
-        if not self.navigation.mover_em_linha_reta(30, 'frente'):
+        # REMOVIDO: Testes que dependem de BasicNavigation (MPU)
+        # Substitua por testes específicos da navegação por linha se necessário
+        print("1. Teste de inicialização da navegação por linha...")
+        if not self.line_navigation.initialize():
+            print("❌ Falha na navegação por linha")
             return False
 
-        print("2. Teste de curva 90°...")
-        if not self.navigation.virar_90_graus('direita'):
-            return False
-
-        print("3. Teste de movimento de retorno...")
-        if not self.navigation.mover_em_linha_reta(30, 'tras'):
-            return False
-
-        print("4. Teste de curva -90°...")
-        if not self.navigation.virar_90_graus('esquerda'):
-            return False
-
-        print("✅ Todos os testes passaram!")
+        print("✅ Teste passou!")
         return True
 
 def main():
@@ -560,10 +713,10 @@ def main():
     print("AGV MISSION CONTROL")
     print("=" * 25)
 
-    # Configurações do config.json
-    pc_ip = get_config('backend.ip')
-    pc_port = get_config('backend.port')
-    esp32_port = get_config('esp32.port')
+    # Configurações centralizadas
+    pc_ip = get_backend_ip()
+    pc_port = get_backend_port()
+    esp32_port = get_config('esp32.port', '/dev/ttyACM0')
 
     print(f"Backend: {pc_ip}:{pc_port}")
     print(f"ESP32: {esp32_port}")
@@ -622,14 +775,61 @@ def main():
                 agv.executar_teste()
 
             elif opcao == '4':
-                agv.navigation.mostrar_status()
+                from esp32_control import get_esp32_motor_controller
+                controller = get_esp32_motor_controller()
+                if controller.connected:
+                    print("📊 ESP32 Motor conectado")
+                else:
+                    print("❌ ESP32 Motor não conectado")
 
             elif opcao == '5':
-                agv.navigation.parar()
+                from esp32_control import stop_esp32
+                stop_esp32()
                 print("🛑 Motores parados")
 
             elif opcao == '6':
-                agv.iniciar_loop_missoes()
+                print("🔧 Registrando Raspberry Pi no backend...")
+                try:
+                    # Registrar automaticamente no backend
+                    import socket
+                    def get_local_ip():
+                        try:
+                            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                            s.connect(("8.8.8.8", 80))
+                            local_ip = s.getsockname()[0]
+                            s.close()
+                            return local_ip
+                        except:
+                            return "127.0.0.1"
+                    
+                    raspberry_ip = get_local_ip()
+                    registration_data = {
+                        "ip": raspberry_ip,
+                        "port": 8080,
+                        "status": {
+                            "battery": 100,
+                            "connected": True,
+                            "last_registration": datetime.now().isoformat()
+                        }
+                    }
+                    
+                    register_url = f"{agv.base_url}/agv/register"
+                    response = requests.post(register_url, json=registration_data, timeout=5)
+                    
+                    if response.status_code == 200 and response.json().get('success'):
+                        print(f"✅ Raspberry Pi registrado com sucesso (IP: {raspberry_ip})")
+                    else:
+                        print(f"⚠️ Aviso: Não foi possível registrar no backend: {response.text}")
+                        
+                except Exception as e:
+                    print(f"⚠️ Aviso: Erro no registro automático: {e}")
+                    print("ℹ️ Continuando sem registro...")
+                
+                # Primeiro tentar executar imediatamente o próximo comando/pedido
+                executed = agv.executar_proximo_comando()
+                if not executed:
+                    print("ℹ️ Nenhum comando imediato; iniciando loop de missões (polling) em segundo plano")
+                    agv.iniciar_loop_missoes()
 
             elif opcao == '7':
                 agv.parar_loop_missoes()

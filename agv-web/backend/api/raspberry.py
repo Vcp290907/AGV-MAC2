@@ -446,8 +446,19 @@ def send_motor_command(direction, duration):
                 'error': 'Nenhum Raspberry Pi conectado'
             }), 400
 
-        # Pegar o primeiro Raspberry Pi conectado (pode ser expandido para múltiplos)
-        raspberry_id = list(connected_raspberries.keys())[0]
+        # Pegar o Raspberry Pi que não seja o próprio backend (sempre o AGV real)
+        backend_ip = "192.168.0.134"  # IP do backend/PC
+        raspberry_id = None
+        for rid, rdata in connected_raspberries.items():
+            if rdata['ip'] != backend_ip:
+                raspberry_id = rid
+                break
+        
+        if not raspberry_id:
+            return jsonify({
+                'success': False,
+                'error': 'Nenhum Raspberry Pi AGV encontrado (apenas backend registrado)'
+            }), 400
         raspberry_data = connected_raspberries[raspberry_id]
 
         # Preparar comando de movimento
@@ -467,7 +478,7 @@ def send_motor_command(direction, duration):
         endpoint = "/move_forward" if direction == "forward" else "/move_backward"
 
         try:
-            response = requests.post(f"{raspberry_url}{endpoint}", timeout=10)
+            response = requests.post(f"{raspberry_url}{endpoint}", timeout=30)  # Aumentado para 30s para comandos de movimento
             raspberry_response = response.json()
 
             if response.status_code == 200 and raspberry_response.get('success'):
@@ -507,6 +518,88 @@ def send_motor_command(direction, duration):
 
     except Exception as e:
         logger.error(f"Erro ao enviar comando de movimento: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@raspberry_bp.route('/agv/execute_sequence/<filename>', methods=['POST'])
+def execute_sequence(filename):
+    """Executa uma sequência de movimentos do AGV"""
+    try:
+        # Encontrar Raspberry Pi conectado
+        if not connected_raspberries:
+            return jsonify({
+                'success': False,
+                'error': 'Nenhum Raspberry Pi conectado'
+            }), 400
+
+        # Pegar o Raspberry Pi que não seja o próprio backend (sempre o AGV real)
+        backend_ip = "192.168.0.134"  # IP do backend/PC
+        raspberry_id = None
+        for rid, rdata in connected_raspberries.items():
+            if rdata['ip'] != backend_ip:
+                raspberry_id = rid
+                break
+        
+        if not raspberry_id:
+            return jsonify({
+                'success': False,
+                'error': 'Nenhum Raspberry Pi AGV encontrado (apenas backend registrado)'
+            }), 400
+        
+        raspberry_data = connected_raspberries[raspberry_id]
+
+        # Preparar comando de execução de sequência
+        command_data = {
+            'type': 'execute_sequence',
+            'filename': filename,
+            'timestamp': datetime.now().isoformat()
+        }
+
+        logger.info(f"Enviando comando de execução de sequência para Raspberry Pi {raspberry_id}: {command_data}")
+
+        # Enviar comando para o Raspberry Pi via HTTP
+        import requests
+
+        raspberry_url = f"http://{raspberry_data['ip']}:{raspberry_data['port']}"
+        endpoint = f"/execute_sequence/{filename}"
+
+        try:
+            response = requests.post(f"{raspberry_url}{endpoint}", timeout=60)  # Aumentado para 60s para sequências longas
+            raspberry_response = response.json()
+
+            if response.status_code == 200 and raspberry_response.get('success'):
+                logger.info(f"Sequência executada com sucesso: {raspberry_response}")
+
+                # Broadcast via WebSocket
+                from app import socketio
+                socketio.emit('sequence_executed', {
+                    'filename': filename,
+                    'timestamp': datetime.now().isoformat()
+                })
+
+                return jsonify({
+                    'success': True,
+                    'message': f'Sequência {filename} executada com sucesso',
+                    'filename': filename
+                })
+            else:
+                logger.error(f"Erro na resposta do Raspberry Pi: {raspberry_response}")
+                return jsonify({
+                    'success': False,
+                    'error': raspberry_response.get('error', 'Erro desconhecido no Raspberry Pi')
+                }), 500
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Erro de conexão com Raspberry Pi: {e}")
+            return jsonify({
+                'success': False,
+                'error': f'Erro de conexão com Raspberry Pi: {str(e)}'
+            }), 500
+
+    except Exception as e:
+        logger.error(f"Erro ao executar sequência: {e}")
         return jsonify({
             'success': False,
             'error': str(e)

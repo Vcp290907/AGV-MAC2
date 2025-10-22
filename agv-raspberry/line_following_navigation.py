@@ -10,8 +10,10 @@ import threading
 import platform
 import numpy as np
 from line_detector import LineDetector
+# RE-ADICIONADO: from navigation_basic import BasicNavigation - MPU necessário
 from navigation_basic import BasicNavigation
-from config import get_esp32_port, NAVIGATION_CONFIG
+from esp32_control import move_forward_esp32, move_backward_esp32, stop_esp32
+from config import get_esp32_motor_port as get_esp32_port, NAVIGATION_CONFIG
 import cv2
 
 class LineFollowingNavigation:
@@ -22,6 +24,7 @@ class LineFollowingNavigation:
 
         # Componentes
         self.line_detector = LineDetector()  # Picamera2 não usa camera_id
+        # RE-ADICIONADO: self.basic_nav = BasicNavigation(esp32_port=self.esp32_port) - MPU necessário
         self.basic_nav = BasicNavigation(esp32_port=self.esp32_port)
         # QR detector removido - usaremos pyzbar diretamente no frame da linha
 
@@ -38,6 +41,8 @@ class LineFollowingNavigation:
         # Detecção de QR codes
         self.qr_detected_recently = False
         self.current_subcorredor = None  # Subcorredor atual detectado
+        self.ignore_green_until = 0.0  # Tempo até ignorar verde após QR correto
+        self.entrega_detectada = False  # Flag para indicar que entrega foi detectada
 
         # Feedback visual opcional
         self.visual_feedback = visual_feedback
@@ -1439,6 +1444,7 @@ class LineFollowingNavigation:
         last_cmd_time = 0.0
         cmd_interval = 0.25
         green_streak = 0
+        # Controle de ignorar verde após QR correto do subcorredor (usa variável de instância)
         # Mapear comando de giro conforme direção desejada e possível inversão
         try:
             inv_cfg = False
@@ -1465,6 +1471,16 @@ class LineFollowingNavigation:
             frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
             elapsed_turn = time.time() - t1
             green = {'detected': False}
+            current_time = time.time()
+            
+            # Verificar se deve ignorar verde (após QR correto do subcorredor)
+            should_ignore_green = (self.ignore_green_until > 0 and current_time < self.ignore_green_until)
+            if should_ignore_green:
+                remaining = self.ignore_green_until - current_time
+                print(f"⏳ Ignorando verde (após QR correto): {remaining:.1f}s restantes")
+                time.sleep(0.05)
+                continue
+            
             try:
                 y1 = self.line_detector.roi_y_start
                 y2 = y1 + self.line_detector.roi_height
@@ -1825,10 +1841,53 @@ class LineFollowingNavigation:
                             except Exception:
                                 pass
 
+                            # Verificar se é um QR especial "Entrega"
+                            print(f"🔍 Verificando QR: '{qr_content}' (tipo: {type(qr_content)})")
+                            if qr_content in ['Entrega', 'entrega']:
+                                print("🎯 QR 'Entrega' detectado! Avançando 2s e executando sequência...")
+                                
+                                # Avançar reto por 2 segundos para posicionamento
+                                if esp32_available:
+                                    print("🚗 Avançando reto por 2 segundos para posicionamento...")
+                                    self.basic_nav.mpu.enviar_comando('mover_frente', {'velocidade': 25})
+                                    time.sleep(2.0)
+                                    self.basic_nav.parar()
+                                    print("✅ Posicionamento concluído")
+                                
+                                # Executar sequência de entrega diretamente
+                                try:
+                                    import json
+                                    from esp32_control import move_servos_esp32
+                                    
+                                    with open('entrega.json', 'r') as f:
+                                        sequencia = json.load(f)
+                                    
+                                    print("🤖 Executando sequência de entrega...")
+                                    for i, passo in enumerate(sequencia, 1):
+                                        print(f"   Passo {i}/{len(sequencia)}: {passo['angles']}")
+                                        move_servos_esp32(passo['angles'])
+                                        pausa_ms = passo.get('pause_ms', 1000)
+                                        time.sleep(pausa_ms / 1000.0)
+                                    
+                                    print("✅ Sequência de entrega concluída")
+                                    print("🎉 Chegada ao ponto de entrega!")
+                                    
+                                    # Definir flag para parar tudo e voltar ao menu
+                                    self.entrega_detectada = True
+                                    
+                                except Exception as e:
+                                    print(f"❌ Erro ao executar sequência de entrega: {e}")
+                                
+                                # Retornar False para parar o seguimento de linha
+                                return False
+                            else:
+                                print(f"ℹ️ QR '{qr_content}' não é 'Entrega', continuando...")
+
                             # Verificar se é um QR code de subcorredor
                             if qr_content.startswith('Corredor') and '_' in qr_content:
                                 self.current_subcorredor = qr_content
-                                print(f"🏢 Subcorredor detectado via quadrado verde: {qr_content}")
+                                self.ignore_green_until = time.time() + 5.0  # Ignorar verde por 5 segundos
+                                print(f"🏢 Subcorredor detectado via quadrado verde: {qr_content} (ignorando verde por 5s)")
 
                             # Após ler QUALQUER QR code, avançar reto por alguns segundos para não interferir no seguimento da linha
                             try:
@@ -2015,8 +2074,10 @@ class LineFollowingNavigation:
                 qr_code = qr_codes[0].data.decode('utf-8')
                 print(f"📷 QR code detectado durante navegação: {qr_code}")
 
-                # Verificar se é um QR code de subcorredor
+                # Verificar se é um QR code de subcorredor ou especial (como "Entrega")
                 if qr_code.startswith('Corredor') and '_' in qr_code:
+                    return qr_code
+                elif qr_code in ['Entrega', 'entrega']:  # QRs especiais
                     return qr_code
 
             return None

@@ -10,7 +10,7 @@ import os
 import cv2
 from datetime import datetime
 from mpu6050_integration import MPU6050Integration
-from config import get_esp32_port, get_esp32_baudrate, NAVIGATION_CONFIG, HARDWARE_CONFIG
+from config import get_esp32_motor_port as get_esp32_port, get_esp32_motor_baudrate as get_esp32_baudrate, NAVIGATION_CONFIG, HARDWARE_CONFIG
 from line_detector import LineDetector, PICAMERA2_AVAILABLE
 
 class BasicNavigation:

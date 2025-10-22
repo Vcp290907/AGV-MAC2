@@ -49,7 +49,7 @@ export default function Controle({ usuario }) {
 
   const carregarItens = async () => {
     try {
-  const response = await fetch(`${API_BASE_URL}/itens`);
+      const response = await fetch(`${API_BASE_URL}/itens`);
       const data = await response.json();
       setItens(data);
       // Update available items after loading all items
@@ -61,7 +61,7 @@ export default function Controle({ usuario }) {
 
   const carregarDispositivos = async () => {
     try {
-  const response = await fetch(`${API_BASE_URL}/dispositivos/disponiveis`);
+      const response = await fetch(`${API_BASE_URL}/dispositivos/disponiveis`);
       const data = await response.json();
       setDispositivos(data);
     } catch (error) {
@@ -71,7 +71,7 @@ export default function Controle({ usuario }) {
 
   const carregarPedidosAtivos = async () => {
     try {
-  const response = await fetch(`${API_BASE_URL}/pedidos?status=pendente,em_andamento,coletando`);
+      const response = await fetch(`${API_BASE_URL}/pedidos?status=pendente,em_andamento,coletando`);
       const data = await response.json();
       setPedidosAtivos(data);
 
@@ -111,7 +111,7 @@ export default function Controle({ usuario }) {
     }
 
     try {
-  const response = await fetch(`${API_BASE_URL}/itens/pesquisar?q=${pesquisa}`);
+      const response = await fetch(`${API_BASE_URL}/itens/pesquisar?q=${pesquisa}`);
       const data = await response.json();
       // Filter search results to only show available items
       const itensFiltrados = data.filter(item => {
@@ -207,6 +207,29 @@ export default function Controle({ usuario }) {
     return texts[status] || status;
   };
 
+  const executarPegandoCartao = async () => {
+    if (motorLoading) return;
+
+    setMotorLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/agv/execute_sequence/pegandoCartao.json`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        alert('Sequência pegandoCartao.json executada com sucesso!');
+      } else {
+        alert('Erro ao executar sequência: ' + (data.error || 'Erro desconhecido'));
+      }
+    } catch (error) {
+      alert('Erro de conexão: ' + error.message);
+    } finally {
+      setMotorLoading(false);
+    }
+  };
+
   const moverParaFrente = async () => {
     if (motorLoading) return;
 
@@ -258,7 +281,7 @@ export default function Controle({ usuario }) {
       {/* Controles superiores */}
       <div className="flex gap-4">
         <div className="min-w-0 flex-shrink-0">
-          <select 
+          <select
             value={dispositivoSelecionado}
             onChange={(e) => setDispositivoSelecionado(e.target.value)}
             className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
@@ -271,7 +294,7 @@ export default function Controle({ usuario }) {
             ))}
           </select>
         </div>
-        
+
         <div className="flex gap-2 flex-1">
           <input
             type="text"
@@ -315,8 +338,8 @@ export default function Controle({ usuario }) {
           >
             <div className="w-16 h-16 bg-gray-200 dark:bg-gray-600 rounded-lg mx-auto mb-2 flex items-center justify-center">
               {item.imagem ? (
-                <img 
-                  src={`${API_BASE_URL}/static/images/${item.imagem}`} 
+                <img
+                  src={`${API_BASE_URL}/static/images/${item.imagem}`}
                   alt={item.nome}
                   className="w-full h-full object-cover rounded-lg"
                 />
@@ -333,7 +356,7 @@ export default function Controle({ usuario }) {
       {/* Itens selecionados */}
       <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-6 bg-white dark:bg-gray-800">
         <h3 className="text-lg font-medium mb-4 text-gray-900 dark:text-white">Itens selecionados</h3>
-        
+
         {itensSelecionados.length === 0 ? (
           <p className="text-gray-500 dark:text-gray-400 text-center py-8">Nenhum item selecionado</p>
         ) : (
@@ -348,8 +371,8 @@ export default function Controle({ usuario }) {
                 </button>
                 <div className="w-16 h-16 bg-teal-500 rounded-lg mx-auto mb-2 flex items-center justify-center text-white">
                   {item.imagem ? (
-                    <img 
-                      src={`${API_BASE_URL}/static/images/${item.imagem}`} 
+                    <img
+                      src={`${API_BASE_URL}/static/images/${item.imagem}`}
                       alt={item.nome}
                       className="w-full h-full object-cover rounded-lg"
                     />
@@ -363,14 +386,14 @@ export default function Controle({ usuario }) {
             ))}
           </div>
         )}
-        
+
         <p className="text-red-500 text-center mb-4">
           Clique para retirar | Max 4 itens ({itensSelecionados.length}/4)
         </p>
       </div>
 
       {/* Botões de ação */}
-      <div className="flex justify-center gap-4">
+      <div className="flex justify-center gap-4 flex-wrap">
         <button
           onClick={() => {
             setItensSelecionados([]);
@@ -380,11 +403,19 @@ export default function Controle({ usuario }) {
         >
           Cancelar
         </button>
-        
+
         <button className="px-8 py-3 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors">
           Criar rotina
         </button>
-        
+
+        <button
+          onClick={executarPegandoCartao}
+          disabled={motorLoading}
+          className="px-8 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50 transition-colors"
+        >
+          {motorLoading ? 'Executando...' : 'Entregar Cartão'}
+        </button>
+
         <button
           onClick={enviarPedido}
           disabled={loading || itensSelecionados.length === 0 || !dispositivoSelecionado}

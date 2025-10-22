@@ -1,0 +1,42 @@
+[
+    {
+        "angles": {
+            "giro": 90,
+            "um": 90,
+            "dois": 90,
+            "garra": 90,
+            "servo3": 90
+        },
+        "pause_ms": 2000
+    },
+    {
+        "angles": {
+            "giro": 0,
+            "um": 0,
+            "dois": 180,
+            "garra": 0,
+            "servo3": 180
+        },
+        "pause_ms": 2000
+    },
+    {
+        "angles": {
+            "giro": 180,
+            "um": 180,
+            "dois": 0,
+            "garra": 180,
+            "servo3": 0
+        },
+        "pause_ms": 2000
+    },
+    {
+        "angles": {
+            "giro": 90,
+            "um": 90,
+            "dois": 90,
+            "garra": 90,
+            "servo3": 90
+        },
+        "pause_ms": 2000
+    }
+]

@@ -34,9 +34,15 @@ HARDWARE_CONFIG = {
             # 'analogue_gain': 2.0         # ganho analógico (exemplo, usar quando auto=False)
         }
     },
-    'esp32': {
+    'esp32_motor': {
         'enabled': True,
-        'port': '/dev/ttyACM0',  # Porta USB do ESP32 - ALTERE AQUI se necessário
+        'port': '/dev/ttyACM3',  # Porta USB do ESP32 de motores - ALTERE AQUI se necessário
+        'baudrate': 115200,
+        'timeout': 2
+    },
+    'esp32_garra': {
+        'enabled': True,
+        'port': '/dev/ttyACM2',  # Porta USB do ESP32 de garra - ALTERE AQUI se necessário
         'baudrate': 115200,
         'timeout': 2
     },
@@ -367,24 +373,40 @@ def update_config(section: str, key: str, value: Any):
         BATTERY_CONFIG[key] = value
 
 # Funções específicas para ESP32
-def get_esp32_config() -> Dict[str, Any]:
-    """Retorna configuração completa do ESP32"""
-    return HARDWARE_CONFIG['esp32'].copy()
+def get_esp32_motor_config() -> Dict[str, Any]:
+    """Retorna configuração completa do ESP32 de motores"""
+    return HARDWARE_CONFIG['esp32_motor'].copy()
 
-def get_esp32_port() -> str:
-    """Retorna apenas a porta do ESP32"""
-    return HARDWARE_CONFIG['esp32'].get('port', '/dev/ttyACM0')
+def get_esp32_garra_config() -> Dict[str, Any]:
+    """Retorna configuração completa do ESP32 de garra"""
+    return HARDWARE_CONFIG['esp32_garra'].copy()
 
-def get_esp32_baudrate() -> int:
-    """Retorna baudrate do ESP32"""
-    return HARDWARE_CONFIG['esp32'].get('baudrate', 115200)
+def get_esp32_motor_port() -> str:
+    """Retorna apenas a porta do ESP32 de motores"""
+    return HARDWARE_CONFIG['esp32_motor'].get('port', '/dev/ttyACM2')
 
-def get_esp32_timeout() -> float:
-    """Retorna timeout do ESP32"""
-    return HARDWARE_CONFIG['esp32'].get('timeout', 1)
+def get_esp32_motor_baudrate() -> int:
+    """Retorna baudrate do ESP32 de motores"""
+    return HARDWARE_CONFIG['esp32_motor'].get('baudrate', 115200)
 
-def auto_detect_esp32_port() -> str:
-    """Detecta automaticamente a porta do ESP32 e atualiza o config"""
+def get_esp32_motor_timeout() -> float:
+    """Retorna timeout do ESP32 de motores"""
+    return HARDWARE_CONFIG['esp32_motor'].get('timeout', 1)
+
+def get_esp32_garra_port() -> str:
+    """Retorna apenas a porta do ESP32 de garra"""
+    return HARDWARE_CONFIG['esp32_garra'].get('port', '/dev/ttyACM3')
+
+def get_esp32_garra_baudrate() -> int:
+    """Retorna baudrate do ESP32 de garra"""
+    return HARDWARE_CONFIG['esp32_garra'].get('baudrate', 115200)
+
+def get_esp32_garra_timeout() -> float:
+    """Retorna timeout do ESP32 de garra"""
+    return HARDWARE_CONFIG['esp32_garra'].get('timeout', 1)
+
+def auto_detect_esp32_motor_port() -> str:
+    """Detecta automaticamente a porta do ESP32 de motores e atualiza o config"""
     import serial.tools.list_ports
     import serial
     
@@ -394,36 +416,72 @@ def auto_detect_esp32_port() -> str:
     for port in usb_ports:
         try:
             ser = serial.Serial(port, 115200, timeout=1)
-            ser.write(b'{"comando": "ping"}\n')
+            ser.write(b'{"comando": "status"}\n')  # MUDADO: de "ping" para "status"
             response = ser.readline().decode().strip()
             ser.close()
             
-            if response and '"status": "ok"' in response:
+            if response and '"status"' in response:  # MUDADO: verifica se contém "status"
                 # Atualizar config
-                HARDWARE_CONFIG['esp32']['port'] = port
-                print(f"✅ Porta ESP32 detectada e atualizada: {port}")
+                HARDWARE_CONFIG['esp32_motor']['port'] = port
+                print(f"✅ Porta ESP32 Motor detectada e atualizada: {port}")
                 return port
-        except:
-            pass
+        except Exception as e:
+            print(f"Erro ao testar porta {port}: {e}")
     
-    print("❌ ESP32 não encontrado automaticamente")
-    return HARDWARE_CONFIG['esp32']['port']
+    print("❌ ESP32 Motor não encontrado automaticamente")
+    return HARDWARE_CONFIG['esp32_motor']['port']
+
+def auto_detect_esp32_garra_port() -> str:
+    """Detecta automaticamente a porta do ESP32 de garra e atualiza o config"""
+    import serial.tools.list_ports
+    import serial
+    
+    ports = serial.tools.list_ports.comports()
+    usb_ports = [p.device for p in ports if 'USB' in p.device or 'ACM' in p.device]
+    
+    for port in usb_ports:
+        try:
+            ser = serial.Serial(port, 115200, timeout=1)
+            ser.write(b'{"comando": "status"}\n')  # MUDADO: de "ping" para "status"
+            response = ser.readline().decode().strip()
+            ser.close()
+            
+            if response and '"status"' in response:  # MUDADO: verifica se contém "status"
+                # Atualizar config
+                HARDWARE_CONFIG['esp32_garra']['port'] = port
+                print(f"✅ Porta ESP32 Garra detectada e atualizada: {port}")
+                return port
+        except Exception as e:
+            print(f"Erro ao testar porta {port}: {e}")
+    
+    print("❌ ESP32 Garra não encontrado automaticamente")
+    return HARDWARE_CONFIG['esp32_garra']['port']
 
 if __name__ == "__main__":
     # Script para testar e atualizar configuração
     print("🔧 Teste de Configuração AGV")
     print("=" * 40)
     
-    print(f"📡 Porta ESP32 atual: {get_esp32_port()}")
+    print(f"📡 Porta ESP32 Motor atual: {get_esp32_motor_port()}")
+    print(f"📡 Porta ESP32 Garra atual: {get_esp32_garra_port()}")
     
     # Tentar detectar automaticamente
-    detected_port = auto_detect_esp32_port()
-    if detected_port != get_esp32_port():
-        print(f"✅ Porta atualizada para: {detected_port}")
-    else:
-        print("ℹ️  Porta já está correta")
+    detected_motor = auto_detect_esp32_motor_port()
+    detected_garra = auto_detect_esp32_garra_port()
     
-    print(f"🔧 Configuração final: {get_esp32_config()}")
+    if detected_motor != get_esp32_motor_port():
+        print(f"✅ Porta Motor atualizada para: {detected_motor}")
+    else:
+        print("ℹ️  Porta Motor já está correta")
+    
+    if detected_garra != get_esp32_garra_port():
+        print(f"✅ Porta Garra atualizada para: {detected_garra}")
+    else:
+        print("ℹ️  Porta Garra já está correta")
+    
+    print(f"🔧 Configuração Motor: {get_esp32_motor_config()}")
+    print(f"🔧 Configuração Garra: {get_esp32_garra_config()}")
+
 
 def save_config_to_file(filepath: str = '/home/pi/agv_config.json'):
     """Salva configurações em arquivo"""
