@@ -2,7 +2,12 @@
 #include "ServoEasing.hpp"
 #include <ArduinoJson.h>
 
-//ESP32 01 - Coisas de baixo
+// ESP32 01 - Coisas de baixo
+
+// ============ IDENTIFICAÇÃO PARA DESCOBERTA AUTOMÁTICA ============
+const char *ESP32_TYPE = "ESP32_MOTOR";
+const char *ESP32_VERSION = "1.0";
+// =================================================================
 
 #define MOTOR_LEFT_PIN 5
 #define MOTOR_RIGHT_PIN 6
@@ -23,7 +28,8 @@ int velocidade_direita = 0;
 String comando_recebido = "";
 bool comando_completo = false;
 
-void setup() {
+void setup()
+{
   Serial.begin(115200);
   pinMode(BUZZER_PIN, OUTPUT);
 
@@ -37,15 +43,25 @@ void setup() {
   pararMotores();
 
   beepBuzzer();
-  Serial.println("{\"status\": \"ESP32 Rodas inicializado\"}");
+
+  // Mensagem de inicialização com identificação
+  DynamicJsonDocument initMsg(256);
+  initMsg["type"] = ESP32_TYPE;
+  initMsg["version"] = ESP32_VERSION;
+  initMsg["status"] = "ready";
+  initMsg["message"] = "ESP32 Rodas inicializado";
+  serializeJson(initMsg, Serial);
+  Serial.println();
 }
 
-void beepBuzzer() {
+void beepBuzzer()
+{
   const int freq = 4000;
   const int dur_ms = 200;
   int halfPeriodUs = 1000000 / (freq * 2);
   unsigned long end = millis() + dur_ms;
-  while (millis() < end) {
+  while (millis() < end)
+  {
     digitalWrite(BUZZER_PIN, HIGH);
     delayMicroseconds(halfPeriodUs);
     digitalWrite(BUZZER_PIN, LOW);
@@ -54,79 +70,133 @@ void beepBuzzer() {
   Serial.println("OK");
 }
 
-void loop() {
+void loop()
+{
   processarComandosSeriais();
   servoEsquerdo.update();
   servoDireito.update();
   delay(10);
 }
 
-void processarComandosSeriais() {
-  while (Serial.available()) {
+void processarComandosSeriais()
+{
+  while (Serial.available())
+  {
     char ch = (char)Serial.read();
-    if (ch == '\n' || ch == '\r' || ch == '}') {
-      if (ch == '}') comando_recebido += '}';
-      if (comando_recebido.length() > 0) comando_completo = true;
-    } else {
+    if (ch == '\n' || ch == '\r' || ch == '}')
+    {
+      if (ch == '}')
+        comando_recebido += '}';
+      if (comando_recebido.length() > 0)
+        comando_completo = true;
+    }
+    else
+    {
       comando_recebido += ch;
-      if (comando_recebido.length() > 512) {
+      if (comando_recebido.length() > 512)
+      {
         Serial.println("ERR: line too long");
         comando_recebido = "";
       }
     }
   }
 
-  if (comando_completo) {
-    String linha = comando_recebido; linha.trim();
-    if (linha.startsWith("{")) processarComando(linha);
-    else processarComandoTexto(linha);
+  if (comando_completo)
+  {
+    String linha = comando_recebido;
+    linha.trim();
+    if (linha.startsWith("{"))
+      processarComando(linha);
+    else
+      processarComandoTexto(linha);
     comando_recebido = "";
     comando_completo = false;
   }
 }
 
-void processarComando(String comando) {
+void processarComando(String comando)
+{
   DynamicJsonDocument doc(1024);
   DeserializationError error = deserializeJson(doc, comando);
-  if (error) {
+  if (error)
+  {
     Serial.println("{\"erro\": \"JSON inválido\"}");
     return;
   }
 
   String tipo_comando = doc["comando"];
 
-  if (tipo_comando == "mover_frente" || tipo_comando == "mover_tras" || tipo_comando == "virar_esquerda" || tipo_comando == "virar_direita" || tipo_comando == "parar") {
+  // ============ COMANDOS DE IDENTIFICAÇÃO ============
+  if (tipo_comando == "identify" || tipo_comando == "whoami" || tipo_comando == "id")
+  {
+    DynamicJsonDocument response(256);
+    response["type"] = ESP32_TYPE;
+    response["version"] = ESP32_VERSION;
+    response["status"] = "online";
+    response["capabilities"] = "motor,buzzer,movement";
+    serializeJson(response, Serial);
+    Serial.println();
+    return;
+  }
+
+  if (tipo_comando == "mover_frente" || tipo_comando == "mover_tras" || tipo_comando == "virar_esquerda" || tipo_comando == "virar_direita" || tipo_comando == "parar")
+  {
     // Processa comandos de movimento localmente
-    if (tipo_comando == "mover_frente") {
+    if (tipo_comando == "mover_frente")
+    {
       int velocidade = doc["velocidade"] | 50;
       moverFrente(velocidade);
-    } else if (tipo_comando == "mover_tras") {
+    }
+    else if (tipo_comando == "mover_tras")
+    {
       int velocidade = doc["velocidade"] | 50;
       moverTras(velocidade);
-    } else if (tipo_comando == "virar_esquerda") {
+    }
+    else if (tipo_comando == "virar_esquerda")
+    {
       int velocidade = doc["velocidade"] | 25;
       virarEsquerda(velocidade);
-    } else if (tipo_comando == "virar_direita") {
+    }
+    else if (tipo_comando == "virar_direita")
+    {
       int velocidade = doc["velocidade"] | 25;
       virarDireita(velocidade);
-    } else if (tipo_comando == "parar") {
+    }
+    else if (tipo_comando == "parar")
+    {
       pararMotores();
     }
-  } else if (tipo_comando == "beep" || tipo_comando == "status") {
-    if (tipo_comando == "beep") beepBuzzer();
-    else if (tipo_comando == "status") Serial.println("{\"status\": \"rodas online\"}");
-  } else {
+  }
+  else if (tipo_comando == "beep" || tipo_comando == "status")
+  {
+    if (tipo_comando == "beep")
+      beepBuzzer();
+    else if (tipo_comando == "status")
+    {
+      DynamicJsonDocument response(256);
+      response["type"] = ESP32_TYPE;
+      response["status"] = "ok";
+      response["motor"] = "ready";
+      response["message"] = "rodas online";
+      serializeJson(response, Serial);
+      Serial.println();
+    }
+  }
+  else
+  {
     Serial.println("{\"erro\": \"Comando desconhecido para rodas\"}");
   }
 }
 
-void processarComandoTexto(String cmd) {
+void processarComandoTexto(String cmd)
+{
   // Apenas comandos de movimento, ignore outros
   Serial.println("ERR: comando texto não suportado para rodas");
 }
 
 // Funções de movimento (iguais ao original)
-void moverFrente(int velocidade) {
+void moverFrente(int velocidade)
+{
   int s = constrain(velocidade, 0, 100);
   velocidade_esquerda = LEFT_DIR * s;
   velocidade_direita = RIGHT_DIR * s;
@@ -138,7 +208,8 @@ void moverFrente(int velocidade) {
   Serial.println();
 }
 
-void moverTras(int velocidade) {
+void moverTras(int velocidade)
+{
   int s = constrain(velocidade, 0, 100);
   velocidade_esquerda = LEFT_DIR * -s;
   velocidade_direita = RIGHT_DIR * -s;
@@ -150,7 +221,8 @@ void moverTras(int velocidade) {
   Serial.println();
 }
 
-void virarEsquerda(int velocidade) {
+void virarEsquerda(int velocidade)
+{
   int s = constrain(velocidade, 0, 100);
   velocidade_esquerda = LEFT_DIR * -s;
   velocidade_direita = RIGHT_DIR * +s;
@@ -162,7 +234,8 @@ void virarEsquerda(int velocidade) {
   Serial.println();
 }
 
-void virarDireita(int velocidade) {
+void virarDireita(int velocidade)
+{
   int s = constrain(velocidade, 0, 100);
   velocidade_esquerda = LEFT_DIR * +s;
   velocidade_direita = RIGHT_DIR * -s;
@@ -174,14 +247,16 @@ void virarDireita(int velocidade) {
   Serial.println();
 }
 
-void pararMotores() {
+void pararMotores()
+{
   velocidade_esquerda = 0;
   velocidade_direita = 0;
   aplicarVelocidadeMotores();
   Serial.println("{\"status\": \"success\"}");
 }
 
-void aplicarVelocidadeMotores() {
+void aplicarVelocidadeMotores()
+{
   servoEsquerdo.startEaseTo(velocidade_esquerda + STOP_TRIM_LEFT);
   servoDireito.startEaseTo(velocidade_direita + STOP_TRIM_RIGHT);
   Serial.printf("{\"motores\": {\"esquerdo\": %d, \"direito\": %d}}\n", velocidade_esquerda, velocidade_direita);

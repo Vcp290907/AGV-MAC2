@@ -2,7 +2,12 @@
 #include "ServoEasing.hpp"
 #include <ArduinoJson.h>
 
-//ESP32 02 - Coisas de cima
+// ESP32 02 - Coisas de cima
+
+// ============ IDENTIFICAÇÃO PARA DESCOBERTA AUTOMÁTICA ============
+const char *ESP32_TYPE = "ESP32_GARRA";
+const char *ESP32_VERSION = "1.0";
+// =================================================================
 
 #define PIN_SERVO_GIRO_GARRA 9
 #define PIN_SERVO_SERVO_UM 8
@@ -19,9 +24,11 @@ ServoEasing motorTres;
 String comando_recebido = "";
 bool comando_completo = false;
 
-void setup() {
+void setup()
+{
   Serial.begin(115200);
-  while (!Serial) delay(10);
+  while (!Serial)
+    delay(10);
 
   motorGarra.attach(PIN_SERVO_GARRA);
   motorDois.attach(PIN_SERVO_SERVO_DOIS);
@@ -47,11 +54,19 @@ void setup() {
   motorGarra.setSpeed(80);
   motorTres.setSpeed(60);
 
-  Serial.println("{\"status\": \"ESP32 Garra inicializado\"}");
+  // Mensagem de inicialização com identificação
+  DynamicJsonDocument initMsg(256);
+  initMsg["type"] = ESP32_TYPE;
+  initMsg["version"] = ESP32_VERSION;
+  initMsg["status"] = "ready";
+  initMsg["message"] = "ESP32 Garra inicializado";
+  serializeJson(initMsg, Serial);
+  Serial.println();
   ligarGarra();
 }
 
-void ligarGarra() {
+void ligarGarra()
+{
   motorGarra.easeTo(35);
   delay(300);
   motorTres.easeTo(90);
@@ -63,7 +78,8 @@ void ligarGarra() {
   delay(300);
 }
 
-void loop() {
+void loop()
+{
   processarComandosSeriais();
   motorGiroGarra.update();
   motorUm.update();
@@ -73,80 +89,135 @@ void loop() {
   delay(10);
 }
 
-void processarComandosSeriais() {
-  while (Serial.available()) {
+void processarComandosSeriais()
+{
+  while (Serial.available())
+  {
     char ch = (char)Serial.read();
-    if (ch == '\n' || ch == '\r' || ch == '}') {
-      if (ch == '}') comando_recebido += '}';
-      if (comando_recebido.length() > 0) comando_completo = true;
-    } else {
+    if (ch == '\n' || ch == '\r' || ch == '}')
+    {
+      if (ch == '}')
+        comando_recebido += '}';
+      if (comando_recebido.length() > 0)
+        comando_completo = true;
+    }
+    else
+    {
       comando_recebido += ch;
-      if (comando_recebido.length() > 512) {
+      if (comando_recebido.length() > 512)
+      {
         Serial.println("ERR: line too long");
         comando_recebido = "";
       }
     }
   }
 
-  if (comando_completo) {
-    String linha = comando_recebido; linha.trim();
-    if (linha.startsWith("{")) processarComando(linha);
-    else processarComandoTexto(linha);
+  if (comando_completo)
+  {
+    String linha = comando_recebido;
+    linha.trim();
+    if (linha.startsWith("{"))
+      processarComando(linha);
+    else
+      processarComandoTexto(linha);
     comando_recebido = "";
     comando_completo = false;
   }
 }
 
-void processarComando(String comando) {
+void processarComando(String comando)
+{
   DynamicJsonDocument doc(1024);
   DeserializationError error = deserializeJson(doc, comando);
-  if (error) {
+  if (error)
+  {
     Serial.println("{\"erro\": \"JSON inválido\"}");
     return;
   }
 
   String tipo_comando = doc["comando"];
 
-  if (tipo_comando == "move_servos") {
+  // ============ COMANDOS DE IDENTIFICAÇÃO ============
+  if (tipo_comando == "identify" || tipo_comando == "whoami" || tipo_comando == "id")
+  {
+    DynamicJsonDocument response(256);
+    response["type"] = ESP32_TYPE;
+    response["version"] = ESP32_VERSION;
+    response["status"] = "online";
+    response["capabilities"] = "gripper,servos";
+    serializeJson(response, Serial);
+    Serial.println();
+    return;
+  }
+
+  if (tipo_comando == "move_servos")
+  {
     int a = -1, b = -1, c = -1, d = -1, e = -1000;
-    if (doc.containsKey("a") && doc.containsKey("b") && doc.containsKey("c") && doc.containsKey("d")) {
+    if (doc.containsKey("a") && doc.containsKey("b") && doc.containsKey("c") && doc.containsKey("d"))
+    {
       a = doc["a"];
       b = doc["b"];
       c = doc["c"];
       d = doc["d"];
-      if (doc.containsKey("e")) e = doc["e"];
+      if (doc.containsKey("e"))
+        e = doc["e"];
     }
-    if (a >= 0) motorGiroGarra.easeTo(a);
-    if (b >= 0) motorUm.easeTo(b);
-    if (c >= 0) motorDois.easeTo(c);
-    if (d >= 0) motorGarra.easeTo(d);
-    if (e != -1000) motorTres.easeTo(e);
+    if (a >= 0)
+      motorGiroGarra.easeTo(a);
+    if (b >= 0)
+      motorUm.easeTo(b);
+    if (c >= 0)
+      motorDois.easeTo(c);
+    if (d >= 0)
+      motorGarra.easeTo(d);
+    if (e != -1000)
+      motorTres.easeTo(e);
     Serial.println("{\"status\": \"success\"}");
-  } else if (tipo_comando == "beep") {
+  }
+  else if (tipo_comando == "beep")
+  {
     Serial.println("{\"status\": \"beep not available\"}");
-  } else if (tipo_comando == "status") {
-    Serial.println("{\"status\": \"garra online\"}");
-  } else {
+  }
+  else if (tipo_comando == "status")
+  {
+    DynamicJsonDocument response(256);
+    response["type"] = ESP32_TYPE;
+    response["status"] = "ok";
+    response["servos"] = "ready";
+    response["message"] = "garra online";
+    serializeJson(response, Serial);
+    Serial.println();
+  }
+  else
+  {
     Serial.println("{\"erro\": \"Comando desconhecido\"}");
   }
 }
 
-void processarComandoTexto(String cmd) {
+void processarComandoTexto(String cmd)
+{
   cmd.trim();
-  if (cmd.startsWith("MOVE ")) {
+  if (cmd.startsWith("MOVE "))
+  {
     int a, b, c, d, e = 0;
     int parsed = sscanf(cmd.c_str(), "MOVE %d %d %d %d %d", &a, &b, &c, &d, &e);
-    if (parsed >= 4) {
+    if (parsed >= 4)
+    {
       motorGiroGarra.easeTo(a);
       motorUm.easeTo(b);
       motorDois.easeTo(c);
       motorGarra.easeTo(d);
-      if (parsed == 5) motorTres.easeTo(e);
+      if (parsed == 5)
+        motorTres.easeTo(e);
       Serial.println("OK");
-    } else {
+    }
+    else
+    {
       Serial.println("ERR: formato MOVE inválido");
     }
-  } else {
+  }
+  else
+  {
     Serial.println("ERR: comando desconhecido");
   }
 }

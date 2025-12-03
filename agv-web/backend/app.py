@@ -12,6 +12,7 @@ from api.dispositivos import dispositivos_bp
 from api.armazem import armazem_bp
 from api.raspberry import raspberry_bp
 from database import init_db, get_db_connection
+from backend_announcer import start_announcer, stop_announcer
 
 app = Flask(__name__)
 CORS(app)
@@ -129,5 +130,25 @@ def start_status_broadcast():
 # Start the status broadcast thread when the app starts
 start_status_broadcast()
 
+# Start backend announcer for auto-discovery
+backend_announcer = None
+
+def start_backend_announcer(port=5000):
+    """Inicia o servidor de descoberta automática"""
+    global backend_announcer
+    try:
+        backend_announcer = start_announcer(backend_port=port)
+        print("✅ Backend Announcer iniciado com sucesso")
+    except Exception as e:
+        print(f"⚠️ Falha ao iniciar Backend Announcer: {e}")
+
+# Iniciar announcer
+start_backend_announcer(port=5000)
+
 if __name__ == "__main__":
-    socketio.run(app, host="0.0.0.0", port=5000, debug=True)
+    try:
+        socketio.run(app, host="0.0.0.0", port=5000, debug=True)
+    finally:
+        # Parar announcer ao fechar
+        if backend_announcer:
+            stop_announcer()

@@ -38,7 +38,7 @@ class LineDetector:
     def __init__(self, width=None, height=None, camera_index=None):
         # Ler resolução do config se não fornecida
         try:
-            cfg_res = HARDWARE_CONFIG.get('camera', {}).get('resolution', (720, 1024))
+            cfg_res = HARDWARE_CONFIG.get('camera', {}).get('resolution', (720, 720))
         except Exception:
             cfg_res = (720, 1024)
         self.width = width or int(cfg_res[0])

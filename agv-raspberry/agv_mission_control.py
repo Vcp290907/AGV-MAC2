@@ -610,8 +610,16 @@ class AGVMissionControl:
             
             print(f"🤖 Executando sequência do arquivo: {caminho_arquivo}")
             for i, passo in enumerate(sequencia, 1):
-                print(f"   Passo {i}/{len(sequencia)}: {passo['angles']}")
-                move_servos_esp32(passo['angles'])
+                angles = passo['angles']
+                # Mostrar comando completo que será enviado ao firmware
+                cmd = {"comando": "move_servos"}
+                if "giro" in angles: cmd["a"] = angles["giro"]
+                if "um" in angles: cmd["b"] = angles["um"]
+                if "dois" in angles: cmd["c"] = angles["dois"]
+                if "garra" in angles: cmd["d"] = angles["garra"]
+                if "servo3" in angles: cmd["e"] = angles["servo3"]
+                print(f"   Passo {i}/{len(sequencia)}: {cmd}")
+                move_servos_esp32(angles)
                 pausa_ms = passo.get('pause_ms', 1000)
                 time.sleep(pausa_ms / 1000.0)
             

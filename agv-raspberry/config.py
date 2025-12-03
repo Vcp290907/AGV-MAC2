@@ -36,13 +36,13 @@ HARDWARE_CONFIG = {
     },
     'esp32_motor': {
         'enabled': True,
-        'port': '/dev/ttyACM3',  # Porta USB do ESP32 de motores - ALTERE AQUI se necessário
+        'port': None,  # None = descoberta automática | ou especifique: '/dev/ttyACM0'
         'baudrate': 115200,
         'timeout': 2
     },
     'esp32_garra': {
         'enabled': True,
-        'port': '/dev/ttyACM2',  # Porta USB do ESP32 de garra - ALTERE AQUI se necessário
+        'port': None,  # None = descoberta automática | ou especifique: '/dev/ttyACM1'
         'baudrate': 115200,
         'timeout': 2
     },

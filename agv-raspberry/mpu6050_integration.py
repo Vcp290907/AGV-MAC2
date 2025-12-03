@@ -17,6 +17,14 @@ import math
 from datetime import datetime
 from config import get_esp32_motor_port as get_esp32_port, get_esp32_motor_baudrate as get_esp32_baudrate
 
+# 🔧 NOVO: Usar controlador centralizado do esp32_control.py
+try:
+    from esp32_control import get_esp32_motor_controller
+    HAVE_ESP32_CONTROL = True
+except ImportError:
+    HAVE_ESP32_CONTROL = False
+    print("⚠️ esp32_control não disponível - usando conexão legada")
+
 class MPU6050Integration:
     """Integração MPU6050 para navegação do AGV"""
 
@@ -25,6 +33,9 @@ class MPU6050Integration:
         self.baudrate = baudrate or get_esp32_baudrate()
         self.serial_conn = None
         self.calibrado = False
+        
+        # 🔧 NOVO: Referência ao controlador centralizado
+        self.esp32_controller = None
 
         # Dados do sensor
         self.aceleracao = {'x': 0, 'y': 0, 'z': 0}
@@ -45,12 +56,33 @@ class MPU6050Integration:
         self.dt = 0.1     # Intervalo de tempo (0.1s entre leituras)
 
     def conectar_esp32(self):
-        """Conectar ao ESP32 via serial"""
+        """Conectar ao ESP32 via serial - usando controlador centralizado"""
         try:
+            # 🔧 PRIORIDADE: Usar controlador centralizado com descoberta automática
+            if HAVE_ESP32_CONTROL:
+                print("🔌 Usando controlador ESP32 centralizado com descoberta automática...")
+                self.esp32_controller = get_esp32_motor_controller()
+                
+                # Se já estiver conectado, usar a conexão existente
+                if self.esp32_controller.connected and self.esp32_controller.serial_connection:
+                    self.serial_conn = self.esp32_controller.serial_connection
+                    print(f"✅ Usando conexão ESP32 existente: {self.esp32_controller.port}")
+                    return True
+                
+                # Caso contrário, conectar
+                if self.esp32_controller.connect():
+                    self.serial_conn = self.esp32_controller.serial_connection
+                    print(f"✅ ESP32 Motor conectado via controlador: {self.esp32_controller.port}")
+                    return True
+                else:
+                    print("❌ Falha ao conectar via controlador centralizado, tentando método legado...")
+            
+            # Fallback: método legado
             if not HAVE_PYSERIAL:
                 print("pyserial nao disponivel - simulando conexao ESP32")
                 self.serial_conn = None  # Simulação
                 return True
+                
             self.serial_conn = serial.Serial(
                 self.esp32_port,
                 self.baudrate,
@@ -71,6 +103,26 @@ class MPU6050Integration:
             if not HAVE_PYSERIAL or self.serial_conn is None:
                 print(f"(simulacao) comando enviado: {comando}")
                 return '{"status": "ok"}'
+
+            # 🔧 Verificar se a porta está aberta
+            if hasattr(self.serial_conn, 'is_open') and not self.serial_conn.is_open:
+                print(f"⚠️ Porta serial fechada, tentando reconectar...")
+                if self.esp32_controller:
+                    # Reconectar via controlador
+                    if self.esp32_controller.connect():
+                        self.serial_conn = self.esp32_controller.serial_connection
+                        print(f"✅ Reconectado com sucesso")
+                    else:
+                        print(f"❌ Falha ao reconectar")
+                        return None
+                else:
+                    # Tentar reabrir porta legada
+                    try:
+                        self.serial_conn.open()
+                        print(f"✅ Porta reaberta com sucesso")
+                    except Exception as e:
+                        print(f"❌ Erro ao reabrir porta: {e}")
+                        return None
 
             # Limpar buffer de entrada
             if self.serial_conn:

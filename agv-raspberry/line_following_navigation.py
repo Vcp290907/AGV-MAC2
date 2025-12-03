@@ -772,7 +772,9 @@ class LineFollowingNavigation:
                    cv2.FONT_HERSHEY_SIMPLEX, 1.5, color, 3)
 
     def _detect_green_square(self, frame):
-        """Detectar quadrado verde no frame (método configurável: HSV ou norm_rgb)."""
+        """Detectar quadrado verde no frame (método configurável: HSV ou norm_rgb).
+        APENAS aceita quadrados nos 25% inferiores da imagem (altura).
+        """
         try:
             from config import NAVIGATION_CONFIG as _NC
         except Exception:
@@ -786,6 +788,10 @@ class LineFollowingNavigation:
         extent_min = float(gcfg.get('extent_min', 0.45))
         debug = bool(gcfg.get('debug', False))
 
+        # 🎯 NOVA RESTRIÇÃO: Apenas aceitar verde nos 25% inferiores
+        frame_height = frame.shape[0]
+        min_y_threshold = int(frame_height * 0.05)  # 60% da altura = 40% de baixo
+        
         mask = None
         candidates = []
         vis_dbg = None
@@ -853,6 +859,12 @@ class LineFollowingNavigation:
                 x, y, w, h = cv2.boundingRect(contour)
                 if w < min_size or h < min_size:
                     continue
+                
+                # 🎯 VERIFICAÇÃO DE POSIÇÃO VERTICAL: só aceita se estiver nos 40% de baixo
+                if y < min_y_threshold:
+                    print(f"🚫 Quadrado verde rejeitado - muito alto (y={y}, limite={min_y_threshold}, altura total={frame_height})")
+                    continue
+                
                 peri = cv2.arcLength(contour, True)
                 approx = cv2.approxPolyDP(contour, 0.04 * peri, True)
                 vertices = len(approx)
@@ -861,6 +873,7 @@ class LineFollowingNavigation:
                 candidates.append({'bbox': (x, y, w, h), 'area': area, 'vertices': vertices,
                                    'aspect': aspect_ratio, 'extent': extent})
                 if 4 <= vertices <= 8 and aspect_min <= aspect_ratio <= aspect_max and extent >= extent_min:
+                    print(f"✅ Quadrado verde ACEITO nos 40% inferiores (y={y}/{frame_height}, posição={((y/frame_height)*100):.1f}%)")
                     return {
                         'detected': True,
                         'bbox': (x, y, w, h),
@@ -1864,8 +1877,16 @@ class LineFollowingNavigation:
                                     
                                     print("🤖 Executando sequência de entrega...")
                                     for i, passo in enumerate(sequencia, 1):
-                                        print(f"   Passo {i}/{len(sequencia)}: {passo['angles']}")
-                                        move_servos_esp32(passo['angles'])
+                                        angles = passo['angles']
+                                        # Mostrar comando completo que será enviado ao firmware
+                                        cmd = {"comando": "move_servos"}
+                                        if "giro" in angles: cmd["a"] = angles["giro"]
+                                        if "um" in angles: cmd["b"] = angles["um"]
+                                        if "dois" in angles: cmd["c"] = angles["dois"]
+                                        if "garra" in angles: cmd["d"] = angles["garra"]
+                                        if "servo3" in angles: cmd["e"] = angles["servo3"]
+                                        print(f"   Passo {i}/{len(sequencia)}: {cmd}")
+                                        move_servos_esp32(angles)
                                         pausa_ms = passo.get('pause_ms', 1000)
                                         time.sleep(pausa_ms / 1000.0)
                                     

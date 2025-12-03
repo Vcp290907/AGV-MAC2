@@ -2,12 +2,14 @@
 """
 Módulo de Controle dos ESP32 - Motores e Garra
 Gerencia comunicação serial com dois ESP32: um para motores/buzzer, outro para garra
+Com descoberta automática de portas
 """
 import serial
 import serial.tools.list_ports
 import json
 import time
 import logging
+import os
 from typing import Optional, Dict, Any
 from config import (
     get_esp32_motor_port, get_esp32_motor_baudrate, get_esp32_motor_timeout,
@@ -15,6 +17,9 @@ from config import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Flag para habilitar/desabilitar descoberta automática
+AUTO_DISCOVERY_ENABLED = True
 
 class ESP32Controller:
     """Controlador para comunicação com um ESP32 via serial"""
@@ -29,32 +34,95 @@ class ESP32Controller:
         logger.info(f"{self.name} Controller inicializado - Porta: {self.port}, Baudrate: {self.baudrate}")
 
     def _auto_detect_port(self) -> Optional[str]:
-        """Tenta detectar automaticamente a porta do ESP32"""
+        """Tenta detectar automaticamente a porta do ESP32 usando sistema de descoberta"""
+        if not AUTO_DISCOVERY_ENABLED:
+            logger.info(f"ℹ️ Descoberta automática desabilitada para {self.name}")
+            return None
+        
         logger.info(f"🔍 Procurando {self.name} automaticamente...")
+        
+        # Tentar usar sistema de descoberta avançado
+        try:
+            from esp32_discovery import ESP32Discovery, load_discovered_ports
+            
+            # Primeiro tentar carregar configuração salva
+            cached_ports = load_discovered_ports()
+            
+            device_type = 'motor' if 'Motor' in self.name else 'garra'
+            cached_port = cached_ports.get(device_type)
+            
+            if cached_port and self._test_port(cached_port):
+                logger.info(f"✅ {self.name} encontrado no cache: {cached_port}")
+                return cached_port
+            
+            # Se cache falhou, fazer nova descoberta
+            logger.info(f"🔍 Cache inválido, iniciando nova descoberta...")
+            discovery = ESP32Discovery(baudrate=self.baudrate, timeout=self.timeout)
+            discovered_ports = discovery.discover_all()
+            
+            # Salvar para uso futuro
+            discovery.save_to_config()
+            
+            new_port = discovered_ports.get(device_type)
+            if new_port:
+                logger.info(f"✅ {self.name} encontrado: {new_port}")
+                return new_port
+            
+        except ImportError:
+            logger.warning("⚠️ Módulo esp32_discovery não disponível, usando método simples")
+        except Exception as e:
+            logger.warning(f"⚠️ Erro na descoberta avançada: {e}, usando método simples")
+        
+        # Fallback: método simples original
+        logger.info(f"🔍 Testando portas USB disponíveis...")
         ports = serial.tools.list_ports.comports()
         usb_ports = [port.device for port in ports if 'USB' in port.device or 'ACM' in port.device]
+        logger.info(f"📋 Portas USB encontradas: {usb_ports}")
+        
         for port in usb_ports:
+            logger.info(f"🔍 Testando {port}...")
             if self._test_port(port):
                 logger.info(f"✅ {self.name} encontrado na porta {port}")
                 return port
+        
+        logger.info(f"🔍 Testando portas comuns...")
         common_ports = ['/dev/ttyACM0', '/dev/ttyACM1', '/dev/ttyACM2', '/dev/ttyUSB0', '/dev/ttyUSB1']
         for port in common_ports:
+            logger.info(f"🔍 Testando {port}...")
             if self._test_port(port):
                 logger.info(f"✅ {self.name} encontrado na porta {port}")
                 return port
+        
         logger.warning(f"❌ {self.name} não encontrado automaticamente")
         return None
 
     def _test_port(self, port: str) -> bool:
-        """Testa se uma porta específica tem o ESP32"""
+        """Testa se uma porta específica tem o ESP32 correto (verifica tipo)"""
         try:
             with serial.Serial(port, self.baudrate, timeout=self.timeout) as ser:
-                ser.write(b'{"comando":"status"}\n')  # MUDADO: de "ping" para "status"
-                time.sleep(0.5)
-                response = self.serial_connection.readline().decode('utf-8').strip()
-                if response and ('status' in response or 'OK' in response):  # MUDADO: verifica "status" ou "OK"
-                    return True
-        except (serial.SerialException, OSError):
+                time.sleep(0.2)  # Aguardar estabilização
+                ser.write(b'{"comando":"identify"}\n')
+                time.sleep(0.3)
+                response = ser.readline().decode('utf-8').strip()
+                
+                # Verificar se é o tipo correto de ESP32
+                if 'Motor' in self.name:
+                    # Procurando ESP32 Motor
+                    if response and 'ESP32_MOTOR' in response:
+                        logger.debug(f"✅ ESP32_MOTOR encontrado em {port}")
+                        return True
+                else:
+                    # Procurando ESP32 Garra
+                    if response and 'ESP32_GARRA' in response:
+                        logger.debug(f"✅ ESP32_GARRA encontrado em {port}")
+                        return True
+                
+                # Log de tipo incorreto
+                if response:
+                    logger.debug(f"❌ Porta {port} tem ESP32 errado: {response[:50]}")
+                    
+        except (serial.SerialException, OSError) as e:
+            logger.debug(f"❌ Erro ao testar porta {port}: {e}")
             pass
         return False
 
@@ -105,6 +173,18 @@ class ESP32Controller:
         if not self.connected or not self.serial_connection:
             logger.error(f"❌ {self.name} não conectado")
             return None
+        
+        # Verificar se a porta ainda está aberta
+        if not self.serial_connection.is_open:
+            logger.warning(f"⚠️ Porta {self.port} fechada, tentando reconectar...")
+            try:
+                self.serial_connection.open()
+                logger.info(f"✅ Porta {self.port} reaberta com sucesso")
+            except Exception as e:
+                logger.error(f"❌ Erro ao reabrir porta: {e}")
+                self.connected = False
+                return None
+        
         try:
             cmd_str = json.dumps(command) + '\n'
             self.serial_connection.write(cmd_str.encode('utf-8'))
@@ -262,6 +342,57 @@ def executar_sequencia_garra(steps: list, repeats: int = 1) -> Dict[str, Any]:
 def get_status_garra() -> Dict[str, Any]:
     """Obtém status do ESP32 de garra"""
     return get_esp32_garra_controller().get_status()
+
+def rediscover_esp32_ports() -> Dict[str, Optional[str]]:
+    """
+    Força uma nova descoberta das portas dos ESP32
+    Útil quando os dispositivos são reconectados
+    """
+    try:
+        from esp32_discovery import ESP32Discovery
+        
+        logger.info("🔄 Forçando redescobrimento dos ESP32...")
+        discovery = ESP32Discovery()
+        ports = discovery.discover_all()
+        
+        # Atualizar portas nos controladores globais
+        if ports['motor']:
+            esp32_motor.port = ports['motor']
+            esp32_motor.connected = False
+            logger.info(f"📌 ESP32 Motor atualizado para: {ports['motor']}")
+        
+        if ports['garra']:
+            esp32_garra.port = ports['garra']
+            esp32_garra.connected = False
+            logger.info(f"📌 ESP32 Garra atualizado para: {ports['garra']}")
+        
+        # Salvar configuração
+        discovery.save_to_config()
+        
+        return ports
+    
+    except Exception as e:
+        logger.error(f"❌ Erro ao redescobrir portas: {e}")
+        return {'motor': None, 'garra': None}
+
+def get_esp32_motor_port() -> Optional[str]:
+    """Retorna a porta do ESP32 Motor (com cache)"""
+    if esp32_motor.port:
+        return esp32_motor.port
+    
+    # Tentar descobrir
+    try:
+        from esp32_discovery import load_discovered_ports
+        ports = load_discovered_ports()
+        return ports.get('motor')
+    except:
+        return None
+
+def enable_auto_discovery(enabled: bool = True):
+    """Habilita/desabilita descoberta automática"""
+    global AUTO_DISCOVERY_ENABLED
+    AUTO_DISCOVERY_ENABLED = enabled
+    logger.info(f"🔧 Descoberta automática: {'✅ Habilitada' if enabled else '❌ Desabilitada'}")
 
 if __name__ == "__main__":
     # Teste do módulo
