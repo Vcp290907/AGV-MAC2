@@ -60,18 +60,18 @@ class AGVMissionControl:
         self.force_return_to_menu = False
         
         self.POSICAO_INICIAL_GARRA = {
-            "giro": 30,   # Centralizado
-            "um": 140,     # Meio
-            "dois": 160,   # Meio
-            "garra": 70,   # Fechada
+            "giro": 41,   # Centralizado
+            "um": 86,     # Meio
+            "dois": 125,   # Meio
+            "garra": 85,   # Fechada
             "servo3": 90  # Meio
         }
         self.POSICAO_ESTANTE_GARRA = {
-            "giro": 23,   # Ajustado para estante
-            "um": 51,     # Estendido
-            "dois": 136,  # Baixo
-            "garra": 129,  # Aberta para coleta
-            "servo3": 35  # Ajustado
+            "giro": 41,   # Centralizado
+            "um": 86,     # Meio
+            "dois": 125,   # Meio
+            "garra": 85,   # Fechada
+            "servo3": 90  # Meio
         }
         
 
@@ -645,9 +645,14 @@ class AGVMissionControl:
             # Verificar QR codes
             qr_found = self.line_navigation.check_qr_codes()
             if qr_found == qr_delivery:
-                print("🎯 QR 'Entrega' detectado! Parando AGV e executando sequência...")
+                print("🎯 QR 'Entrega' detectado! Avançando mais 2 segundos...")
                 print(f"QR detectado: '{qr_found}' (esperado: '{qr_delivery}')")
 
+                # Avançar mais 2 segundos
+                print("⏩ Avançando por 2 segundos...")
+                move_forward_esp32(2.0)
+                time.sleep(2.0)
+                
                 # Parar motores
                 stop_esp32()
 
